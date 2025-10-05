@@ -266,15 +266,6 @@ export default function Community() {
                               >
                                 @{user.username}
                               </Typography>
-                              {user.bio && (
-                                <Typography
-                                  variant="body2"
-                                  color="text.secondary"
-                                  sx={{ display: "block" }}
-                                >
-                                  {user.bio}
-                                </Typography>
-                              )}
                             </Box>
                           }
                           primaryTypographyProps={{ fontWeight: 600 }}

@@ -569,14 +569,24 @@ app.get("/api/community/search", requireAuth, async (req, res) => {
     const pool = await getPool();
     const likeTerm = `%${escapeForLike(rawQuery)}%`;
     const [rows] = await pool.query(
-      `SELECT username, displayName, bio, profilePic FROM User
+      `SELECT username, displayName, profilePic FROM User
        WHERE username LIKE ? OR displayName LIKE ?
        ORDER BY username
        LIMIT 10`,
       [likeTerm, likeTerm]
     );
     const results = rows
-      .map((row) => normalizePublicUser(row))
+      .map((row) => {
+        const displayName =
+          typeof row.displayName === "string" && row.displayName.trim()
+            ? row.displayName.trim()
+            : null;
+        return {
+          username: row.username,
+          displayName,
+          profilePicUrl: buildProfilePicPublicPath(row.profilePic),
+        };
+      })
       .filter((value) => value !== null);
     res.json(results);
   } catch (error) {

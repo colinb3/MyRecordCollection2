@@ -100,7 +100,6 @@ export interface ProfileHighlights {
 export interface CommunityUserSummary {
   username: string;
   displayName: string | null;
-  bio: string | null;
   profilePicUrl: string | null;
 }
 

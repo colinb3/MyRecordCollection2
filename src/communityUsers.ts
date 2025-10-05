@@ -40,15 +40,10 @@ function normalizeUserSummary(raw: AnyObject): CommunityUserSummary {
     typeof raw.displayName === "string" && raw.displayName.trim()
       ? raw.displayName
       : null;
-  const bio =
-    typeof raw.bio === "string" && raw.bio.trim().length > 0
-      ? raw.bio.trim()
-      : null;
   const profilePicUrl = normalizeProfilePicUrl(raw.profilePicUrl);
   return {
     username,
     displayName,
-    bio,
     profilePicUrl,
   };
 }
