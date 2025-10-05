@@ -48,6 +48,21 @@ export async function loadUserInfo(
       const displayName =
         typeof data.displayName === "string" ? data.displayName : null;
       const userUuid = typeof data.userUuid === "string" ? data.userUuid : "";
+      const rawBio = typeof data.bio === "string" ? data.bio : "";
+      const bio = rawBio.trim().length > 0 ? rawBio : null;
+      const rawProfilePic =
+        typeof data.profilePicUrl === "string" ? data.profilePicUrl.trim() : "";
+      let profilePicUrl: string | null = null;
+      if (rawProfilePic) {
+        if (rawProfilePic.startsWith("http://") || rawProfilePic.startsWith("https://")) {
+          profilePicUrl = rawProfilePic;
+        } else {
+          const normalizedPath = rawProfilePic.startsWith("/")
+            ? rawProfilePic
+            : `/${rawProfilePic}`;
+          profilePicUrl = apiUrl(normalizedPath);
+        }
+      }
       if (!username || !userUuid) {
         throw new Error("Invalid user info payload");
       }
@@ -55,6 +70,8 @@ export async function loadUserInfo(
         username,
         displayName,
         userUuid,
+        bio,
+        profilePicUrl,
       };
       cachedUserInfo = normalized;
       return { ...normalized };

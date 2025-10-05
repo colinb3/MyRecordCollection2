@@ -505,22 +505,24 @@ export default function CollectionSettings() {
   };
 
   return (
-    <Box display="flex" flexDirection="column" gap={3}>
+    <Box display="flex" flexDirection="column">
       <Box>
-        <Typography variant="h5" gutterBottom>
+        <Typography variant="h4" gutterBottom>
           Collection Settings
         </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Import your Discogs collection directly into{" "}
-          <strong>{DEFAULT_COLLECTION}</strong>. Choose your Discogs CSV export,
-          optionally enrich records with Wikipedia tags, and let the app add
-          everything in one go.
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Make your collection your own.
         </Typography>
       </Box>
 
       <Paper
         variant="outlined"
-        sx={{ p: 3, borderRadius: 2, backgroundColor: "background.paper" }}
+        sx={{
+          p: 3,
+          mb: 2,
+          borderRadius: 2,
+          backgroundColor: "background.paper",
+        }}
       >
         <Stack spacing={2}>
           <Box>
@@ -620,9 +622,25 @@ export default function CollectionSettings() {
 
       <Paper
         variant="outlined"
-        sx={{ p: 3, borderRadius: 2, backgroundColor: "background.paper" }}
+        sx={{
+          p: 3,
+          mb: 2,
+          borderRadius: 2,
+          backgroundColor: "background.paper",
+        }}
       >
         <Stack direction="column" spacing={2} alignItems="stretch">
+          <Box>
+            <Typography variant="h6" gutterBottom>
+              Import Discogs Collection
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Import your Discogs collection directly into{" "}
+              <strong>{DEFAULT_COLLECTION}</strong>. Choose your Discogs CSV
+              export, optionally enrich records with Wikipedia tags, and let the
+              app add everything in one go.
+            </Typography>
+          </Box>
           <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
             <Button
               variant="contained"
@@ -771,8 +789,6 @@ export default function CollectionSettings() {
           </Alert>
         )}
       </Paper>
-
-      <Divider />
 
       <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
         <Button

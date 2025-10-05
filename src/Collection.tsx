@@ -81,6 +81,9 @@ export default function Collection({ tableName, title }: CollectionProps) {
   const [displayName, setDisplayName] = useState<string>(
     cachedUserInfo?.displayName ?? ""
   );
+  const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
+    cachedUserInfo?.profilePicUrl ?? null
+  );
 
   const [selectedRecord, setSelectedRecord] = useState<Record | null>(null);
   // Track the last actual (persisted) selected record so we can restore after cancelling a create
@@ -232,6 +235,7 @@ export default function Collection({ tableName, title }: CollectionProps) {
       }
       setUsername(info.username);
       setDisplayName(info.displayName ?? "");
+      setProfilePicUrl(info.profilePicUrl ?? null);
       try {
         setUserId(info.userUuid);
       } catch {
@@ -471,6 +475,7 @@ export default function Collection({ tableName, title }: CollectionProps) {
             title={title ?? tableName}
             username={username}
             displayName={displayName}
+            profilePicUrl={profilePicUrl ?? undefined}
           />
         </Box>
 

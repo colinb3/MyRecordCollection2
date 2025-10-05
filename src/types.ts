@@ -88,6 +88,8 @@ export interface UserInfo {
   username: string;
   displayName: string | null;
   userUuid: string;
+  bio: string | null;
+  profilePicUrl: string | null;
 }
 
 export interface ProfileHighlights {

@@ -44,6 +44,9 @@ export default function FindRecord() {
   const [displayName, setDisplayName] = useState<string>(
     cachedUser?.displayName ?? ""
   );
+  const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
+    cachedUser?.profilePicUrl ?? null
+  );
   const [selectedAlbumId, setSelectedAlbumId] = useState<string | undefined>(
     undefined
   );
@@ -101,6 +104,7 @@ export default function FindRecord() {
 
       setUsername(info.username);
       setDisplayName(info.displayName ?? "");
+      setProfilePicUrl(info.profilePicUrl ?? null);
       try {
         setUserId(info.userUuid);
       } catch {
@@ -320,6 +324,7 @@ export default function FindRecord() {
           onLogout={handleLogout}
           username={username}
           displayName={displayName}
+          profilePicUrl={profilePicUrl ?? undefined}
           searchMode="submit"
           searchPlaceholder="Search All Albums (By Title)"
         />

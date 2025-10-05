@@ -44,6 +44,10 @@ export default function Settings() {
     cachedUser?.displayName ?? ""
   );
   const [userUuid, setUserUuid] = useState<string>(cachedUser?.userUuid ?? "");
+  const [bio, setBio] = useState<string>(cachedUser?.bio ?? "");
+  const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
+    cachedUser?.profilePicUrl ?? null
+  );
   const [selectedSection, setSelectedSection] = useState<string>(
     MENU_OPTIONS[0].id
   );
@@ -63,6 +67,8 @@ export default function Settings() {
       setUsername(info.username);
       setDisplayName(info.displayName ?? "");
       setUserUuid(info.userUuid);
+      setBio(info.bio ?? "");
+      setProfilePicUrl(info.profilePicUrl ?? null);
       try {
         setUserId(info.userUuid);
       } catch {
@@ -97,17 +103,25 @@ export default function Settings() {
           <ProfileSettings
             username={username}
             displayName={displayName}
+            bio={bio}
+            profilePicUrl={profilePicUrl}
             onProfileUpdated={({
               username: newUsername,
               displayName: newDisplayName,
+              bio: newBio,
+              profilePicUrl: newProfilePic,
             }) => {
               setUsername(newUsername);
               setDisplayName(newDisplayName);
+              setBio(newBio ?? "");
+              setProfilePicUrl(newProfilePic ?? null);
               const uuid = userUuid || cachedUser?.userUuid || "";
               if (uuid) {
                 setCachedUserInfo({
                   username: newUsername,
                   displayName: newDisplayName,
+                  bio: newBio ?? null,
+                  profilePicUrl: newProfilePic ?? null,
                   userUuid: uuid,
                 });
                 setUserUuid(uuid);
@@ -119,7 +133,15 @@ export default function Settings() {
       default:
         return <CollectionSettings />;
     }
-  }, [selectedSection, username, displayName]);
+  }, [
+    selectedSection,
+    username,
+    displayName,
+    bio,
+    profilePicUrl,
+    userUuid,
+    cachedUser,
+  ]);
 
   const menu = (
     <SettingsMenu
@@ -152,6 +174,7 @@ export default function Settings() {
           title="Settings"
           username={username}
           displayName={displayName}
+          profilePicUrl={profilePicUrl ?? undefined}
           searchBar={false}
         />
 

@@ -6,6 +6,8 @@ CREATE TABLE User (
     username VARCHAR(32) UNIQUE NOT NULL,
     displayName VARCHAR(50) NOT NULL,
     password VARCHAR(255) NOT NULL,
+    bio TINYTEXT DEFAULT NULL,
+    profilePic VARCHAR(255) DEFAULT NULL,
 );
 
 CREATE TABLE RecTable (

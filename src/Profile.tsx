@@ -37,11 +37,10 @@ const PREVIEW_LIMIT = 4;
 
 interface ProfileSectionProps {
   title: string;
-  action?: ReactNode;
   children: ReactNode;
 }
 
-function ProfileSection({ title, action, children }: ProfileSectionProps) {
+function ProfileSection({ title, children }: ProfileSectionProps) {
   return (
     <Paper
       sx={{
@@ -56,12 +55,11 @@ function ProfileSection({ title, action, children }: ProfileSectionProps) {
         sx={{
           display: "flex",
           alignItems: "center",
-          justifyContent: "space-between",
+          // header layout no longer needs space-between since there's no action button
           gap: 1,
         }}
       >
         <Typography variant="h6">{title}</Typography>
-        {action}
       </Box>
       {children}
     </Paper>
@@ -135,8 +133,12 @@ export default function Profile() {
   const [displayName, setDisplayName] = useState<string>(
     cachedUser?.displayName ?? ""
   );
-  const [favouriteRecords, setFavouriteRecords] = useState<Record[]>([]);
-  const [loadingFavourites, setLoadingFavourites] = useState<boolean>(true);
+  const [bio, setBio] = useState<string>(cachedUser?.bio ?? "");
+  const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
+    cachedUser?.profilePicUrl ?? null
+  );
+  const [highlightRecords, setHighlightRecords] = useState<Record[]>([]);
+  const [loadingHighlights, setLoadingHighlights] = useState<boolean>(true);
   const [recentRecords, setRecentRecords] = useState<Record[]>([]);
   const [loadingRecent, setLoadingRecent] = useState<boolean>(true);
 
@@ -152,6 +154,8 @@ export default function Profile() {
       }
       setUsername(info.username);
       setDisplayName(info.displayName ?? "");
+      setBio(info.bio ?? "");
+      setProfilePicUrl(info.profilePicUrl ?? null);
       try {
         setUserId(info.userUuid);
       } catch {
@@ -168,24 +172,24 @@ export default function Profile() {
     let cancelled = false;
 
     const loadRecords = async () => {
-      setLoadingFavourites(true);
+      setLoadingHighlights(true);
       try {
         const highlights = await loadProfileHighlights();
         if (cancelled) return;
 
         if (highlights && highlights.records.length > 0) {
-          setFavouriteRecords(highlights.records.slice(0, PREVIEW_LIMIT));
+          setHighlightRecords(highlights.records.slice(0, PREVIEW_LIMIT));
         } else {
-          setFavouriteRecords([]);
+          setHighlightRecords([]);
         }
       } catch (error) {
         if (!cancelled) {
           console.warn("Failed to load profile highlights", error);
-          setFavouriteRecords([]);
+          setHighlightRecords([]);
         }
       } finally {
         if (!cancelled) {
-          setLoadingFavourites(false);
+          setLoadingHighlights(false);
         }
       }
     };
@@ -225,15 +229,20 @@ export default function Profile() {
     };
   }, []);
 
-  const favouritePreviewRecords = useMemo(
-    () => favouriteRecords.slice(0, PREVIEW_LIMIT),
-    [favouriteRecords]
+  const highlightsPreviewRecords = useMemo(
+    () => highlightRecords.slice(0, PREVIEW_LIMIT),
+    [highlightRecords]
   );
 
   const recentPreviewRecords = useMemo(
     () => recentRecords.slice(0, PREVIEW_LIMIT),
     [recentRecords]
   );
+
+  const avatarInitial = useMemo(() => {
+    const source = displayName || username;
+    return source ? source.charAt(0).toUpperCase() : "";
+  }, [displayName, username]);
 
   const handleLogout = async () => {
     await fetch(apiUrl("/api/logout"), {
@@ -275,6 +284,7 @@ export default function Profile() {
           title="Profile"
           username={username}
           displayName={displayName}
+          profilePicUrl={profilePicUrl ?? undefined}
           onLogout={handleLogout}
           searchBar={false}
         />
@@ -287,10 +297,21 @@ export default function Profile() {
                   borderRadius: 2,
                   display: "flex",
                   flexDirection: { xs: "column", sm: "row" },
-                  alignItems: { xs: "flex-start", sm: "center" },
+                  alignItems: "flex-start",
                   gap: 3,
+                  position: "relative",
                 }}
               >
+                {isOwnProfile && (
+                  <IconButton
+                    color="inherit"
+                    aria-label="Open profile settings"
+                    onClick={handleOpenProfileSettings}
+                    sx={{ position: "absolute", top: 16, right: 16 }}
+                  >
+                    <SettingsIcon />
+                  </IconButton>
+                )}
                 <Avatar
                   variant="rounded"
                   sx={{
@@ -298,44 +319,45 @@ export default function Profile() {
                     height: 120,
                     bgcolor: "grey.700",
                   }}
-                />
+                  src={profilePicUrl ?? undefined}
+                >
+                  {!profilePicUrl && avatarInitial}
+                </Avatar>
                 <Box>
-                  <Typography variant="h4" gutterBottom>
+                  <Typography variant="h4">
                     {displayName || username || "Your Profile"}
                   </Typography>
-                  <Typography variant="subtitle1" color="text.secondary">
+                  <Typography
+                    variant="subtitle1"
+                    color="text.secondary"
+                    sx={{ pb: 1 }}
+                  >
                     @{username}
                   </Typography>
+                  {bio.trim().length > 0 && (
+                    <Typography
+                      variant="body1"
+                      sx={{ mt: 1, whiteSpace: "pre-line" }}
+                    >
+                      {bio}
+                    </Typography>
+                  )}
                 </Box>
               </Paper>
             </Grid>
 
             <Grid size={{ xs: 12 }}>
-              <ProfileSection
-                title="Favourites"
-                action={
-                  isOwnProfile ? (
-                    <IconButton
-                      color="inherit"
-                      size="small"
-                      aria-label="Open profile settings"
-                      onClick={handleOpenProfileSettings}
-                    >
-                      <SettingsIcon fontSize="small" />
-                    </IconButton>
-                  ) : undefined
-                }
-              >
-                {loadingFavourites ? (
+              <ProfileSection title="Collection Highlights">
+                {loadingHighlights ? (
                   <Box sx={{ mt: 2 }}>
                     <LinearProgress />
                   </Box>
-                ) : favouritePreviewRecords.length === 0 ? (
+                ) : highlightsPreviewRecords.length === 0 ? (
                   <Typography color="text.secondary">
-                    No Favourites Set
+                    No Highlights Set
                   </Typography>
                 ) : (
-                  <RecordPreviewGrid records={favouritePreviewRecords} />
+                  <RecordPreviewGrid records={highlightsPreviewRecords} />
                 )}
               </ProfileSection>
             </Grid>

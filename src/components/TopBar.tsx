@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import {
+  Avatar,
   Box,
   Typography,
   TextField,
@@ -24,6 +25,7 @@ interface TopBarProps {
   title: string;
   username?: string;
   displayName?: string;
+  profilePicUrl?: string | null;
   /** When set to 'submit', only fire onSearchChange when user presses Enter */
   searchMode?: "change" | "submit";
   /** Optional placeholder override */
@@ -37,6 +39,7 @@ export default function TopBar({
   title,
   username,
   displayName,
+  profilePicUrl,
   searchMode = "change",
   searchPlaceholder,
   searchBar = true,
@@ -124,9 +127,17 @@ export default function TopBar({
               aria-label="account of current user"
               aria-haspopup="true"
               onMouseEnter={handleMenuOpen} // Open menu on hover
+              onClick={handleMenuOpen}
               color="inherit"
             >
-              <AccountCircle fontSize="large" />
+              <Avatar
+                src={profilePicUrl ?? undefined}
+                alt={displayName || username || "Profile"}
+                sx={{ width: 40, height: 40, bgcolor: "grey.700" }}
+              >
+                {!profilePicUrl &&
+                  (displayName || username || "").charAt(0).toUpperCase()}
+              </Avatar>
             </IconButton>
             <Menu
               anchorEl={anchorEl}

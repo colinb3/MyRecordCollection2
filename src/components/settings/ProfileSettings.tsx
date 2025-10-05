@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import apiUrl from "../../api";
 import {
   Box,
@@ -35,25 +35,60 @@ import type { Record as MrcRecord } from "../../types";
 interface ProfileSettingsProps {
   username: string;
   displayName: string;
-  onProfileUpdated?: (user: { username: string; displayName: string }) => void;
+  bio: string;
+  profilePicUrl: string | null;
+  onProfileUpdated?: (user: {
+    username: string;
+    displayName: string;
+    bio: string | null;
+    profilePicUrl: string | null;
+  }) => void;
 }
 
 const usernameRegex = /^[a-zA-Z0-9_]+$/;
 const passwordRegex = /(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9])/;
 const MAX_PROFILE_HIGHLIGHTS = 4;
+const PROFILE_PIC_MAX_SIZE = 5 * 1024 * 1024; // 5 MB
+const ALLOWED_PROFILE_MIME_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/avif",
+];
 
 export default function ProfileSettings({
   username,
   displayName,
+  bio,
+  profilePicUrl,
   onProfileUpdated,
 }: ProfileSettingsProps) {
   const [usernameValue, setUsernameValue] = useState(username);
   const [displayNameValue, setDisplayNameValue] = useState(displayName);
+  const [bioValue, setBioValue] = useState(bio);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileSuccess, setProfileSuccess] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [usernameError, setUsernameError] = useState<string | null>(null);
   const [displayNameError, setDisplayNameError] = useState<string | null>(null);
+  const [bioError, setBioError] = useState<string | null>(null);
+  const [profilePicPreview, setProfilePicPreview] = useState<string | null>(
+    profilePicUrl
+  );
+  const [profilePicError, setProfilePicError] = useState<string | null>(null);
+  const [profilePicUploading, setProfilePicUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const normalizeProfilePicUrl = useCallback((raw: unknown): string | null => {
+    if (typeof raw !== "string") return null;
+    const trimmed = raw.trim();
+    if (!trimmed) return null;
+    if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+      return trimmed;
+    }
+    const normalizedPath = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+    return apiUrl(normalizedPath);
+  }, []);
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -82,8 +117,9 @@ export default function ProfileSettings({
   const [savingHighlights, setSavingHighlights] = useState(false);
 
   const [availableRecords, setAvailableRecords] = useState<MrcRecord[]>([]);
-  const [candidatesLoading, setCandidatesLoading] = useState(true);
+  const [candidatesLoading, setCandidatesLoading] = useState(false);
   const [candidateError, setCandidateError] = useState<string | null>(null);
+  const [hasLoadedCandidates, setHasLoadedCandidates] = useState(false);
   const [searchInput, setSearchInput] = useState("");
 
   useEffect(() => {
@@ -93,6 +129,14 @@ export default function ProfileSettings({
   useEffect(() => {
     setDisplayNameValue(displayName);
   }, [displayName]);
+
+  useEffect(() => {
+    setBioValue(bio);
+  }, [bio]);
+
+  useEffect(() => {
+    setProfilePicPreview(normalizeProfilePicUrl(profilePicUrl));
+  }, [profilePicUrl, normalizeProfilePicUrl]);
 
   useEffect(() => {
     let cancelled = false;
@@ -134,38 +178,31 @@ export default function ProfileSettings({
     };
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadCandidates = async () => {
-      setCandidatesLoading(true);
-      setCandidateError(null);
-      try {
-        const records = await loadCollectionRecords(
-          DEFAULT_COLLECTION_NAME,
-          true
-        );
-        if (cancelled) return;
-        setAvailableRecords(records);
-      } catch (error) {
-        if (!cancelled) {
-          console.warn("Failed to load available records", error);
-          setAvailableRecords([]);
-          setCandidateError("Failed to load records. Please try again.");
-        }
-      } finally {
-        if (!cancelled) {
-          setCandidatesLoading(false);
-        }
-      }
-    };
-
-    loadCandidates();
-
-    return () => {
-      cancelled = true;
-    };
+  const ensureCandidatesLoaded = useCallback(async () => {
+    setCandidatesLoading(true);
+    setCandidateError(null);
+    try {
+      const records = await loadCollectionRecords(
+        DEFAULT_COLLECTION_NAME,
+        true
+      );
+      setAvailableRecords(records);
+      setHasLoadedCandidates(true);
+    } catch (error) {
+      console.warn("Failed to load available records", error);
+      setAvailableRecords([]);
+      setCandidateError("Failed to load records. Please try again.");
+    } finally {
+      setCandidatesLoading(false);
+    }
   }, []);
+
+  const handleCandidatePickerOpen = useCallback(() => {
+    if (hasLoadedCandidates || candidatesLoading) {
+      return;
+    }
+    void ensureCandidatesLoaded();
+  }, [candidatesLoading, ensureCandidatesLoaded, hasLoadedCandidates]);
 
   const highlightIds = useMemo(
     () => highlightRecords.map((record) => record.id),
@@ -289,16 +326,22 @@ export default function ProfileSettings({
   }, [highlightRecords]);
 
   const profileDirty = useMemo(() => {
+    const normalizedUsername = usernameValue.trim();
+    const normalizedDisplayName = displayNameValue.trim();
+    const normalizedBio = bioValue.trim();
+    const initialBio = (bio || "").trim();
     return (
-      usernameValue.trim() !== username ||
-      displayNameValue.trim() !== displayName
+      normalizedUsername !== username ||
+      normalizedDisplayName !== displayName ||
+      normalizedBio !== initialBio
     );
-  }, [usernameValue, displayNameValue, username, displayName]);
+  }, [usernameValue, displayNameValue, bioValue, username, displayName, bio]);
 
   const validateProfile = () => {
     let hasError = false;
     const trimmedUsername = usernameValue.trim();
     const trimmedDisplayName = displayNameValue.trim();
+    const trimmedBio = bioValue.trim();
 
     if (trimmedUsername.length < 3 || trimmedUsername.length > 30) {
       setUsernameError("Username must be between 3 and 30 characters");
@@ -322,24 +365,40 @@ export default function ProfileSettings({
       setDisplayNameError(null);
     }
 
+    if (trimmedBio.length > 255) {
+      setBioError("Bio must be 255 characters or fewer");
+      hasError = true;
+    } else {
+      setBioError(null);
+    }
+
     return !hasError;
   };
 
   const handleSaveProfile = async () => {
     setProfileSuccess(null);
     setProfileError(null);
+    setProfilePicError(null);
     if (!profileDirty) {
       setProfileError("No changes to save");
       return;
     }
     if (!validateProfile()) return;
 
-    const payload: Record<string, string> = {};
+    const payload: Record<string, string | null> = {};
     if (usernameValue.trim() !== username) {
       payload.username = usernameValue.trim();
     }
     if (displayNameValue.trim() !== displayName) {
       payload.displayName = displayNameValue.trim();
+    }
+    const normalizedBio = bioValue.trim();
+    const formattedBio = normalizedBio.length > 0 ? normalizedBio : null;
+    const initialBioValue = (bio || "").trim();
+    const initialBioNormalized =
+      initialBioValue.length > 0 ? initialBioValue : null;
+    if (formattedBio !== initialBioNormalized) {
+      payload.bio = formattedBio;
     }
     if (Object.keys(payload).length === 0) {
       setProfileError("No changes to save");
@@ -363,11 +422,24 @@ export default function ProfileSettings({
       const updated = data.user ?? {
         username: payload.username ?? username,
         displayName: payload.displayName ?? displayName,
+        bio: formattedBio,
+        profilePicUrl: profilePicPreview,
       };
       setUsernameValue(updated.username);
-      setDisplayNameValue(updated.displayName);
+      setDisplayNameValue(updated.displayName ?? "");
+      setBioValue(updated.bio ?? "");
+      const nextProfilePic =
+        typeof updated.profilePicUrl === "string"
+          ? normalizeProfilePicUrl(updated.profilePicUrl)
+          : profilePicPreview;
+      setProfilePicPreview(nextProfilePic ?? null);
       if (onProfileUpdated) {
-        onProfileUpdated(updated);
+        onProfileUpdated({
+          username: updated.username,
+          displayName: updated.displayName ?? "",
+          bio: updated.bio ?? null,
+          profilePicUrl: nextProfilePic ?? null,
+        });
       }
     } catch (err) {
       setProfileError("Network error");
@@ -375,6 +447,93 @@ export default function ProfileSettings({
       setProfileLoading(false);
     }
   };
+
+  const handleTriggerProfilePicSelect = useCallback(() => {
+    if (profilePicUploading) return;
+    fileInputRef.current?.click();
+  }, [profilePicUploading]);
+
+  const handleProfilePicInputChange = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setProfileSuccess(null);
+    setProfilePicError(null);
+
+    if (!ALLOWED_PROFILE_MIME_TYPES.includes(file.type)) {
+      setProfilePicError("Please choose a JPG, PNG, WEBP, or AVIF image.");
+      event.target.value = "";
+      return;
+    }
+    if (file.size > PROFILE_PIC_MAX_SIZE) {
+      setProfilePicError("Image must be 5 MB or smaller.");
+      event.target.value = "";
+      return;
+    }
+
+    setProfilePicUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("avatar", file);
+      const res = await fetch(apiUrl("/api/profile/avatar"), {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setProfilePicError(data.error || "Failed to upload profile picture");
+        return;
+      }
+      const absoluteUrl = normalizeProfilePicUrl(data.profilePicUrl);
+      setProfilePicPreview(absoluteUrl ?? null);
+      setProfileSuccess("Profile picture updated");
+      onProfileUpdated?.({
+        username: usernameValue.trim(),
+        displayName: displayNameValue.trim(),
+        bio: bioValue.trim().length > 0 ? bioValue.trim() : null,
+        profilePicUrl: absoluteUrl ?? null,
+      });
+    } catch (error) {
+      setProfilePicError("Failed to upload profile picture");
+    } finally {
+      setProfilePicUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  const handleRemoveProfilePic = useCallback(async () => {
+    setProfileSuccess(null);
+    setProfilePicError(null);
+    setProfilePicUploading(true);
+    try {
+      const res = await fetch(apiUrl("/api/profile/avatar"), {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setProfilePicError(data.error || "Failed to remove profile picture");
+        return;
+      }
+      setProfilePicPreview(null);
+      setProfileSuccess("Profile picture removed");
+      onProfileUpdated?.({
+        username: usernameValue.trim(),
+        displayName: displayNameValue.trim(),
+        bio: bioValue.trim().length > 0 ? bioValue.trim() : null,
+        profilePicUrl: null,
+      });
+    } catch (error) {
+      setProfilePicError("Failed to remove profile picture");
+    } finally {
+      setProfilePicUploading(false);
+    }
+  }, [bio, displayName, onProfileUpdated, username]);
 
   const validatePasswordFields = () => {
     let hasError = false;
@@ -459,14 +618,71 @@ export default function ProfileSettings({
   return (
     <Box display="flex" flexDirection="column" gap={4}>
       <Box>
-        <Typography variant="h5" gutterBottom>
+        <Typography variant="h4" gutterBottom>
           Profile Settings
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          Update your username, display name, or change your password.
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Update everything about your profile.
         </Typography>
-
-        <Stack spacing={2}>
+        <Stack
+          direction={{ xs: "row", sm: "row" }}
+          spacing={3}
+          alignItems={{ xs: "center", sm: "center" }}
+          sx={{ mb: 3 }}
+        >
+          <Avatar
+            variant="rounded"
+            src={profilePicPreview ?? undefined}
+            alt={displayNameValue || usernameValue}
+            sx={{ width: 112, height: 112, bgcolor: "grey.700" }}
+          >
+            {!profilePicPreview &&
+              (displayNameValue || usernameValue || "").charAt(0).toUpperCase()}
+          </Avatar>
+          <Stack spacing={1} width="100%">
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={1}
+              alignItems={{ xs: "stretch", sm: "center" }}
+            >
+              <Button
+                variant="contained"
+                onClick={handleTriggerProfilePicSelect}
+                disabled={profilePicUploading}
+                sx={{ alignSelf: "flex-start" }}
+              >
+                {profilePicUploading ? "Uploading..." : "Upload new photo"}
+              </Button>
+              {profilePicPreview && (
+                <Button
+                  variant="text"
+                  color="inherit"
+                  onClick={handleRemoveProfilePic}
+                  disabled={profilePicUploading}
+                  sx={{ alignSelf: "flex-start" }}
+                >
+                  Remove photo
+                </Button>
+              )}
+            </Stack>
+            <Typography variant="caption" color="text.secondary">
+              JPG, PNG, WEBP, AVIF (max 5 MB).
+            </Typography>
+            {profilePicError && (
+              <Alert severity="error" onClose={() => setProfilePicError(null)}>
+                {profilePicError}
+              </Alert>
+            )}
+          </Stack>
+        </Stack>
+        <input
+          type="file"
+          ref={fileInputRef}
+          hidden
+          accept={ALLOWED_PROFILE_MIME_TYPES.join(",")}
+          onChange={handleProfilePicInputChange}
+        />
+        <Stack spacing={2} pb={2} width={{ xs: "100%", sm: "50%" }}>
           <TextField
             label="Username"
             value={usernameValue}
@@ -492,24 +708,53 @@ export default function ProfileSettings({
             helperText={displayNameError ?? ""}
             size="small"
           />
-          {profileError && <Alert severity="error">{profileError}</Alert>}
-          <Button
-            variant="contained"
-            onClick={handleSaveProfile}
-            disabled={profileLoading || !profileDirty}
-            sx={{ alignSelf: "flex-start" }}
-          >
-            {profileLoading ? "Saving..." : "Save changes"}
-          </Button>
         </Stack>
+
+        <TextField
+          label="Bio"
+          multiline
+          fullWidth
+          maxRows={10}
+          value={bioValue}
+          onChange={(e) => {
+            setBioValue(e.target.value);
+            setProfileError(null);
+            setProfileSuccess(null);
+            setBioError(null);
+          }}
+          error={!!bioError}
+          helperText={
+            bioError ?? `${Math.min(bioValue.trim().length, 255)}/255`
+          }
+          size="small"
+          sx={{
+            mb: 1.5,
+            "& .MuiOutlinedInput-root": {
+              height: "auto",
+            },
+          }}
+        />
+
+        {profileError && <Alert severity="error">{profileError}</Alert>}
+        <Button
+          variant="contained"
+          onClick={handleSaveProfile}
+          disabled={profileLoading || !profileDirty}
+          sx={{ alignSelf: "flex-start" }}
+        >
+          {profileLoading ? "Saving..." : "Save changes"}
+        </Button>
       </Box>
+
+      <Divider />
 
       <Box>
         <Typography variant="h6" gutterBottom>
           Collection Highlights
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Choose up to four records to feature on your profile page.
+          Choose up to {MAX_PROFILE_HIGHLIGHTS} records to feature on your
+          profile page.
         </Typography>
 
         <Box sx={{ mt: 2 }}>
@@ -519,6 +764,7 @@ export default function ProfileSettings({
             value={null}
             filterOptions={(options) => options}
             inputValue={searchInput}
+            onOpen={handleCandidatePickerOpen}
             onInputChange={(_, value, reason) => {
               if (reason === "reset") {
                 setSearchInput("");
@@ -542,7 +788,6 @@ export default function ProfileSettings({
                     : "Type to search for a record"
                 }
                 size="small"
-                helperText={`You can feature up to ${MAX_PROFILE_HIGHLIGHTS} records.`}
                 InputProps={{
                   ...params.InputProps,
                   endAdornment: (
@@ -709,7 +954,7 @@ export default function ProfileSettings({
       <Divider />
 
       <Box>
-        <Typography variant="h6" gutterBottom>
+        <Typography variant="h6" sx={{ mb: 1 }}>
           Change Password
         </Typography>
         <Stack spacing={2}>

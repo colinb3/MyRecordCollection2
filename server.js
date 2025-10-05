@@ -3,14 +3,34 @@ import cors from "cors";
 import mysql from "mysql2/promise";
 import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
-import path from 'path';
-import { fileURLToPath } from 'url';
+import path from "path";
+import { fileURLToPath } from "url";
+import fs from "fs";
+import multer from "multer";
 import { v4 as uuidv4 } from "uuid";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import fetch from 'node-fetch';
+import fetch from "node-fetch";
+import sharp from "sharp";
 
 dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const uploadsRoot = path.join(__dirname, "uploads");
+const profileUploadsDir = path.join(uploadsRoot, "profile");
+const PROFILE_PIC_SIZE_LIMIT = Number(process.env.PROFILE_PIC_MAX_BYTES || 5 * 1024 * 1024);
+const PROFILE_PIC_MAX_DIMENSION = Number(process.env.PROFILE_PIC_MAX_DIMENSION || 512);
+const PROFILE_PIC_JPEG_QUALITY = Number(process.env.PROFILE_PIC_JPEG_QUALITY || 80);
+const PROFILE_PIC_WEBP_QUALITY = Number(process.env.PROFILE_PIC_WEBP_QUALITY || 80);
+const PROFILE_PIC_AVIF_QUALITY = Number(process.env.PROFILE_PIC_AVIF_QUALITY || 45);
+const PROFILE_PIC_PNG_COMPRESSION = Number(process.env.PROFILE_PIC_PNG_COMPRESSION || 9);
+const ALLOWED_PROFILE_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/avif",
+]);
 
 const app = express();
 app.use(express.json());
@@ -19,6 +39,7 @@ app.use(cors({
   credentials: true
 }));
 app.use(cookieParser());
+app.use("/uploads", express.static(uploadsRoot));
 
 const PORT = Number(process.env.PORT || 4000);
 // bind to 0.0.0.0 so the server is reachable from other machines (GCE VM)
@@ -29,6 +50,99 @@ const MAX_PROFILE_HIGHLIGHTS = 4;
 const PROFILE_HIGHLIGHT_CANDIDATE_LIMIT = 25;
 const PROFILE_RECENT_DEFAULT_LIMIT = 4;
 const PROFILE_RECENT_MAX_LIMIT = 20;
+
+const fsPromises = fs.promises;
+const MIME_EXTENSION_MAP = new Map([
+  ["image/jpeg", ".jpg"],
+  ["image/png", ".png"],
+  ["image/webp", ".webp"],
+  ["image/avif", ".avif"],
+]);
+
+const profilePicStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    fsPromises
+      .mkdir(profileUploadsDir, { recursive: true })
+      .then(() => cb(null, profileUploadsDir))
+      .catch((err) => cb(err));
+  },
+  filename: (req, file, cb) => {
+    const fallbackExt = path.extname(file.originalname) || ".jpg";
+    const ext = MIME_EXTENSION_MAP.get(file.mimetype) || fallbackExt;
+    const safeExt = ext.startsWith(".") ? ext : `.${ext}`;
+    const uniqueName = `${req.userUuid || uuidv4()}-${Date.now()}${safeExt}`;
+    cb(null, uniqueName);
+  },
+});
+
+function profilePicFileFilter(_req, file, cb) {
+  if (!ALLOWED_PROFILE_MIME_TYPES.has(file.mimetype)) {
+    return cb(new Error("Only image files (JPG, PNG, WEBP, AVIF) are allowed."));
+  }
+  cb(null, true);
+}
+
+const profilePicUpload = multer({
+  storage: profilePicStorage,
+  fileFilter: profilePicFileFilter,
+  limits: { fileSize: PROFILE_PIC_SIZE_LIMIT },
+});
+
+function buildProfilePicRelativePath(filename) {
+  return `profile/${filename}`;
+}
+
+function buildProfilePicPublicPath(relativePath) {
+  if (!relativePath) return null;
+  const normalized = relativePath.replace(/\\/g, "/");
+  return `/uploads/${normalized}`;
+}
+
+async function deleteProfilePicFile(relativePath) {
+  if (!relativePath) return;
+  const absolutePath = path.join(uploadsRoot, relativePath);
+  try {
+    await fsPromises.unlink(absolutePath);
+  } catch (error) {
+    if (error && error.code !== "ENOENT") {
+      console.warn("Failed to delete previous profile picture", error);
+    }
+  }
+}
+
+async function optimizeProfileImage(absolutePath, mimetype) {
+  try {
+    const inputBuffer = await fsPromises.readFile(absolutePath);
+    const transformer = sharp(inputBuffer)
+      .rotate()
+      .resize({
+        width: PROFILE_PIC_MAX_DIMENSION,
+        height: PROFILE_PIC_MAX_DIMENSION,
+        fit: sharp.fit.inside,
+        withoutEnlargement: true,
+      });
+
+    let pipeline;
+    if (mimetype === "image/png") {
+      pipeline = transformer.png({
+        compressionLevel: PROFILE_PIC_PNG_COMPRESSION,
+        adaptiveFiltering: true,
+        palette: true,
+      });
+    } else if (mimetype === "image/webp") {
+      pipeline = transformer.webp({ quality: PROFILE_PIC_WEBP_QUALITY, effort: 5 });
+    } else if (mimetype === "image/avif") {
+      pipeline = transformer.avif({ quality: PROFILE_PIC_AVIF_QUALITY, effort: 4 });
+    } else {
+      pipeline = transformer.jpeg({ quality: PROFILE_PIC_JPEG_QUALITY, mozjpeg: true });
+    }
+
+    const buffer = await pipeline.toBuffer();
+    await fsPromises.writeFile(absolutePath, buffer);
+  } catch (error) {
+    throw error;
+  }
+}
 
 const RECORD_TABLE_COLUMN_KEYS = [
   "cover",
@@ -434,8 +548,8 @@ app.post('/api/register', async (req, res) => {
         : username;
     const pool = await getPool();
     await pool.execute(
-      'INSERT INTO User (uuid, username, displayName, password) VALUES (?, ?, ?, ?)',
-      [userUuid, username, displayName, hashedPassword]
+      'INSERT INTO User (uuid, username, displayName, password, bio, profilePic) VALUES (?, ?, ?, ?, ?, ?)',
+      [userUuid, username, displayName, hashedPassword, null, null]
     );
     await pool.execute(
       `INSERT INTO RecTable (name, userUuid) VALUES (?, ?), (?, ?)`,
@@ -492,10 +606,17 @@ app.get('/api/me', requireAuth, async (req, res) => {
   console.log("Fetching user info...");
   try {
     const pool = await getPool();
-    const [rows] = await pool.execute('SELECT username, displayName FROM User WHERE uuid = ?', [req.userUuid]);
+    const [rows] = await pool.execute('SELECT username, displayName, bio, profilePic FROM User WHERE uuid = ?', [req.userUuid]);
     if (rows.length === 0) return res.status(404).json({ error: 'User not found' });
     // Also return the userUuid so clients can wire analytics user_id without decoding the token
-    res.json({ username: rows[0].username, displayName: rows[0].displayName, userUuid: req.userUuid });
+    const profilePicUrl = buildProfilePicPublicPath(rows[0].profilePic);
+    res.json({
+      username: rows[0].username,
+      displayName: rows[0].displayName,
+      bio: rows[0].bio ?? null,
+      profilePicUrl,
+      userUuid: req.userUuid,
+    });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch user info' });
   }
@@ -503,8 +624,8 @@ app.get('/api/me', requireAuth, async (req, res) => {
 
 app.patch('/api/profile', requireAuth, async (req, res) => {
   console.log("Updating profile...");
-  const { username: newUsername, displayName: rawDisplayName } = req.body || {};
-  if (!newUsername && !rawDisplayName) {
+  const { username: newUsername, displayName: rawDisplayName, bio: rawBio } = req.body || {};
+  if (!newUsername && !rawDisplayName && rawBio === undefined) {
     return res.status(400).json({ error: 'Nothing to update' });
   }
 
@@ -523,6 +644,21 @@ app.patch('/api/profile', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Display name cannot be empty.' });
     }
     displayName = rawDisplayName.trim().slice(0, 50);
+  }
+
+  let bio;
+  if (rawBio !== undefined) {
+    if (rawBio === null) {
+      bio = null;
+    } else if (typeof rawBio !== 'string') {
+      return res.status(400).json({ error: 'Bio must be a string.' });
+    } else {
+      const normalizedBio = rawBio.trim();
+      if (normalizedBio.length > 255) {
+        return res.status(400).json({ error: 'Bio must be 255 characters or fewer.' });
+      }
+      bio = normalizedBio.length > 0 ? normalizedBio : null;
+    }
   }
 
   try {
@@ -547,6 +683,10 @@ app.patch('/api/profile', requireAuth, async (req, res) => {
       fields.push('displayName = ?');
       params.push(displayName);
     }
+    if (rawBio !== undefined) {
+      fields.push('bio = ?');
+      params.push(bio);
+    }
     if (fields.length === 0) {
       return res.status(400).json({ error: 'Nothing to update' });
     }
@@ -557,13 +697,109 @@ app.patch('/api/profile', requireAuth, async (req, res) => {
     );
 
     const [rows] = await pool.execute(
-      'SELECT username, displayName FROM User WHERE uuid = ?',
+      'SELECT username, displayName, bio, profilePic FROM User WHERE uuid = ?',
       [req.userUuid]
     );
-    res.json({ success: true, user: rows[0] });
+    const updatedUser = rows[0];
+    res.json({
+      success: true,
+      user: {
+        username: updatedUser.username,
+        displayName: updatedUser.displayName,
+        bio: updatedUser.bio ?? null,
+        profilePicUrl: buildProfilePicPublicPath(updatedUser.profilePic),
+      },
+    });
   } catch (err) {
     console.error('Profile update failed', err);
     res.status(500).json({ error: 'Failed to update profile' });
+  }
+});
+
+app.post('/api/profile/avatar', requireAuth, (req, res) => {
+  console.log("Uploading profile picture...");
+  profilePicUpload.single('avatar')(req, res, async (err) => {
+    if (err) {
+      if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(413).json({ error: 'Profile picture is too large.' });
+        }
+        return res.status(400).json({ error: err.message || 'Upload failed.' });
+      }
+      return res.status(400).json({ error: err.message || 'Upload failed.' });
+    }
+
+    const file = req.file;
+    if (!file) {
+      return res.status(400).json({ error: 'No file uploaded.' });
+    }
+
+    const relativePath = buildProfilePicRelativePath(file.filename);
+    const absolutePath = path.join(uploadsRoot, relativePath);
+
+    try {
+      await optimizeProfileImage(absolutePath, file.mimetype);
+    } catch (error) {
+      console.error('Profile picture optimization failed', error);
+      await deleteProfilePicFile(relativePath);
+      return res.status(400).json({ error: 'Unsupported or corrupt image file.' });
+    }
+
+    try {
+      const pool = await getPool();
+      const [rows] = await pool.execute(
+        'SELECT profilePic FROM User WHERE uuid = ? LIMIT 1',
+        [req.userUuid]
+      );
+      if (!rows || rows.length === 0) {
+        await deleteProfilePicFile(relativePath);
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const previousPath = rows[0].profilePic;
+
+      await pool.execute('UPDATE User SET profilePic = ? WHERE uuid = ?', [relativePath, req.userUuid]);
+
+      if (previousPath && previousPath !== relativePath) {
+        await deleteProfilePicFile(previousPath);
+      }
+
+      res.json({
+        success: true,
+        profilePicUrl: buildProfilePicPublicPath(relativePath),
+      });
+    } catch (error) {
+      console.error('Failed to save profile picture', error);
+      await deleteProfilePicFile(relativePath);
+      res.status(500).json({ error: 'Failed to save profile picture' });
+    }
+  });
+});
+
+app.delete('/api/profile/avatar', requireAuth, async (req, res) => {
+  console.log("Removing profile picture...");
+  try {
+    const pool = await getPool();
+    const [rows] = await pool.execute(
+      'SELECT profilePic FROM User WHERE uuid = ? LIMIT 1',
+      [req.userUuid]
+    );
+    if (!rows || rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const currentPath = rows[0].profilePic;
+    if (!currentPath) {
+      return res.json({ success: true, profilePicUrl: null });
+    }
+
+    await pool.execute('UPDATE User SET profilePic = NULL WHERE uuid = ?', [req.userUuid]);
+    await deleteProfilePicFile(currentPath);
+
+    res.json({ success: true, profilePicUrl: null });
+  } catch (error) {
+    console.error('Failed to remove profile picture', error);
+    res.status(500).json({ error: 'Failed to remove profile picture' });
   }
 });
 
