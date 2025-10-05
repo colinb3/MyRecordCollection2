@@ -1,0 +1,43 @@
+name: Build and Deploy to GitHub Pages
+permissions:
+  contents: write
+on:
+  push:
+    branches: [main] # replace with your default branch (or create a branch trigger you use)
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # ensure the action can push back using the GITHUB_TOKEN
+          persist-credentials: true
+
+      - name: Use Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (Vite)
+        env:
+          VITE_API_BASE: ${{ secrets.VITE_API_BASE }}
+          VITE_GA_MEASUREMENT_ID: ${{ secrets.GA_MEASUREMENT_ID }}
+        run: npm run build
+
+      - name: Create CNAME for custom domain
+        run: |
+          echo "myrecordcollection.app" > ./dist/CNAME
+        shell: bash
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          publish_dir: ./dist
+          publish_branch: gh-pages
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          allow_empty_commit: true

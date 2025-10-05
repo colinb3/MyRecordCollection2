@@ -1,0 +1,8 @@
+@keyframes spinRecord { 
+  0% { rotate:0deg; } 
+  100% { rotate: 360deg; }
+} 
+
+.record {
+  animation: spinRecord 4s infinite linear;
+}
