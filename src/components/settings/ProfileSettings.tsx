@@ -48,7 +48,7 @@ interface ProfileSettingsProps {
 const usernameRegex = /^[a-zA-Z0-9_]+$/;
 const passwordRegex = /(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9])/;
 const MAX_PROFILE_HIGHLIGHTS = 4;
-const PROFILE_PIC_MAX_SIZE = 5 * 1024 * 1024; // 5 MB
+const PROFILE_PIC_MAX_SIZE = 3 * 1024 * 1024; // 3 MB
 const ALLOWED_PROFILE_MIME_TYPES = [
   "image/jpeg",
   "image/png",
@@ -468,7 +468,7 @@ export default function ProfileSettings({
       return;
     }
     if (file.size > PROFILE_PIC_MAX_SIZE) {
-      setProfilePicError("Image must be 5 MB or smaller.");
+      setProfilePicError("Image must be 3 MB or smaller.");
       event.target.value = "";
       return;
     }
@@ -684,6 +684,18 @@ export default function ProfileSettings({
         />
         <Stack spacing={2} pb={2} width={{ xs: "100%", sm: "50%" }}>
           <TextField
+            label="Display name"
+            value={displayNameValue}
+            onChange={(e) => {
+              setDisplayNameValue(e.target.value);
+              setProfileError(null);
+              setProfileSuccess(null);
+            }}
+            error={!!displayNameError}
+            helperText={displayNameError ?? ""}
+            size="small"
+          />
+          <TextField
             label="Username"
             value={usernameValue}
             onChange={(e) => {
@@ -695,18 +707,6 @@ export default function ProfileSettings({
             helperText={usernameError ?? ""}
             size="small"
             autoComplete="username"
-          />
-          <TextField
-            label="Display name"
-            value={displayNameValue}
-            onChange={(e) => {
-              setDisplayNameValue(e.target.value);
-              setProfileError(null);
-              setProfileSuccess(null);
-            }}
-            error={!!displayNameError}
-            helperText={displayNameError ?? ""}
-            size="small"
           />
         </Stack>
 
