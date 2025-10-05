@@ -25,6 +25,7 @@ import {
   loadUserInfo,
 } from "./userInfo";
 import { clearRecordTablePreferencesCache } from "./preferences";
+import { clearCommunityCaches } from "./communityUsers";
 
 interface AlbumResult {
   name: string;
@@ -127,6 +128,7 @@ export default function FindRecord() {
     });
     clearRecordTablePreferencesCache();
     clearUserInfoCache();
+    clearCommunityCaches();
     try {
       setUserId(undefined);
     } catch {}

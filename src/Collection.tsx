@@ -37,6 +37,7 @@ import {
   getCachedUserInfo,
   loadUserInfo,
 } from "./userInfo";
+import { clearCommunityCaches } from "./communityUsers";
 import { useNavigate } from "react-router-dom";
 import { useLocation } from "react-router-dom";
 import { setUserId } from "./analytics";
@@ -62,6 +63,7 @@ const initialFilters: Filters = {
 };
 
 export default function Collection({ tableName, title }: CollectionProps) {
+  const searchPlaceholder = `Search ${title ?? tableName}`;
   const cachedRecordTablePreferences = getCachedRecordTablePreferences();
   const cachedUserInfo = getCachedUserInfo();
   const [records, setRecords] = useState<Record[]>([]);
@@ -271,6 +273,7 @@ export default function Collection({ tableName, title }: CollectionProps) {
     });
     clearRecordTablePreferencesCache();
     clearUserInfoCache();
+    clearCommunityCaches();
     try {
       setUserId(undefined);
     } catch {}
@@ -476,6 +479,7 @@ export default function Collection({ tableName, title }: CollectionProps) {
             username={username}
             displayName={displayName}
             profilePicUrl={profilePicUrl ?? undefined}
+            searchPlaceholder={searchPlaceholder}
           />
         </Box>
 

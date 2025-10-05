@@ -288,6 +288,57 @@ async function fetchRecordsWithTagsByIds(pool, userUuid, recordIds) {
     .filter((value) => value !== undefined);
 }
 
+async function getUserByUsername(pool, username) {
+  const [rows] = await pool.execute(
+    `SELECT uuid, username, displayName, bio, profilePic FROM User WHERE username = ? LIMIT 1`,
+    [username]
+  );
+  if (!rows || rows.length === 0) return null;
+  return rows[0];
+}
+
+function normalizePublicUser(row) {
+  if (!row) return null;
+  const displayName =
+    typeof row.displayName === "string" && row.displayName.trim()
+      ? row.displayName.trim()
+      : null;
+  const bio =
+    typeof row.bio === "string" && row.bio.trim().length > 0
+      ? row.bio.trim()
+      : null;
+  return {
+    username: row.username,
+    displayName,
+    bio,
+    profilePicUrl: buildProfilePicPublicPath(row.profilePic),
+  };
+}
+
+function escapeForLike(term) {
+  return term.replace(/[\\%_]/g, (match) => `\\${match}`);
+}
+
+async function fetchTagsByRecordIds(pool, recordIds) {
+  const tagsByRecord = {};
+  if (!Array.isArray(recordIds) || recordIds.length === 0) {
+    return tagsByRecord;
+  }
+  const placeholders = recordIds.map(() => "?").join(", ");
+  const [tagRows] = await pool.query(
+    `SELECT t.name, tg.recordId FROM Tag t JOIN Tagged tg ON t.id = tg.tagId WHERE tg.recordId IN (${placeholders})`,
+    recordIds
+  );
+  for (const row of tagRows) {
+    const recordId = row.recordId;
+    if (!tagsByRecord[recordId]) {
+      tagsByRecord[recordId] = [];
+    }
+    tagsByRecord[recordId].push(row.name);
+  }
+  return tagsByRecord;
+}
+
 // In production we require a JWT secret
 if (process.env.NODE_ENV === 'production' && !JWT_SECRET) {
   console.error('Missing JWT_SECRET in production environment. Set JWT_SECRET and restart.');
@@ -507,6 +558,127 @@ app.get("/api/profile/recent", requireAuth, async (req, res) => {
     res.status(500).json({ error: "DB error" });
   }
 });
+
+app.get("/api/community/search", requireAuth, async (req, res) => {
+  console.log("Community user search...");
+  const rawQuery = typeof req.query.q === "string" ? req.query.q.trim() : "";
+  if (rawQuery.length < 2) {
+    return res.json([]);
+  }
+  try {
+    const pool = await getPool();
+    const likeTerm = `%${escapeForLike(rawQuery)}%`;
+    const [rows] = await pool.query(
+      `SELECT username, displayName, bio, profilePic FROM User
+       WHERE username LIKE ? OR displayName LIKE ?
+       ORDER BY username
+       LIMIT 10`,
+      [likeTerm, likeTerm]
+    );
+    const results = rows
+      .map((row) => normalizePublicUser(row))
+      .filter((value) => value !== null);
+    res.json(results);
+  } catch (error) {
+    console.error("Community user search failed", error);
+    res.status(500).json({ error: "Failed to search users" });
+  }
+});
+
+app.get("/api/community/users/:username", requireAuth, async (req, res) => {
+  console.log("Fetching public profile...");
+  const targetUsername = req.params.username;
+  if (!targetUsername) {
+    return res.status(400).json({ error: "Username is required" });
+  }
+  try {
+    const pool = await getPool();
+    const userRow = await getUserByUsername(pool, targetUsername);
+    if (!userRow) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const publicUser = normalizePublicUser(userRow);
+
+    const highlightIds = await getProfileHighlightIds(pool, userRow.uuid);
+    const highlights = await fetchRecordsWithTagsByIds(
+      pool,
+      userRow.uuid,
+      highlightIds
+    );
+
+    const [recentRows] = await pool.query(
+      `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as dateAdded, r.tableId
+       FROM Record r
+       JOIN RecTable t ON r.tableId = t.id
+       WHERE r.userUuid = ? AND t.name = ?
+       ORDER BY r.added DESC
+       LIMIT ?`,
+      [userRow.uuid, DEFAULT_COLLECTION_NAME, PROFILE_RECENT_DEFAULT_LIMIT]
+    );
+
+    const recentRecordIds = recentRows.map((row) => row.id);
+    const tagsByRecord = await fetchTagsByRecordIds(pool, recentRecordIds);
+    const recentRecords = recentRows.map((row) => ({
+      ...row,
+      tags: tagsByRecord[row.id] || [],
+    }));
+
+    res.json({
+      ...publicUser,
+      highlights,
+      recentRecords,
+    });
+  } catch (error) {
+    console.error("Failed to load public profile", error);
+    res.status(500).json({ error: "Failed to load profile" });
+  }
+});
+
+app.get(
+  "/api/community/users/:username/collection",
+  requireAuth,
+  async (req, res) => {
+    console.log("Fetching public collection...");
+    const targetUsername = req.params.username;
+    if (!targetUsername) {
+      return res.status(400).json({ error: "Username is required" });
+    }
+    const rawTable =
+      typeof req.query.table === "string" && req.query.table.trim()
+        ? req.query.table.trim()
+        : DEFAULT_COLLECTION_NAME;
+    try {
+      const pool = await getPool();
+      const userRow = await getUserByUsername(pool, targetUsername);
+      if (!userRow) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const tableId = await getUserTableId(pool, userRow.uuid, rawTable);
+      if (!tableId) {
+        return res.status(404).json({ error: "Collection not found" });
+      }
+
+      const [rows] = await pool.query(
+        `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as dateAdded, r.tableId
+         FROM Record r WHERE r.userUuid = ? AND r.tableId = ?`,
+        [userRow.uuid, tableId]
+      );
+
+      const recordIds = rows.map((row) => row.id);
+      const tagsByRecord = await fetchTagsByRecordIds(pool, recordIds);
+      const response = rows.map((row) => ({
+        ...row,
+        tags: tagsByRecord[row.id] || [],
+      }));
+      res.json(response);
+    } catch (error) {
+      console.error("Failed to load public collection", error);
+      res.status(500).json({ error: "Failed to load collection" });
+    }
+  }
+);
 
 app.get("/api/tags", requireAuth, async (req, res) => {
   console.log("Fetching tags...");

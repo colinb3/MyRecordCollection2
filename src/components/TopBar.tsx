@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Avatar,
   Box,
@@ -17,6 +17,7 @@ import LogoutIcon from "@mui/icons-material/Logout";
 import FavoriteIcon from "@mui/icons-material/Favorite";
 import LibraryMusicIcon from "@mui/icons-material/LibraryMusic";
 import SettingsIcon from "@mui/icons-material/Settings";
+import PeopleAltIcon from "@mui/icons-material/PeopleAlt";
 import { useNavigate } from "react-router-dom";
 
 interface TopBarProps {
@@ -31,6 +32,8 @@ interface TopBarProps {
   /** Optional placeholder override */
   searchPlaceholder?: string;
   searchBar?: boolean;
+  /** Optional initial search value to sync with the input */
+  initialSearchValue?: string;
 }
 
 export default function TopBar({
@@ -43,10 +46,16 @@ export default function TopBar({
   searchMode = "change",
   searchPlaceholder,
   searchBar = true,
+  initialSearchValue,
 }: TopBarProps) {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
-  const [text, setText] = useState("");
+  const [text, setText] = useState(initialSearchValue ?? "");
+
+  useEffect(() => {
+    if (initialSearchValue === undefined) return;
+    setText(initialSearchValue);
+  }, [initialSearchValue]);
 
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const v = event.target.value;
@@ -176,6 +185,17 @@ export default function TopBar({
                   <AccountCircle />
                 </ListItemIcon>
                 <ListItemText>Profile</ListItemText>
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  navigate("/community");
+                  handleMenuClose();
+                }}
+              >
+                <ListItemIcon>
+                  <PeopleAltIcon />
+                </ListItemIcon>
+                <ListItemText>Community</ListItemText>
               </MenuItem>
               <Divider sx={{ my: 0.5 }} />
               <MenuItem onClick={() => navigate("/mycollection")}>

@@ -97,15 +97,17 @@ export default function FilterSidebar({
             )}
           </List>
         </Box>
-        <Button
-          variant="outlined"
-          size="small"
-          sx={{ fontWeight: 700, mt: 0.5, alignSelf: "flex-start" }}
-          onClick={onOpenManageTags}
-          startIcon={<SettingsIcon />}
-        >
-          Manage Tags
-        </Button>
+        {onOpenManageTags && (
+          <Button
+            variant="outlined"
+            size="small"
+            sx={{ fontWeight: 700, mt: 0.5, alignSelf: "flex-start" }}
+            onClick={onOpenManageTags}
+            startIcon={<SettingsIcon />}
+          >
+            Manage Tags
+          </Button>
+        )}
 
         <Box sx={{ flex: "0 0 auto" }}>
           <Typography variant="subtitle1" mt={1} mb={1}>

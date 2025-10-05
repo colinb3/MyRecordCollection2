@@ -96,3 +96,19 @@ export interface ProfileHighlights {
   recordIds: number[];
   records: Record[];
 }
+
+export interface CommunityUserSummary {
+  username: string;
+  displayName: string | null;
+  bio: string | null;
+  profilePicUrl: string | null;
+}
+
+export interface PublicUserProfile {
+  username: string;
+  displayName: string | null;
+  bio: string | null;
+  profilePicUrl: string | null;
+  highlights: Record[];
+  recentRecords: Record[];
+}

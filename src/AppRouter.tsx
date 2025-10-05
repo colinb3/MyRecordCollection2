@@ -10,6 +10,9 @@ import RequireAuth from "./RequireAuth";
 import NotFound from "./NotFound";
 import Settings from "./Settings";
 import Profile from "./Profile";
+import Community from "./Community";
+import CommunityProfile from "./CommunityProfile";
+import CommunityCollection from "./CommunityCollection";
 import { useLocation } from "react-router-dom";
 import { trackPage } from "./analytics";
 import { loadUserInfo } from "./userInfo";
@@ -82,6 +85,30 @@ export default function AppRouter() {
           element={
             <RequireAuth>
               <Profile />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/community"
+          element={
+            <RequireAuth>
+              <Community />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/community/:username"
+          element={
+            <RequireAuth>
+              <CommunityProfile />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/community/:username/collection"
+          element={
+            <RequireAuth>
+              <CommunityCollection />
             </RequireAuth>
           }
         />

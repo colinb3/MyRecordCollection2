@@ -18,6 +18,7 @@ import {
   setCachedUserInfo,
 } from "./userInfo";
 import { clearRecordTablePreferencesCache } from "./preferences";
+import { clearCommunityCaches } from "./communityUsers";
 import { useNavigate } from "react-router-dom";
 import { darkTheme } from "./theme";
 import { useMediaQuery } from "@mui/material";
@@ -88,6 +89,7 @@ export default function Settings() {
     });
     clearRecordTablePreferencesCache();
     clearUserInfoCache();
+    clearCommunityCaches();
     try {
       setUserId(undefined);
     } catch {
