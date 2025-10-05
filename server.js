@@ -47,7 +47,6 @@ const HOST = process.env.HOST || '0.0.0.0';
 const JWT_SECRET = process.env.JWT_SECRET;
 const DEFAULT_COLLECTION_NAME = "My Collection";
 const MAX_PROFILE_HIGHLIGHTS = 4;
-const PROFILE_HIGHLIGHT_CANDIDATE_LIMIT = 25;
 const PROFILE_RECENT_DEFAULT_LIMIT = 4;
 const PROFILE_RECENT_MAX_LIMIT = 20;
 
@@ -1522,35 +1521,6 @@ app.post('/api/profile/highlights', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('Failed to update profile highlights', err);
     res.status(500).json({ error: 'Failed to update profile highlights' });
-  }
-});
-
-app.get('/api/profile/highlights/candidates', requireAuth, async (req, res) => {
-  console.log('Searching highlight candidates...');
-  const query = typeof req.query.q === 'string' ? req.query.q.trim() : '';
-  try {
-    const pool = await getPool();
-    const params = [req.userUuid];
-    let whereClause = '';
-    if (query) {
-      params.push(`%${query}%`, `%${query}%`);
-      whereClause = 'AND (r.name LIKE ? OR r.artist LIKE ?)';
-    }
-
-    const [rows] = await pool.query(
-      `SELECT r.id, r.name as record, r.artist, r.cover, r.tableId, t.name as collectionName
-       FROM Record r
-       LEFT JOIN RecTable t ON r.tableId = t.id
-       WHERE r.userUuid = ? ${whereClause}
-       ORDER BY r.added DESC
-       LIMIT ${PROFILE_HIGHLIGHT_CANDIDATE_LIMIT}`,
-      params
-    );
-
-    res.json({ records: rows || [] });
-  } catch (err) {
-    console.error('Failed to search highlight candidates', err);
-    res.status(500).json({ error: 'Failed to search highlight candidates' });
   }
 });
 

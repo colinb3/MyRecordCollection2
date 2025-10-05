@@ -9,7 +9,6 @@ import Register from "./Register";
 import RequireAuth from "./RequireAuth";
 import NotFound from "./NotFound";
 import Settings from "./Settings";
-import Profile from "./Profile";
 import Community from "./Community";
 import CommunityProfile from "./CommunityProfile";
 import CommunityCollection from "./CommunityCollection";
@@ -77,14 +76,6 @@ export default function AppRouter() {
           element={
             <RequireAuth>
               <Settings />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/profile"
-          element={
-            <RequireAuth>
-              <Profile />
             </RequireAuth>
           }
         />

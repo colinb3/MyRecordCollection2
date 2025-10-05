@@ -14,6 +14,7 @@ import {
   Avatar,
   Button,
   CircularProgress,
+  IconButton,
 } from "@mui/material";
 import Grid from "@mui/material/Grid";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -26,12 +27,19 @@ import {
 } from "./userInfo";
 import { clearRecordTablePreferencesCache } from "./preferences";
 import { setUserId } from "./analytics";
-import { clearProfileHighlightsCache } from "./profileHighlights";
+import {
+  clearProfileHighlightsCache,
+  loadProfileHighlights,
+} from "./profileHighlights";
 import { clearCollectionRecordsCache } from "./collectionRecords";
 import RecordPreviewGrid from "./components/RecordPreviewGrid";
-import type { PublicUserProfile } from "./types";
+import type { PublicUserProfile, Record as MrcRecord } from "./types";
 import { clearCommunityCaches, loadPublicUserProfile } from "./communityUsers";
 import apiUrl from "./api";
+import { loadRecentRecords } from "./profileRecentRecords";
+import SettingsIcon from "@mui/icons-material/Settings";
+
+const OWN_PREVIEW_LIMIT = 4;
 
 interface SectionCardProps {
   title: string;
@@ -107,43 +115,105 @@ export default function CommunityProfile() {
     };
   }, [navigate]);
 
+  const normalizedTarget = targetUsername.trim().toLowerCase();
+  const normalizedCurrent = (username ?? "").toLowerCase();
+  const isViewingOwnProfile =
+    normalizedTarget.length === 0 || normalizedTarget === normalizedCurrent;
+
   useEffect(() => {
-    if (!targetUsername) {
-      setError("Missing username");
-      setProfile(null);
-      setLoading(false);
+    let cancelled = false;
+
+    if (isViewingOwnProfile && !username) {
       return;
     }
-    let cancelled = false;
+
     setLoading(true);
     setError(null);
 
-    loadPublicUserProfile(targetUsername)
-      .then((data) => {
-        if (cancelled) return;
-        setProfile(data);
-        setError(null);
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        const message =
-          err instanceof Error ? err.message : "Failed to load profile";
-        setProfile(null);
-        setError(message);
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
+    const loadData = async () => {
+      if (isViewingOwnProfile) {
+        try {
+          const userInfo = await loadUserInfo();
+          if (cancelled) return;
+          if (!userInfo) {
+            setProfile(null);
+            setError("Failed to load profile");
+            return;
+          }
+          const [highlightsData, recentData] = await Promise.all([
+            loadProfileHighlights().catch((err) => {
+              console.warn("Failed to load profile highlights", err);
+              return null;
+            }),
+            loadRecentRecords().catch((err) => {
+              console.warn("Failed to load recent records", err);
+              return [] as MrcRecord[];
+            }),
+          ]);
+          if (cancelled) return;
+          setProfile({
+            username: userInfo.username,
+            displayName: userInfo.displayName ?? null,
+            bio: userInfo.bio ?? null,
+            profilePicUrl: userInfo.profilePicUrl ?? null,
+            highlights: highlightsData?.records ?? [],
+            recentRecords: recentData ?? [],
+          });
+          setError(null);
+        } catch (err: unknown) {
+          if (cancelled) return;
+          const message =
+            err instanceof Error ? err.message : "Failed to load profile";
+          setProfile(null);
+          setError(message);
+        } finally {
+          if (!cancelled) {
+            setLoading(false);
+          }
         }
-      });
+      } else {
+        try {
+          const data = await loadPublicUserProfile(targetUsername);
+          if (cancelled) return;
+          setProfile(data);
+          setError(null);
+        } catch (err: unknown) {
+          if (cancelled) return;
+          const message =
+            err instanceof Error ? err.message : "Failed to load profile";
+          setProfile(null);
+          setError(message);
+        } finally {
+          if (!cancelled) {
+            setLoading(false);
+          }
+        }
+      }
+    };
+
+    loadData();
 
     return () => {
       cancelled = true;
     };
-  }, [targetUsername]);
+  }, [isViewingOwnProfile, normalizedTarget, targetUsername, username]);
 
-  const highlights = useMemo(() => profile?.highlights ?? [], [profile]);
-  const recentRecords = useMemo(() => profile?.recentRecords ?? [], [profile]);
+  const highlights = useMemo(() => {
+    const records = profile?.highlights ?? [];
+    return isViewingOwnProfile ? records.slice(0, OWN_PREVIEW_LIMIT) : records;
+  }, [profile, isViewingOwnProfile]);
+
+  const recentRecords = useMemo(() => {
+    const records = profile?.recentRecords ?? [];
+    return isViewingOwnProfile ? records.slice(0, OWN_PREVIEW_LIMIT) : records;
+  }, [profile, isViewingOwnProfile]);
+
+  const profileUsername = profile?.username ?? (targetUsername || username);
+  const targetDisplayName =
+    profile?.displayName || profileUsername || username || "";
+  const targetAvatarInitial = targetDisplayName
+    ? targetDisplayName.charAt(0).toUpperCase()
+    : "";
 
   const handleLogout = useCallback(async () => {
     await fetch(apiUrl("/api/logout"), {
@@ -163,6 +233,10 @@ export default function CommunityProfile() {
     navigate("/login");
   }, [navigate]);
 
+  const handleOpenProfileSettings = useCallback(() => {
+    navigate("/settings");
+  }, [navigate]);
+
   const handleCommunitySearch = useCallback(
     (value: string) => {
       const trimmed = value.trim();
@@ -176,16 +250,31 @@ export default function CommunityProfile() {
   );
 
   const handleSeeCollection = useCallback(() => {
-    if (!targetUsername) return;
-    navigate(`/community/${encodeURIComponent(targetUsername)}/collection`);
-  }, [navigate, targetUsername]);
-
-  const targetDisplayName = profile?.displayName || targetUsername;
-  const targetAvatarInitial = (profile?.displayName || targetUsername)
-    .charAt(0)
-    .toUpperCase();
+    if (isViewingOwnProfile) {
+      navigate("/mycollection");
+      return;
+    }
+    if (!profileUsername) return;
+    navigate(`/community/${encodeURIComponent(profileUsername)}/collection`);
+  }, [isViewingOwnProfile, navigate, profileUsername]);
 
   const initialSearchValue = searchParams.get("q") ?? "";
+  const topBarProps = {
+    onSearchChange: handleCommunitySearch,
+    searchMode: "submit" as const,
+    searchPlaceholder: "Search for users",
+    initialSearchValue,
+  };
+
+  const seeCollectionLabel = isViewingOwnProfile
+    ? "Go to My Collection"
+    : "See Full Collection";
+  const highlightEmptyCopy = isViewingOwnProfile
+    ? "No Highlights Set"
+    : "No highlights shared yet.";
+  const recentEmptyCopy = isViewingOwnProfile
+    ? "No recent additions yet."
+    : "No recent additions available.";
 
   return (
     <ThemeProvider theme={darkTheme}>
@@ -200,17 +289,14 @@ export default function CommunityProfile() {
         }}
       >
         <TopBar
-          title="Community"
+          title={isViewingOwnProfile ? "Your Profile" : "Community"}
           username={username}
           displayName={displayName}
           profilePicUrl={profilePicUrl ?? undefined}
           onLogout={handleLogout}
-          onSearchChange={handleCommunitySearch}
-          searchMode="submit"
-          searchPlaceholder="Search for users"
-          initialSearchValue={initialSearchValue}
+          {...topBarProps}
         />
-        <Box sx={{ flex: 1, overflowY: "auto", pb: 3, px: 1 }}>
+        <Box sx={{ flex: 1, overflowY: "auto", pb: 3, pr: 1 }}>
           <Grid container spacing={2}>
             <Grid size={{ xs: 12 }}>
               <Paper
@@ -221,6 +307,7 @@ export default function CommunityProfile() {
                   flexDirection: { xs: "column", sm: "row" },
                   alignItems: "flex-start",
                   gap: 3,
+                  position: "relative",
                 }}
               >
                 {loading ? (
@@ -240,6 +327,16 @@ export default function CommunityProfile() {
                   <Typography color="error">{error}</Typography>
                 ) : profile ? (
                   <>
+                    {isViewingOwnProfile && (
+                      <IconButton
+                        color="inherit"
+                        aria-label="Open profile settings"
+                        onClick={handleOpenProfileSettings}
+                        sx={{ position: "absolute", top: 16, right: 16 }}
+                      >
+                        <SettingsIcon />
+                      </IconButton>
+                    )}
                     <Avatar
                       variant="rounded"
                       sx={{
@@ -258,7 +355,7 @@ export default function CommunityProfile() {
                         color="text.secondary"
                         sx={{ pb: 1 }}
                       >
-                        @{profile.username}
+                        @{profileUsername}
                       </Typography>
                       {profile.bio && profile.bio.trim().length > 0 && (
                         <Typography
@@ -290,7 +387,7 @@ export default function CommunityProfile() {
                   </Box>
                 ) : highlights.length === 0 ? (
                   <Typography color="text.secondary">
-                    No highlights shared yet.
+                    {highlightEmptyCopy}
                   </Typography>
                 ) : (
                   <RecordPreviewGrid
@@ -312,7 +409,7 @@ export default function CommunityProfile() {
                   </Box>
                 ) : recentRecords.length === 0 ? (
                   <Typography color="text.secondary">
-                    No recent additions available.
+                    {recentEmptyCopy}
                   </Typography>
                 ) : (
                   <RecordPreviewGrid
@@ -322,7 +419,7 @@ export default function CommunityProfile() {
                 )}
                 <Box sx={{ mt: 1 }}>
                   <Button variant="contained" onClick={handleSeeCollection}>
-                    See Full Collection
+                    {seeCollectionLabel}
                   </Button>
                 </Box>
               </SectionCard>

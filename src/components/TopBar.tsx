@@ -177,7 +177,14 @@ export default function TopBar({
               </MenuItem>
               <MenuItem
                 onClick={() => {
-                  navigate("/profile");
+                  const trimmedUsername = (username || "").trim();
+                  if (trimmedUsername) {
+                    navigate(
+                      `/community/${encodeURIComponent(trimmedUsername)}`
+                    );
+                  } else {
+                    navigate("/community");
+                  }
                   handleMenuClose();
                 }}
               >
