@@ -495,7 +495,12 @@ export default function Collection({ tableName, title }: CollectionProps) {
         <Grid
           container
           spacing={2}
-          sx={{ flex: "1 1 0", minHeight: 0, overflow: "hidden" }}
+          sx={{
+            flex: "1 1 0",
+            minHeight: 0,
+            overflow: "hidden",
+            pb: { xs: 1, sm: 0 },
+          }}
         >
           <Grid
             size={{ xs: isLargeScreen ? 9 : 12 }}

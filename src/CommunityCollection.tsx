@@ -257,8 +257,7 @@ export default function CommunityCollection() {
             flex: 1,
             display: "flex",
             flexDirection: "column",
-            pb: 3,
-            px: 1,
+            pb: { xs: 1, sm: 0 },
             overflow: "hidden",
           }}
         >
