@@ -12,6 +12,7 @@ import Settings from "./Settings";
 import Community from "./Community";
 import CommunityProfile from "./CommunityProfile";
 import CommunityCollection from "./CommunityCollection";
+import CommunityFollows from "./CommunityFollows";
 import { useLocation } from "react-router-dom";
 import { trackPage } from "./analytics";
 import { loadUserInfo } from "./userInfo";
@@ -100,6 +101,14 @@ export default function AppRouter() {
           element={
             <RequireAuth>
               <CommunityCollection />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/community/:username/follows"
+          element={
+            <RequireAuth>
+              <CommunityFollows />
             </RequireAuth>
           }
         />

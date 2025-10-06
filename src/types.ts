@@ -90,6 +90,8 @@ export interface UserInfo {
   userUuid: string;
   bio: string | null;
   profilePicUrl: string | null;
+  followersCount: number;
+  followingCount: number;
 }
 
 export interface ProfileHighlights {
@@ -101,6 +103,8 @@ export interface CommunityUserSummary {
   username: string;
   displayName: string | null;
   profilePicUrl: string | null;
+  followersCount: number;
+  followingCount: number;
 }
 
 export interface PublicUserProfile {
@@ -110,4 +114,12 @@ export interface PublicUserProfile {
   profilePicUrl: string | null;
   highlights: Record[];
   recentRecords: Record[];
+  followersCount: number;
+  followingCount: number;
+  isFollowing: boolean | null;
+}
+
+export interface UserFollowLists {
+  followers: CommunityUserSummary[];
+  following: CommunityUserSummary[];
 }

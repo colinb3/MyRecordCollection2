@@ -4,6 +4,7 @@ import type {
   CommunityUserSummary,
   PublicUserProfile,
   Record as MrcRecord,
+  UserFollowLists,
 } from "./types";
 
 type AnyObject = { [key: string]: unknown };
@@ -34,6 +35,14 @@ function normalizeProfilePicUrl(raw: unknown): string | null {
   return apiUrl(normalized);
 }
 
+function normalizeCount(value: unknown): number {
+  const num = Number(value);
+  if (!Number.isFinite(num) || num < 0) {
+    return 0;
+  }
+  return Math.trunc(num);
+}
+
 function normalizeUserSummary(raw: AnyObject): CommunityUserSummary {
   const username = typeof raw.username === "string" ? raw.username : "";
   const displayName =
@@ -41,10 +50,14 @@ function normalizeUserSummary(raw: AnyObject): CommunityUserSummary {
       ? raw.displayName
       : null;
   const profilePicUrl = normalizeProfilePicUrl(raw.profilePicUrl);
+  const followersCount = normalizeCount(raw.followersCount);
+  const followingCount = normalizeCount(raw.followingCount);
   return {
     username,
     displayName,
     profilePicUrl,
+    followersCount,
+    followingCount,
   };
 }
 
@@ -164,6 +177,12 @@ export async function loadPublicUserProfile(
         profilePicUrl: normalizeProfilePicUrl(data.profilePicUrl),
         highlights: normalizeRecords(data.highlights),
         recentRecords: normalizeRecords(data.recentRecords),
+        followersCount: normalizeCount(data.followersCount),
+        followingCount: normalizeCount(data.followingCount),
+        isFollowing:
+          typeof data.isFollowing === "boolean"
+            ? data.isFollowing
+            : null,
       };
       profileCache.set(key, {
         ...normalizedProfile,
@@ -182,6 +201,87 @@ export async function loadPublicUserProfile(
 
 const collectionCache = new Map<string, MrcRecord[]>();
 const collectionInFlight = new Map<string, Promise<MrcRecord[]>>();
+
+const followsCache = new Map<string, UserFollowLists>();
+const followsInFlight = new Map<string, Promise<UserFollowLists>>();
+
+export interface FollowCountsSummary {
+  followersCount: number;
+  followingCount: number;
+}
+
+export interface FollowActionResult {
+  target: FollowCountsSummary;
+  viewer: FollowCountsSummary;
+  isFollowing: boolean;
+}
+
+function normalizeFollowCounts(raw: unknown): FollowCountsSummary {
+  if (!raw || typeof raw !== "object") {
+    return { followersCount: 0, followingCount: 0 };
+  }
+  const obj = raw as AnyObject;
+  return {
+    followersCount: normalizeCount(obj.followersCount),
+    followingCount: normalizeCount(obj.followingCount),
+  };
+}
+
+async function performFollowRequest(
+  username: string,
+  method: "POST" | "DELETE"
+): Promise<FollowActionResult> {
+  const trimmed = username.trim();
+  if (!trimmed) {
+    const error = new Error("Username is required");
+    (error as any).status = 400;
+    throw error;
+  }
+
+  const res = await fetch(apiUrl(`/api/community/users/${encodeURIComponent(trimmed)}/follow`), {
+    method,
+    credentials: "include",
+  });
+
+  if (!res.ok) {
+    const message = await res
+      .json()
+      .catch(() => ({}))
+      .then((data: any) => data?.error || "Failed to update follow status");
+    const error = new Error(message);
+    (error as any).status = res.status;
+    throw error;
+  }
+
+  const payload = (await res.json().catch(() => ({}))) as AnyObject;
+
+  clearCommunityCaches();
+
+  return {
+  target: normalizeFollowCounts(payload?.target),
+  viewer: normalizeFollowCounts(payload?.viewer),
+    isFollowing: Boolean(payload?.isFollowing),
+  };
+}
+
+export function followUser(username: string): Promise<FollowActionResult> {
+  return performFollowRequest(username, "POST");
+}
+
+export function unfollowUser(username: string): Promise<FollowActionResult> {
+  return performFollowRequest(username, "DELETE");
+}
+
+function cloneUserSummary(summary: CommunityUserSummary): CommunityUserSummary {
+  return { ...summary };
+}
+
+function cloneFollowLists(lists: UserFollowLists): UserFollowLists {
+  return {
+    followers: lists.followers.map(cloneUserSummary),
+    following: lists.following.map(cloneUserSummary),
+  };
+}
 
 export async function loadPublicUserCollection(
   username: string,
@@ -240,6 +340,64 @@ export async function loadPublicUserCollection(
   return fetchPromise;
 }
 
+export async function loadUserFollows(username: string): Promise<UserFollowLists> {
+  const normalizedUser = username.trim().toLowerCase();
+  if (!normalizedUser) {
+    const error = new Error("Username is required");
+    (error as any).status = 400;
+    throw error;
+  }
+
+  if (followsCache.has(normalizedUser)) {
+    return cloneFollowLists(followsCache.get(normalizedUser)!);
+  }
+
+  if (followsInFlight.has(normalizedUser)) {
+    return followsInFlight.get(normalizedUser)!;
+  }
+
+  const fetchPromise = (async () => {
+    try {
+      const res = await fetch(
+        apiUrl(`/api/community/users/${username}/follows`),
+        {
+          credentials: "include",
+        }
+      );
+      if (!res.ok) {
+        const message = await res
+          .json()
+          .catch(() => ({}))
+          .then((data: any) => data?.error || "Failed to load follows");
+        const error = new Error(message);
+        (error as any).status = res.status;
+        throw error;
+      }
+
+      const data = (await res.json().catch(() => ({}))) as AnyObject;
+      const followersRaw = Array.isArray(data.followers) ? data.followers : [];
+      const followingRaw = Array.isArray(data.following) ? data.following : [];
+
+      const follows: UserFollowLists = {
+        followers: followersRaw
+          .filter((item): item is AnyObject => isObject(item))
+          .map((item) => normalizeUserSummary(item)),
+        following: followingRaw
+          .filter((item): item is AnyObject => isObject(item))
+          .map((item) => normalizeUserSummary(item)),
+      };
+
+      followsCache.set(normalizedUser, cloneFollowLists(follows));
+      return cloneFollowLists(follows);
+    } finally {
+      followsInFlight.delete(normalizedUser);
+    }
+  })();
+
+  followsInFlight.set(normalizedUser, fetchPromise);
+  return fetchPromise;
+}
+
 export function clearCommunityCaches(): void {
   searchCache.clear();
   searchInFlight.clear();
@@ -247,4 +405,6 @@ export function clearCommunityCaches(): void {
   profileInFlight.clear();
   collectionCache.clear();
   collectionInFlight.clear();
+  followsCache.clear();
+  followsInFlight.clear();
 }

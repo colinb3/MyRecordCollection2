@@ -103,6 +103,14 @@ async function deleteProfilePicFile(relativePath) {
   }
 }
 
+function normalizeFollowCount(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num) || num < 0) {
+    return 0;
+  }
+  return Math.trunc(num);
+}
+
 const RECORD_TABLE_COLUMN_KEYS = [
   "cover",
   "record",
@@ -249,11 +257,42 @@ async function fetchRecordsWithTagsByIds(pool, userUuid, recordIds) {
 
 async function getUserByUsername(pool, username) {
   const [rows] = await pool.execute(
-    `SELECT uuid, username, displayName, bio, profilePic FROM User WHERE username = ? LIMIT 1`,
+    `SELECT u.uuid, u.username, u.displayName, u.bio, u.profilePic,
+            (SELECT COUNT(*) FROM Follows WHERE followsUuid = u.uuid) AS followersCount,
+            (SELECT COUNT(*) FROM Follows WHERE userUuid = u.uuid) AS followingCount
+     FROM User u WHERE u.username = ? LIMIT 1`,
     [username]
   );
   if (!rows || rows.length === 0) return null;
   return rows[0];
+}
+
+async function getFollowersForUser(pool, userUuid) {
+  const [rows] = await pool.query(
+    `SELECT follower.username, follower.displayName, follower.profilePic,
+            (SELECT COUNT(*) FROM Follows WHERE followsUuid = follower.uuid) AS followersCount,
+            (SELECT COUNT(*) FROM Follows WHERE userUuid = follower.uuid) AS followingCount
+     FROM Follows f
+     JOIN User follower ON f.userUuid = follower.uuid
+     WHERE f.followsUuid = ?
+     ORDER BY follower.username`,
+    [userUuid]
+  );
+  return rows.map(mapCommunityUserSummary);
+}
+
+async function getFollowingForUser(pool, userUuid) {
+  const [rows] = await pool.query(
+    `SELECT following.username, following.displayName, following.profilePic,
+            (SELECT COUNT(*) FROM Follows WHERE followsUuid = following.uuid) AS followersCount,
+            (SELECT COUNT(*) FROM Follows WHERE userUuid = following.uuid) AS followingCount
+     FROM Follows f
+     JOIN User following ON f.followsUuid = following.uuid
+     WHERE f.userUuid = ?
+     ORDER BY following.username`,
+    [userUuid]
+  );
+  return rows.map(mapCommunityUserSummary);
 }
 
 function normalizePublicUser(row) {
@@ -266,11 +305,31 @@ function normalizePublicUser(row) {
     typeof row.bio === "string" && row.bio.trim().length > 0
       ? row.bio.trim()
       : null;
+  const followersCount = normalizeFollowCount(row.followersCount);
+  const followingCount = normalizeFollowCount(row.followingCount);
   return {
     username: row.username,
     displayName,
     bio,
     profilePicUrl: buildProfilePicPublicPath(row.profilePic),
+    followersCount,
+    followingCount,
+  };
+}
+
+function mapCommunityUserSummary(row) {
+  const displayName =
+    typeof row.displayName === "string" && row.displayName.trim()
+      ? row.displayName.trim()
+      : null;
+  const followersCount = normalizeFollowCount(row.followersCount);
+  const followingCount = normalizeFollowCount(row.followingCount);
+  return {
+    username: row.username,
+    displayName,
+    profilePicUrl: buildProfilePicPublicPath(row.profilePic),
+    followersCount,
+    followingCount,
   };
 }
 
@@ -296,6 +355,20 @@ async function fetchTagsByRecordIds(pool, recordIds) {
     tagsByRecord[recordId].push(row.name);
   }
   return tagsByRecord;
+}
+
+async function getUserFollowCounts(pool, userUuid) {
+  const [rows] = await pool.query(
+    `SELECT
+       (SELECT COUNT(*) FROM Follows WHERE followsUuid = ?) AS followersCount,
+       (SELECT COUNT(*) FROM Follows WHERE userUuid = ?) AS followingCount`,
+    [userUuid, userUuid]
+  );
+  const row = Array.isArray(rows) && rows.length > 0 ? rows[0] : {};
+  return {
+    followersCount: normalizeFollowCount(row.followersCount),
+    followingCount: normalizeFollowCount(row.followingCount),
+  };
 }
 
 // In production we require a JWT secret
@@ -528,25 +601,16 @@ app.get("/api/community/search", requireAuth, async (req, res) => {
     const pool = await getPool();
     const likeTerm = `%${escapeForLike(rawQuery)}%`;
     const [rows] = await pool.query(
-      `SELECT username, displayName, profilePic FROM User
-       WHERE username LIKE ? OR displayName LIKE ?
-       ORDER BY username
+      `SELECT u.username, u.displayName, u.profilePic,
+              (SELECT COUNT(*) FROM Follows WHERE followsUuid = u.uuid) AS followersCount,
+              (SELECT COUNT(*) FROM Follows WHERE userUuid = u.uuid) AS followingCount
+       FROM User u
+       WHERE u.username LIKE ? OR u.displayName LIKE ?
+       ORDER BY u.username
        LIMIT 10`,
       [likeTerm, likeTerm]
     );
-    const results = rows
-      .map((row) => {
-        const displayName =
-          typeof row.displayName === "string" && row.displayName.trim()
-            ? row.displayName.trim()
-            : null;
-        return {
-          username: row.username,
-          displayName,
-          profilePicUrl: buildProfilePicPublicPath(row.profilePic),
-        };
-      })
-      .filter((value) => value !== null);
+    const results = rows.map(mapCommunityUserSummary);
     res.json(results);
   } catch (error) {
     console.error("Community user search failed", error);
@@ -568,6 +632,15 @@ app.get("/api/community/users/:username", requireAuth, async (req, res) => {
     }
 
     const publicUser = normalizePublicUser(userRow);
+
+    let isFollowing = null;
+    if (userRow.uuid !== req.userUuid) {
+      const [followRows] = await pool.query(
+        `SELECT 1 FROM Follows WHERE userUuid = ? AND followsUuid = ? LIMIT 1`,
+        [req.userUuid, userRow.uuid]
+      );
+      isFollowing = Array.isArray(followRows) && followRows.length > 0;
+    }
 
     const highlightIds = await getProfileHighlightIds(pool, userRow.uuid);
     const highlights = await fetchRecordsWithTagsByIds(
@@ -597,6 +670,7 @@ app.get("/api/community/users/:username", requireAuth, async (req, res) => {
       ...publicUser,
       highlights,
       recentRecords,
+      isFollowing,
     });
   } catch (error) {
     console.error("Failed to load public profile", error);
@@ -649,6 +723,36 @@ app.get(
   }
 );
 
+app.get(
+  "/api/community/users/:username/follows",
+  requireAuth,
+  async (req, res) => {
+    console.log("Fetching followers/following...");
+    const targetUsername = req.params.username;
+    if (!targetUsername) {
+      return res.status(400).json({ error: "Username is required" });
+    }
+
+    try {
+      const pool = await getPool();
+      const userRow = await getUserByUsername(pool, targetUsername);
+      if (!userRow) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const [followers, following] = await Promise.all([
+        getFollowersForUser(pool, userRow.uuid),
+        getFollowingForUser(pool, userRow.uuid),
+      ]);
+
+      res.json({ followers, following });
+    } catch (error) {
+      console.error("Failed to load follows", error);
+      res.status(500).json({ error: "Failed to load follows" });
+    }
+  }
+);
+
 app.get("/api/tags", requireAuth, async (req, res) => {
   console.log("Fetching tags...");
   try {
@@ -660,6 +764,98 @@ app.get("/api/tags", requireAuth, async (req, res) => {
     res.status(500).json({ error: "DB error" });
   }
 });
+
+app.post(
+  "/api/community/users/:username/follow",
+  requireAuth,
+  async (req, res) => {
+    console.log("Following user...");
+    const targetUsername = req.params.username;
+    if (!targetUsername) {
+      return res.status(400).json({ error: "Username is required" });
+    }
+
+    try {
+      const pool = await getPool();
+      const targetUser = await getUserByUsername(pool, targetUsername);
+      if (!targetUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      if (targetUser.uuid === req.userUuid) {
+        return res.status(400).json({ error: "You cannot follow yourself" });
+      }
+
+      try {
+        await pool.execute(
+          `INSERT INTO Follows (userUuid, followsUuid) VALUES (?, ?)`,
+          [req.userUuid, targetUser.uuid]
+        );
+      } catch (error) {
+        if (!error || error.code !== "ER_DUP_ENTRY") {
+          throw error;
+        }
+      }
+
+      const [targetCounts, viewerCounts] = await Promise.all([
+        getUserFollowCounts(pool, targetUser.uuid),
+        getUserFollowCounts(pool, req.userUuid),
+      ]);
+
+      res.json({
+        target: targetCounts,
+        viewer: viewerCounts,
+        isFollowing: true,
+      });
+    } catch (error) {
+      console.error("Failed to follow user", error);
+      res.status(500).json({ error: "Failed to follow user" });
+    }
+  }
+);
+
+app.delete(
+  "/api/community/users/:username/follow",
+  requireAuth,
+  async (req, res) => {
+    console.log("Unfollowing user...");
+    const targetUsername = req.params.username;
+    if (!targetUsername) {
+      return res.status(400).json({ error: "Username is required" });
+    }
+
+    try {
+      const pool = await getPool();
+      const targetUser = await getUserByUsername(pool, targetUsername);
+      if (!targetUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      if (targetUser.uuid === req.userUuid) {
+        return res.status(400).json({ error: "You cannot unfollow yourself" });
+      }
+
+      await pool.execute(
+        `DELETE FROM Follows WHERE userUuid = ? AND followsUuid = ?`,
+        [req.userUuid, targetUser.uuid]
+      );
+
+      const [targetCounts, viewerCounts] = await Promise.all([
+        getUserFollowCounts(pool, targetUser.uuid),
+        getUserFollowCounts(pool, req.userUuid),
+      ]);
+
+      res.json({
+        target: targetCounts,
+        viewer: viewerCounts,
+        isFollowing: false,
+      });
+    } catch (error) {
+      console.error("Failed to unfollow user", error);
+      res.status(500).json({ error: "Failed to unfollow user" });
+    }
+  }
+);
 
 // Register endpoint
 app.post('/api/register', async (req, res) => {
@@ -747,16 +943,35 @@ app.get('/api/me', requireAuth, async (req, res) => {
   console.log("Fetching user info...");
   try {
     const pool = await getPool();
-    const [rows] = await pool.execute('SELECT username, displayName, bio, profilePic FROM User WHERE uuid = ?', [req.userUuid]);
+    const [rows] = await pool.execute(
+      `SELECT u.username, u.displayName, u.bio, u.profilePic,
+              (SELECT COUNT(*) FROM Follows WHERE followsUuid = u.uuid) AS followersCount,
+              (SELECT COUNT(*) FROM Follows WHERE userUuid = u.uuid) AS followingCount
+       FROM User u
+       WHERE u.uuid = ?
+       LIMIT 1`,
+      [req.userUuid]
+    );
     if (rows.length === 0) return res.status(404).json({ error: 'User not found' });
     // Also return the userUuid so clients can wire analytics user_id without decoding the token
-    const profilePicUrl = buildProfilePicPublicPath(rows[0].profilePic);
+    const userRow = rows[0];
+    const profilePicUrl = buildProfilePicPublicPath(userRow.profilePic);
+    const followersCountRaw = Number(userRow.followersCount);
+    const followersCount = Number.isFinite(followersCountRaw)
+      ? Math.max(0, Math.trunc(followersCountRaw))
+      : 0;
+    const followingCountRaw = Number(userRow.followingCount);
+    const followingCount = Number.isFinite(followingCountRaw)
+      ? Math.max(0, Math.trunc(followingCountRaw))
+      : 0;
     res.json({
-      username: rows[0].username,
-      displayName: rows[0].displayName,
-      bio: rows[0].bio ?? null,
+      username: userRow.username,
+      displayName: userRow.displayName,
+      bio: userRow.bio ?? null,
       profilePicUrl,
       userUuid: req.userUuid,
+      followersCount,
+      followingCount,
     });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch user info' });

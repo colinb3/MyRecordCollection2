@@ -63,6 +63,14 @@ export async function loadUserInfo(
           profilePicUrl = apiUrl(normalizedPath);
         }
       }
+      const followersCountRaw = Number((data as Record<string, unknown>).followersCount);
+      const followersCount = Number.isFinite(followersCountRaw)
+        ? Math.max(0, Math.trunc(followersCountRaw))
+        : 0;
+      const followingCountRaw = Number((data as Record<string, unknown>).followingCount);
+      const followingCount = Number.isFinite(followingCountRaw)
+        ? Math.max(0, Math.trunc(followingCountRaw))
+        : 0;
       if (!username || !userUuid) {
         throw new Error("Invalid user info payload");
       }
@@ -72,6 +80,8 @@ export async function loadUserInfo(
         userUuid,
         bio,
         profilePicUrl,
+        followersCount,
+        followingCount,
       };
       cachedUserInfo = normalized;
       return { ...normalized };

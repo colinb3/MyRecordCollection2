@@ -34,7 +34,12 @@ import {
 import { clearCollectionRecordsCache } from "./collectionRecords";
 import RecordPreviewGrid from "./components/RecordPreviewGrid";
 import type { PublicUserProfile, Record as MrcRecord } from "./types";
-import { clearCommunityCaches, loadPublicUserProfile } from "./communityUsers";
+import {
+  clearCommunityCaches,
+  followUser,
+  loadPublicUserProfile,
+  unfollowUser,
+} from "./communityUsers";
 import apiUrl from "./api";
 import { loadRecentRecords } from "./profileRecentRecords";
 import SettingsIcon from "@mui/icons-material/Settings";
@@ -89,6 +94,8 @@ export default function CommunityProfile() {
   const [profile, setProfile] = useState<PublicUserProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [followPending, setFollowPending] = useState<boolean>(false);
+  const [followError, setFollowError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -158,6 +165,9 @@ export default function CommunityProfile() {
             profilePicUrl: userInfo.profilePicUrl ?? null,
             highlights: highlightsData?.records ?? [],
             recentRecords: recentData ?? [],
+            followersCount: userInfo.followersCount,
+            followingCount: userInfo.followingCount,
+            isFollowing: null,
           });
           setError(null);
         } catch (err: unknown) {
@@ -258,6 +268,66 @@ export default function CommunityProfile() {
     navigate(`/community/${encodeURIComponent(profileUsername)}/collection`);
   }, [isViewingOwnProfile, navigate, profileUsername]);
 
+  const handleViewFollows = useCallback(
+    (tab: "followers" | "following") => {
+      if (!profileUsername) return;
+      navigate(
+        `/community/${encodeURIComponent(profileUsername)}/follows?tab=${tab}`
+      );
+    },
+    [navigate, profileUsername]
+  );
+
+  const handleToggleFollow = useCallback(async () => {
+    if (!profile || profile.isFollowing === null || followPending) {
+      return;
+    }
+
+    const targetUsername = profile.username;
+    const normalizedTarget = targetUsername.toLowerCase();
+    const currentlyFollowing = profile.isFollowing;
+
+    setFollowPending(true);
+    setFollowError(null);
+
+    try {
+      const result = currentlyFollowing
+        ? await unfollowUser(targetUsername)
+        : await followUser(targetUsername);
+
+      setProfile((prev) => {
+        if (!prev) return prev;
+        if (prev.username.toLowerCase() !== normalizedTarget) {
+          return prev;
+        }
+        return {
+          ...prev,
+          followersCount: result.target.followersCount,
+          followingCount: result.target.followingCount,
+          isFollowing: result.isFollowing,
+        };
+      });
+
+      const updatedInfo = await loadUserInfo(true);
+      if (updatedInfo) {
+        setUsername(updatedInfo.username);
+        setDisplayName(updatedInfo.displayName ?? "");
+        setProfilePicUrl(updatedInfo.profilePicUrl ?? null);
+      }
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Failed to update follow status";
+      setFollowError(message);
+    } finally {
+      setFollowPending(false);
+    }
+  }, [followPending, profile]);
+
+  useEffect(() => {
+    setFollowError(null);
+    setFollowPending(false);
+  }, [profile?.username]);
+
   const initialSearchValue = searchParams.get("q") ?? "";
   const topBarProps = {
     onSearchChange: handleCommunitySearch,
@@ -349,18 +419,71 @@ export default function CommunityProfile() {
                       {!profile.profilePicUrl && targetAvatarInitial}
                     </Avatar>
                     <Box>
-                      <Typography variant="h4">{targetDisplayName}</Typography>
+                      <Typography variant="h4" mt={{ xs: -2, sm: 0 }}>
+                        {targetDisplayName}
+                      </Typography>
                       <Typography
                         variant="subtitle1"
                         color="text.secondary"
-                        sx={{ pb: 1 }}
+                        sx={{ pb: 0.8 }}
                       >
                         @{profileUsername}
                       </Typography>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          gap: 0.5,
+                          flexWrap: "wrap",
+                          mb: profile?.bio ? 1.5 : 0,
+                        }}
+                      >
+                        {typeof profile?.isFollowing === "boolean" && (
+                          <Button
+                            variant={
+                              profile.isFollowing ? "outlined" : "contained"
+                            }
+                            size="small"
+                            onClick={handleToggleFollow}
+                            disabled={followPending}
+                            sx={{ textTransform: "none", minWidth: 0 }}
+                          >
+                            {followPending
+                              ? "Updating…"
+                              : profile.isFollowing
+                              ? "Unfollow"
+                              : "Follow"}
+                          </Button>
+                        )}
+                        <Button
+                          variant="text"
+                          size="small"
+                          onClick={() => handleViewFollows("followers")}
+                          sx={{ textTransform: "none", minWidth: 0 }}
+                        >
+                          {profile?.followersCount.toLocaleString()} Followers
+                        </Button>
+                        <Button
+                          variant="text"
+                          size="small"
+                          onClick={() => handleViewFollows("following")}
+                          sx={{ textTransform: "none", minWidth: 0 }}
+                        >
+                          {profile?.followingCount.toLocaleString()} Following
+                        </Button>
+                      </Box>
+                      {followError && (
+                        <Typography
+                          variant="body2"
+                          color="error"
+                          sx={{ mt: 0.5 }}
+                        >
+                          {followError}
+                        </Typography>
+                      )}
                       {profile.bio && profile.bio.trim().length > 0 && (
                         <Typography
                           variant="body1"
-                          sx={{ mt: 1, whiteSpace: "pre-line" }}
+                          sx={{ whiteSpace: "pre-line" }}
                           color="text.primary"
                         >
                           {profile.bio}

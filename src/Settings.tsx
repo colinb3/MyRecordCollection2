@@ -125,6 +125,8 @@ export default function Settings() {
                   bio: newBio ?? null,
                   profilePicUrl: newProfilePic ?? null,
                   userUuid: uuid,
+                  followersCount: cachedUser?.followersCount ?? 0,
+                  followingCount: cachedUser?.followingCount ?? 0,
                 });
                 setUserUuid(uuid);
               }

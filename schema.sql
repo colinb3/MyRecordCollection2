@@ -52,3 +52,13 @@ CREATE TABLE UserSettings (
     profileHighlights JSON,
     FOREIGN KEY (userUuid) REFERENCES User(uuid) ON DELETE CASCADE
 );
+
+CREATE TABLE Follows (
+    userUuid CHAR(36) NOT NULL,
+    followsUuid CHAR(36) NOT NULL,
+    PRIMARY KEY (userUuid, followsUuid),
+    FOREIGN KEY (userUuid) REFERENCES User(uuid) ON DELETE CASCADE,
+    FOREIGN KEY (followsUuid) REFERENCES User(uuid) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_follows_followed ON Follows (followsUuid);
