@@ -473,7 +473,7 @@ export default function CommunityProfile() {
                         <Typography
                           variant="body2"
                           color="text.secondary"
-                          sx={{ pb: 0.3 }}
+                          sx={{ pb: 0.6 }}
                         >
                           Joined {joinedDateDisplay}
                         </Typography>
@@ -483,8 +483,7 @@ export default function CommunityProfile() {
                           display: "flex",
                           gap: 0.5,
                           flexWrap: "wrap",
-                          mt: 0.5,
-                          mb: profile?.bio ? 1.5 : 0,
+                          mb: profile?.bio ? 0.6 : 0,
                         }}
                       >
                         {typeof profile?.isFollowing === "boolean" && (
