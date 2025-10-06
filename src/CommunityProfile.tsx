@@ -415,6 +415,7 @@ export default function CommunityProfile() {
                   <RecordPreviewGrid
                     records={recentRecords}
                     keyPrefix="recent"
+                    showDateAdded
                   />
                 )}
                 <Box sx={{ mt: 1 }}>

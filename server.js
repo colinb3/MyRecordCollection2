@@ -11,7 +11,6 @@ import { v4 as uuidv4 } from "uuid";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import fetch from "node-fetch";
-import sharp from "sharp";
 
 dotenv.config();
 
@@ -20,11 +19,6 @@ const __dirname = path.dirname(__filename);
 const uploadsRoot = path.join(__dirname, "uploads");
 const profileUploadsDir = path.join(uploadsRoot, "profile");
 const PROFILE_PIC_SIZE_LIMIT = Number(process.env.PROFILE_PIC_MAX_BYTES || 5 * 1024 * 1024);
-const PROFILE_PIC_MAX_DIMENSION = Number(process.env.PROFILE_PIC_MAX_DIMENSION || 512);
-const PROFILE_PIC_JPEG_QUALITY = Number(process.env.PROFILE_PIC_JPEG_QUALITY || 80);
-const PROFILE_PIC_WEBP_QUALITY = Number(process.env.PROFILE_PIC_WEBP_QUALITY || 80);
-const PROFILE_PIC_AVIF_QUALITY = Number(process.env.PROFILE_PIC_AVIF_QUALITY || 45);
-const PROFILE_PIC_PNG_COMPRESSION = Number(process.env.PROFILE_PIC_PNG_COMPRESSION || 9);
 const ALLOWED_PROFILE_MIME_TYPES = new Set([
   "image/jpeg",
   "image/png",
@@ -106,40 +100,6 @@ async function deleteProfilePicFile(relativePath) {
     if (error && error.code !== "ENOENT") {
       console.warn("Failed to delete previous profile picture", error);
     }
-  }
-}
-
-async function optimizeProfileImage(absolutePath, mimetype) {
-  try {
-    const inputBuffer = await fsPromises.readFile(absolutePath);
-    const transformer = sharp(inputBuffer)
-      .rotate()
-      .resize({
-        width: PROFILE_PIC_MAX_DIMENSION,
-        height: PROFILE_PIC_MAX_DIMENSION,
-        fit: sharp.fit.inside,
-        withoutEnlargement: true,
-      });
-
-    let pipeline;
-    if (mimetype === "image/png") {
-      pipeline = transformer.png({
-        compressionLevel: PROFILE_PIC_PNG_COMPRESSION,
-        adaptiveFiltering: true,
-        palette: true,
-      });
-    } else if (mimetype === "image/webp") {
-      pipeline = transformer.webp({ quality: PROFILE_PIC_WEBP_QUALITY, effort: 5 });
-    } else if (mimetype === "image/avif") {
-      pipeline = transformer.avif({ quality: PROFILE_PIC_AVIF_QUALITY, effort: 4 });
-    } else {
-      pipeline = transformer.jpeg({ quality: PROFILE_PIC_JPEG_QUALITY, mozjpeg: true });
-    }
-
-    const buffer = await pipeline.toBuffer();
-    await fsPromises.writeFile(absolutePath, buffer);
-  } catch (error) {
-    throw error;
   }
 }
 
@@ -916,15 +876,6 @@ app.post('/api/profile/avatar', requireAuth, (req, res) => {
     }
 
     const relativePath = buildProfilePicRelativePath(file.filename);
-    const absolutePath = path.join(uploadsRoot, relativePath);
-
-    try {
-      await optimizeProfileImage(absolutePath, file.mimetype);
-    } catch (error) {
-      console.error('Profile picture optimization failed', error);
-      await deleteProfilePicFile(relativePath);
-      return res.status(400).json({ error: 'Unsupported or corrupt image file.' });
-    }
 
     try {
       const pool = await getPool();
@@ -950,7 +901,7 @@ app.post('/api/profile/avatar', requireAuth, (req, res) => {
         profilePicUrl: buildProfilePicPublicPath(relativePath),
       });
     } catch (error) {
-      console.error('Failed to save profile picture', error);
+  console.error('Failed to save profile picture', error);
       await deleteProfilePicFile(relativePath);
       res.status(500).json({ error: 'Failed to save profile picture' });
     }

@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import Box from "@mui/material/Box";
 import Grid from "@mui/material/Grid";
 import Paper from "@mui/material/Paper";
@@ -8,17 +9,31 @@ import type { Record } from "../types";
 interface RecordPreviewGridProps {
   records: Record[];
   keyPrefix?: string;
+  showDateAdded?: boolean;
 }
 
 export default function RecordPreviewGrid({
   records,
   keyPrefix,
+  showDateAdded = false,
 }: RecordPreviewGridProps) {
+  const dateFormatter = useMemo(() => {
+    return new Intl.DateTimeFormat(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  }, []);
+
   return (
     <Grid container spacing={2} maxWidth={800}>
       {records.map((record) => {
         const coverSrc = record.cover || placeholderCover;
         const key = keyPrefix ? `${keyPrefix}-${record.id}` : record.id;
+        const addedDateText =
+          showDateAdded && record.dateAdded
+            ? dateFormatter.format(new Date(record.dateAdded))
+            : null;
         return (
           <Grid size={{ xs: 6, sm: 3 }} key={key}>
             <Paper
@@ -56,9 +71,19 @@ export default function RecordPreviewGrid({
                 <Typography variant="subtitle1" noWrap>
                   {record.record}
                 </Typography>
-                <Typography variant="body2" color="text.secondary" noWrap>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  noWrap
+                  pb={1}
+                >
                   {record.artist}
                 </Typography>
+                {addedDateText && (
+                  <Typography variant="body2" color="text.secondary" noWrap>
+                    {addedDateText}
+                  </Typography>
+                )}
               </Box>
             </Paper>
           </Grid>

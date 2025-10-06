@@ -31,6 +31,7 @@ import {
   setCachedProfileHighlights,
 } from "../../profileHighlights";
 import type { Record as MrcRecord } from "../../types";
+import { optimizeProfileImageFile } from "../../profileImageOptimizer";
 
 interface ProfileSettingsProps {
   username: string;
@@ -467,16 +468,27 @@ export default function ProfileSettings({
       event.target.value = "";
       return;
     }
-    if (file.size > PROFILE_PIC_MAX_SIZE) {
-      setProfilePicError("Image must be 3 MB or smaller.");
-      event.target.value = "";
-      return;
-    }
 
     setProfilePicUploading(true);
     try {
+      const optimizedFile = await optimizeProfileImageFile(file).catch(
+        (error) => {
+          console.warn("Client-side image optimization failed", error);
+          throw new Error(
+            "Could not process that image. Please choose a different file."
+          );
+        }
+      );
+
+      if (optimizedFile.size > PROFILE_PIC_MAX_SIZE) {
+        setProfilePicError(
+          "Optimized image is still larger than 3 MB. Please choose a smaller image."
+        );
+        return;
+      }
+
       const formData = new FormData();
-      formData.append("avatar", file);
+      formData.append("avatar", optimizedFile);
       const res = await fetch(apiUrl("/api/profile/avatar"), {
         method: "POST",
         credentials: "include",
@@ -497,7 +509,11 @@ export default function ProfileSettings({
         profilePicUrl: absoluteUrl ?? null,
       });
     } catch (error) {
-      setProfilePicError("Failed to upload profile picture");
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : "Failed to upload profile picture";
+      setProfilePicError(message);
     } finally {
       setProfilePicUploading(false);
       if (fileInputRef.current) {
@@ -666,7 +682,7 @@ export default function ProfileSettings({
               )}
             </Stack>
             <Typography variant="caption" color="text.secondary">
-              JPG, PNG, WEBP, AVIF (max 5 MB).
+              JPG, PNG, WEBP, AVIF (max 3 MB).
             </Typography>
             {profilePicError && (
               <Alert severity="error" onClose={() => setProfilePicError(null)}>
