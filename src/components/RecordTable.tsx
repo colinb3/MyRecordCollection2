@@ -116,6 +116,8 @@ interface RecordTableProps {
   onSelect?: (record: Record | null) => void;
   initialColumnVisibility?: ColumnVisibilityMap;
   defaultSort?: RecordTableSortPreference;
+  // When true, shows the DataGrid loading overlay
+  loading?: boolean;
 }
 
 export default function RecordTable({
@@ -124,6 +126,7 @@ export default function RecordTable({
   onSelect,
   initialColumnVisibility,
   defaultSort,
+  loading = false,
 }: RecordTableProps) {
   const handleRowClick = (params: any) => {
     onSelect?.(params.row as Record);
@@ -167,6 +170,7 @@ export default function RecordTable({
       key={gridKey}
       rows={records}
       columns={columns}
+      loading={loading}
       initialState={gridInitialState}
       density="comfortable"
       rowHeight={90}

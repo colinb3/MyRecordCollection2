@@ -63,6 +63,9 @@ export async function loadUserInfo(
           profilePicUrl = apiUrl(normalizedPath);
         }
       }
+      const rawJoinedDate =
+        typeof data.joinedDate === "string" ? data.joinedDate.trim() : "";
+      const joinedDate = rawJoinedDate ? rawJoinedDate.slice(0, 10) : null;
       const followersCountRaw = Number((data as Record<string, unknown>).followersCount);
       const followersCount = Number.isFinite(followersCountRaw)
         ? Math.max(0, Math.trunc(followersCountRaw))
@@ -82,6 +85,7 @@ export async function loadUserInfo(
         profilePicUrl,
         followersCount,
         followingCount,
+        joinedDate,
       };
       cachedUserInfo = normalized;
       return { ...normalized };

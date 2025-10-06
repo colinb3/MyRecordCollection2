@@ -2,6 +2,7 @@ import apiUrl from "./api";
 import { normalizeApiRecord } from "./collectionRecords";
 import type {
   CommunityUserSummary,
+  CommunityFeedEntry,
   PublicUserProfile,
   Record as MrcRecord,
   UserFollowLists,
@@ -43,6 +44,26 @@ function normalizeCount(value: unknown): number {
   return Math.trunc(num);
 }
 
+function normalizeDateString(value: unknown): string | null {
+  if (value instanceof Date) {
+    return value.toISOString().slice(0, 10);
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
+      return trimmed.slice(0, 10);
+    }
+    const parsed = new Date(trimmed);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toISOString().slice(0, 10);
+    }
+  }
+
+  return null;
+}
+
 function normalizeUserSummary(raw: AnyObject): CommunityUserSummary {
   const username = typeof raw.username === "string" ? raw.username : "";
   const displayName =
@@ -73,8 +94,69 @@ function normalizeRecords(raw: unknown): MrcRecord[] {
   return normalized;
 }
 
+function cloneFeedEntry(entry: CommunityFeedEntry): CommunityFeedEntry {
+  return {
+    owner: { ...entry.owner },
+    record: cloneRecord(entry.record),
+  };
+}
+
+function cloneFeedEntries(entries: CommunityFeedEntry[]): CommunityFeedEntry[] {
+  return entries.map((entry) => cloneFeedEntry(entry));
+}
+
+function normalizeFeedEntry(raw: AnyObject): CommunityFeedEntry | null {
+  const ownerRaw = raw.owner;
+  const recordRaw = raw.record;
+  if (!isObject(ownerRaw) || !isObject(recordRaw)) {
+    return null;
+  }
+
+  const ownerObject = ownerRaw as AnyObject;
+  const recordObject = recordRaw as AnyObject;
+
+  const ownerUsername =
+    typeof ownerObject.username === "string" && ownerObject.username.trim()
+      ? ownerObject.username.trim()
+      : "";
+  if (!ownerUsername) {
+    return null;
+  }
+
+  const record = normalizeApiRecord(recordObject);
+  if (!record) {
+    return null;
+  }
+
+  record.collectionName = null;
+
+  if (!Array.isArray(record.tags)) {
+    record.tags = [];
+  }
+
+  const displayName =
+    typeof ownerObject.displayName === "string" &&
+    ownerObject.displayName.trim()
+      ? ownerObject.displayName
+      : null;
+
+  const profilePicUrl = normalizeProfilePicUrl(ownerObject.profilePicUrl);
+
+  return {
+    owner: {
+      username: ownerUsername,
+      displayName,
+      profilePicUrl,
+    },
+    record,
+  };
+}
+
 const searchCache = new Map<string, CommunityUserSummary[]>();
 const searchInFlight = new Map<string, Promise<CommunityUserSummary[]>>();
+
+let feedCache: CommunityFeedEntry[] | null = null;
+let feedInFlight: Promise<CommunityFeedEntry[]> | null = null;
 
 export async function searchCommunityUsers(
   query: string
@@ -119,6 +201,50 @@ export async function searchCommunityUsers(
   })();
 
   searchInFlight.set(normalized, fetchPromise);
+  return fetchPromise;
+}
+
+export async function loadCommunityFeed(): Promise<CommunityFeedEntry[]> {
+  if (feedCache) {
+    return cloneFeedEntries(feedCache);
+  }
+
+  if (feedInFlight) {
+    return feedInFlight.then((entries) => cloneFeedEntries(entries));
+  }
+
+  const fetchPromise = (async () => {
+    try {
+      const res = await fetch(apiUrl("/api/community/feed"), {
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const message = await res
+          .json()
+          .catch(() => ({}))
+          .then((data: any) => data?.error || "Failed to load feed");
+        const error = new Error(message);
+        (error as any).status = res.status;
+        throw error;
+      }
+
+      const data = (await res.json().catch(() => [])) as unknown[];
+      const normalized = data
+        .filter((item): item is AnyObject => isObject(item))
+        .map((item) => normalizeFeedEntry(item))
+        .filter((item): item is CommunityFeedEntry => item !== null);
+
+      feedCache = cloneFeedEntries(normalized);
+      return cloneFeedEntries(normalized);
+    } catch (error) {
+      feedCache = null;
+      throw error;
+    } finally {
+      feedInFlight = null;
+    }
+  })();
+
+  feedInFlight = fetchPromise;
   return fetchPromise;
 }
 
@@ -183,6 +309,7 @@ export async function loadPublicUserProfile(
           typeof data.isFollowing === "boolean"
             ? data.isFollowing
             : null,
+        joinedDate: normalizeDateString(data.joinedDate),
       };
       profileCache.set(key, {
         ...normalizedProfile,
@@ -407,4 +534,6 @@ export function clearCommunityCaches(): void {
   collectionInFlight.clear();
   followsCache.clear();
   followsInFlight.clear();
+  feedCache = null;
+  feedInFlight = null;
 }

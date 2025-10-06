@@ -111,6 +111,28 @@ function normalizeFollowCount(value) {
   return Math.trunc(num);
 }
 
+function normalizeDateOnly(value) {
+  if (!value) return null;
+
+  if (value instanceof Date) {
+    return value.toISOString().slice(0, 10);
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
+      return trimmed.slice(0, 10);
+    }
+    const parsed = new Date(trimmed);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toISOString().slice(0, 10);
+    }
+  }
+
+  return null;
+}
+
 const RECORD_TABLE_COLUMN_KEYS = [
   "cover",
   "record",
@@ -257,7 +279,7 @@ async function fetchRecordsWithTagsByIds(pool, userUuid, recordIds) {
 
 async function getUserByUsername(pool, username) {
   const [rows] = await pool.execute(
-    `SELECT u.uuid, u.username, u.displayName, u.bio, u.profilePic,
+    `SELECT u.uuid, u.username, u.displayName, u.bio, u.profilePic, u.created,
             (SELECT COUNT(*) FROM Follows WHERE followsUuid = u.uuid) AS followersCount,
             (SELECT COUNT(*) FROM Follows WHERE userUuid = u.uuid) AS followingCount
      FROM User u WHERE u.username = ? LIMIT 1`,
@@ -307,6 +329,7 @@ function normalizePublicUser(row) {
       : null;
   const followersCount = normalizeFollowCount(row.followersCount);
   const followingCount = normalizeFollowCount(row.followingCount);
+  const joinedDate = normalizeDateOnly(row.created);
   return {
     username: row.username,
     displayName,
@@ -314,6 +337,7 @@ function normalizePublicUser(row) {
     profilePicUrl: buildProfilePicPublicPath(row.profilePic),
     followersCount,
     followingCount,
+    joinedDate,
   };
 }
 
@@ -753,6 +777,81 @@ app.get(
   }
 );
 
+app.get("/api/community/feed", requireAuth, async (req, res) => {
+  console.log("Fetching community feed...");
+  try {
+    const pool = await getPool();
+    const [rows] = await pool.query(
+      `SELECT r.id, r.name as record, r.artist, r.cover, r.rating,
+              r.release_year as 'release', r.added as dateAdded, r.tableId,
+              u.username, u.displayName, u.profilePic
+       FROM Record r
+       JOIN Follows f ON f.followsUuid = r.userUuid
+       JOIN User u ON u.uuid = r.userUuid
+       JOIN RecTable t ON r.tableId = t.id
+       WHERE f.userUuid = ? AND t.name = ?
+       ORDER BY r.added DESC, r.id DESC
+       LIMIT 20`,
+      [req.userUuid, DEFAULT_COLLECTION_NAME]
+    );
+
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return res.json([]);
+    }
+
+    const recordIds = rows.map((row) => row.id);
+    const tagsByRecord = await fetchTagsByRecordIds(pool, recordIds);
+
+    const feed = rows.map((row) => {
+      const displayName =
+        typeof row.displayName === "string" && row.displayName.trim()
+          ? row.displayName.trim()
+          : null;
+      const ratingRaw = Number(row.rating);
+      const rating = Number.isFinite(ratingRaw) ? ratingRaw : 0;
+      const releaseRaw = Number(row.release);
+      const release = Number.isFinite(releaseRaw) ? releaseRaw : 0;
+      const dateAddedValue = row.dateAdded;
+      const dateAdded =
+        dateAddedValue instanceof Date
+          ? dateAddedValue.toISOString().slice(0, 10)
+          : dateAddedValue;
+      const cover =
+        typeof row.cover === "string" && row.cover ? row.cover : undefined;
+      const tags = tagsByRecord[row.id] || [];
+
+      const record = {
+        id: row.id,
+        record: row.record,
+        artist: row.artist,
+        rating,
+        release,
+        dateAdded,
+        tags,
+        tableId: row.tableId,
+      };
+
+      if (cover) {
+        record.cover = cover;
+      }
+
+      return {
+        owner: {
+          username: row.username,
+          displayName,
+          profilePicUrl: buildProfilePicPublicPath(row.profilePic),
+        },
+        record,
+      };
+    });
+
+    res.json(feed);
+  } catch (error) {
+    console.error("Failed to load community feed", error);
+    res.status(500).json({ error: "Failed to load feed" });
+  }
+});
+
 app.get("/api/tags", requireAuth, async (req, res) => {
   console.log("Fetching tags...");
   try {
@@ -944,7 +1043,7 @@ app.get('/api/me', requireAuth, async (req, res) => {
   try {
     const pool = await getPool();
     const [rows] = await pool.execute(
-      `SELECT u.username, u.displayName, u.bio, u.profilePic,
+      `SELECT u.username, u.displayName, u.bio, u.profilePic, u.created,
               (SELECT COUNT(*) FROM Follows WHERE followsUuid = u.uuid) AS followersCount,
               (SELECT COUNT(*) FROM Follows WHERE userUuid = u.uuid) AS followingCount
        FROM User u
@@ -972,6 +1071,7 @@ app.get('/api/me', requireAuth, async (req, res) => {
       userUuid: req.userUuid,
       followersCount,
       followingCount,
+      joinedDate: normalizeDateOnly(userRow.created),
     });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch user info' });

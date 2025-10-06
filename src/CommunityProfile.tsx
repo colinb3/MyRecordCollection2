@@ -168,6 +168,7 @@ export default function CommunityProfile() {
             followersCount: userInfo.followersCount,
             followingCount: userInfo.followingCount,
             isFollowing: null,
+            joinedDate: userInfo.joinedDate ?? null,
           });
           setError(null);
         } catch (err: unknown) {
@@ -224,6 +225,45 @@ export default function CommunityProfile() {
   const targetAvatarInitial = targetDisplayName
     ? targetDisplayName.charAt(0).toUpperCase()
     : "";
+  const joinedDateDisplay = useMemo(() => {
+    const raw = profile?.joinedDate;
+    if (!raw) return null;
+    const trimmed = raw.trim();
+    if (!trimmed) return null;
+
+    const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    let date: Date | null = null;
+    if (isoMatch) {
+      const year = Number(isoMatch[1]);
+      const month = Number(isoMatch[2]);
+      const day = Number(isoMatch[3]);
+      if (
+        Number.isFinite(year) &&
+        Number.isFinite(month) &&
+        Number.isFinite(day)
+      ) {
+        date = new Date(Date.UTC(year, month - 1, day));
+      }
+    }
+
+    if (!date) {
+      const parsed = new Date(trimmed);
+      if (!Number.isNaN(parsed.getTime())) {
+        date = parsed;
+      }
+    }
+
+    if (!date) {
+      return null;
+    }
+
+    return new Intl.DateTimeFormat(undefined, {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      timeZone: "UTC",
+    }).format(date);
+  }, [profile?.joinedDate]);
 
   const handleLogout = useCallback(async () => {
     await fetch(apiUrl("/api/logout"), {
@@ -425,15 +465,25 @@ export default function CommunityProfile() {
                       <Typography
                         variant="subtitle1"
                         color="text.secondary"
-                        sx={{ pb: 0.8 }}
+                        sx={{ pb: joinedDateDisplay ? 0.3 : 0.8 }}
                       >
                         @{profileUsername}
                       </Typography>
+                      {joinedDateDisplay && (
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ pb: 0.3 }}
+                        >
+                          Joined {joinedDateDisplay}
+                        </Typography>
+                      )}
                       <Box
                         sx={{
                           display: "flex",
                           gap: 0.5,
                           flexWrap: "wrap",
+                          mt: 0.5,
                           mb: profile?.bio ? 1.5 : 0,
                         }}
                       >

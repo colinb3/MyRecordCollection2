@@ -10,6 +10,7 @@ import {
   ListItemText,
   TextField,
   Button,
+  CircularProgress,
 } from "@mui/material";
 import { type Filters } from "../types";
 import ReplayOutlinedIcon from "@mui/icons-material/ReplayOutlined";
@@ -22,6 +23,8 @@ interface FilterSidebarProps {
   onFiltersChange: (filters: Partial<Filters>) => void;
   onResetFilters: () => void;
   onOpenManageTags?: () => void;
+  // When true, show a small spinner next to the Tags header
+  tagsLoading?: boolean;
 }
 
 export default function FilterSidebar({
@@ -30,6 +33,7 @@ export default function FilterSidebar({
   onFiltersChange,
   onResetFilters,
   onOpenManageTags,
+  tagsLoading = false,
 }: FilterSidebarProps) {
   // --- All internal state has been removed ---
 
@@ -57,7 +61,14 @@ export default function FilterSidebar({
       }}
     >
       <Box sx={{ overflowY: "auto", pr: 1, flex: 1, minHeight: 0 }}>
-        <Typography variant="subtitle1">Filter by Tags</Typography>
+        <Typography
+          variant="subtitle1"
+          component="div"
+          sx={{ display: "flex", alignItems: "center", gap: 1 }}
+        >
+          Filter by Tags
+          {tagsLoading && <CircularProgress size={20} />}
+        </Typography>
         <Box
           sx={{
             flexGrow: 1,
@@ -90,7 +101,7 @@ export default function FilterSidebar({
                 </ListItemButton>
               </ListItem>
             ))}
-            {(tags ?? []).length === 0 && (
+            {!tagsLoading && (tags ?? []).length === 0 && (
               <ListItem>
                 <ListItemText primary="No tags yet" />
               </ListItem>

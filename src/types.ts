@@ -92,6 +92,7 @@ export interface UserInfo {
   profilePicUrl: string | null;
   followersCount: number;
   followingCount: number;
+  joinedDate: string | null;
 }
 
 export interface ProfileHighlights {
@@ -107,6 +108,17 @@ export interface CommunityUserSummary {
   followingCount: number;
 }
 
+export interface CommunityFeedOwner {
+  username: string;
+  displayName: string | null;
+  profilePicUrl: string | null;
+}
+
+export interface CommunityFeedEntry {
+  owner: CommunityFeedOwner;
+  record: Record;
+}
+
 export interface PublicUserProfile {
   username: string;
   displayName: string | null;
@@ -117,6 +129,7 @@ export interface PublicUserProfile {
   followersCount: number;
   followingCount: number;
   isFollowing: boolean | null;
+  joinedDate: string | null;
 }
 
 export interface UserFollowLists {

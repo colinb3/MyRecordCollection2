@@ -127,6 +127,7 @@ export default function Settings() {
                   userUuid: uuid,
                   followersCount: cachedUser?.followersCount ?? 0,
                   followingCount: cachedUser?.followingCount ?? 0,
+                  joinedDate: cachedUser?.joinedDate ?? null,
                 });
                 setUserUuid(uuid);
               }

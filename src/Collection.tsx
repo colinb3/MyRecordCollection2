@@ -69,6 +69,7 @@ export default function Collection({ tableName, title }: CollectionProps) {
   const [records, setRecords] = useState<Record[]>([]);
   const [filteredRecords, setFilteredRecords] = useState<Record[]>([]);
   const [allTags, setAllTags] = useState<string[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
 
   // State for controlling the UI
   const [searchTerm, setSearchTerm] = useState("");
@@ -168,6 +169,7 @@ export default function Collection({ tableName, title }: CollectionProps) {
     let cancelled = false;
 
     const fetchData = async () => {
+      setLoading(true);
       try {
         const [recordData, tagData, prefs] = await Promise.all([
           (async () => {
@@ -215,6 +217,8 @@ export default function Collection({ tableName, title }: CollectionProps) {
         if (!cancelled) {
           console.error("Failed to fetch collection data", err);
         }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     };
 
@@ -519,6 +523,7 @@ export default function Collection({ tableName, title }: CollectionProps) {
               onSelect={handleSelectRecord}
               initialColumnVisibility={columnVisibility}
               defaultSort={defaultSortPref}
+              loading={loading}
             />
           </Grid>
           {isLargeScreen && (
@@ -529,6 +534,7 @@ export default function Collection({ tableName, title }: CollectionProps) {
                 onFiltersChange={handleFilterChange}
                 onResetFilters={resetFilters}
                 onOpenManageTags={() => setManageTagsOpen(true)}
+                tagsLoading={loading}
               />
             </Grid>
           )}
@@ -635,6 +641,7 @@ export default function Collection({ tableName, title }: CollectionProps) {
               onFiltersChange={handleFilterChange}
               onResetFilters={resetFilters}
               onOpenManageTags={() => setManageTagsOpen(true)}
+              tagsLoading={loading}
             />
             <Box sx={{ textAlign: "right", p: 1 }}>
               <IconButton onClick={() => setSidebarOpen(false)}>

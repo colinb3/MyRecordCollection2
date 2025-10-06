@@ -5,7 +5,6 @@ import {
   Box,
   Typography,
   Avatar,
-  CircularProgress,
   TextField,
   Drawer,
   IconButton,
@@ -340,18 +339,7 @@ export default function CommunityCollection() {
                 />
               </Box>
               <Box sx={{ flex: 1, minHeight: 0 }}>
-                {loading ? (
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      height: "100%",
-                    }}
-                  >
-                    <CircularProgress size={24} />
-                  </Box>
-                ) : error ? (
+                {error ? (
                   <Box
                     sx={{
                       display: "flex",
@@ -365,7 +353,7 @@ export default function CommunityCollection() {
                       {error}
                     </Typography>
                   </Box>
-                ) : filteredRecords.length === 0 ? (
+                ) : filteredRecords.length === 0 && !loading ? (
                   <Box
                     sx={{
                       display: "flex",
@@ -382,7 +370,7 @@ export default function CommunityCollection() {
                     </Typography>
                   </Box>
                 ) : (
-                  <RecordTable records={filteredRecords} />
+                  <RecordTable records={filteredRecords} loading={loading} />
                 )}
               </Box>
             </Grid>
@@ -393,6 +381,7 @@ export default function CommunityCollection() {
                   currentFilters={filters}
                   onFiltersChange={handleFilterChange}
                   onResetFilters={resetFilters}
+                  tagsLoading={loading}
                 />
               </Grid>
             )}
@@ -434,6 +423,7 @@ export default function CommunityCollection() {
                   currentFilters={filters}
                   onFiltersChange={handleFilterChange}
                   onResetFilters={resetFilters}
+                  tagsLoading={loading}
                 />
                 <Box sx={{ textAlign: "right" }}>
                   <IconButton onClick={() => setSidebarOpen(false)}>
