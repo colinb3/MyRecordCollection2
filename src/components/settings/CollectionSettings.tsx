@@ -673,186 +673,183 @@ export default function CollectionSettings() {
         </Typography>
       </Box>
 
-      <Paper
-        variant="outlined"
-        sx={{
-          p: 3,
-          mb: 2,
-          borderRadius: 2,
-          backgroundColor: "background.paper",
-        }}
-      >
-        <Stack spacing={1.5}>
-          <Typography variant="h6">Privacy</Typography>
-          <Typography variant="body2" color="text.secondary">
-            Control who can see your main collection and wishlist on your public
-            profile and in the community feed. Highlights stay visible even when
-            these collections are private.
-          </Typography>
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            spacing={1.5}
-            alignItems={{ xs: "flex-start", sm: "center" }}
+      <Stack spacing={1.5}>
+        <Typography variant="h6">Privacy</Typography>
+        <Typography variant="body2" color="text.secondary">
+          Control who can see your main collection or wishlist. Collection
+          highlights remain visible even when these collections are private.
+        </Typography>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={1.5}
+          alignItems={{ xs: "flex-start", sm: "center" }}
+        >
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+              flexWrap: "wrap",
+            }}
           >
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                gap: 1,
-                flexWrap: "wrap",
-              }}
-            >
-              <FormControlLabel
-                control={
-                  <Switch
-                    color="primary"
-                    checked={isCollectionPrivate}
-                    onChange={handleToggleCollectionPrivacy}
-                    disabled={
-                      collectionPrivacyLoading || collectionPrivacySaving
-                    }
-                  />
-                }
-                label="Make my collection private"
-                sx={{ m: 0 }}
-              />
-              {(collectionPrivacyLoading || collectionPrivacySaving) && (
-                <CircularProgress size={22} sx={{ ml: { sm: 1 } }} />
-              )}
-            </Box>
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                gap: 1,
-                flexWrap: "wrap",
-              }}
-            >
-              <FormControlLabel
-                control={
-                  <Switch
-                    color="primary"
-                    checked={isWishlistPrivate}
-                    onChange={handleToggleWishlistPrivacy}
-                    disabled={wishlistPrivacyLoading || wishlistPrivacySaving}
-                  />
-                }
-                label="Make my wishlist private"
-                sx={{ m: 0 }}
-              />
-              {(wishlistPrivacyLoading || wishlistPrivacySaving) && (
-                <CircularProgress size={22} sx={{ ml: { sm: 1 } }} />
-              )}
-            </Box>
-          </Stack>
-        </Stack>
-      </Paper>
-
-      <Paper
-        variant="outlined"
-        sx={{
-          p: 3,
-          mb: 2,
-          borderRadius: 2,
-          backgroundColor: "background.paper",
-        }}
-      >
-        <Stack spacing={2}>
-          <Box>
-            <Typography variant="h6" gutterBottom>
-              Record table display
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Choose which columns appear by default when you open a collection,
-              and pick the column that should be pre-sorted.
-            </Typography>
-          </Box>
-          {prefsLoading && <LinearProgress sx={{ mt: 1 }} />}
-          <Typography variant="caption" color="text.secondary">
-            The Record column is always visible.
-          </Typography>
-          <FormGroup row sx={{ flexWrap: "wrap" }}>
-            {RECORD_TABLE_COLUMNS.filter((column) => column.hideable).map(
-              (column) => (
-                <FormControlLabel
-                  key={column.key}
-                  control={
-                    <Switch
-                      checked={columnVisibility[column.key]}
-                      onChange={handleToggleColumn(column.key)}
-                      disabled={prefsLoading || savingPrefs}
-                    />
-                  }
-                  label={`${column.label}`}
-                  sx={{
-                    minWidth: { xs: "50%", sm: "33%" },
-                    m: 0,
-                    mb: 1,
-                  }}
+            <FormControlLabel
+              control={
+                <Switch
+                  color="primary"
+                  checked={isCollectionPrivate}
+                  onChange={handleToggleCollectionPrivacy}
+                  disabled={collectionPrivacyLoading || collectionPrivacySaving}
                 />
-              )
+              }
+              label="Private Collection"
+              sx={{ m: 0 }}
+            />
+            {(collectionPrivacyLoading || collectionPrivacySaving) && (
+              <CircularProgress size={22} sx={{ ml: { sm: 1 } }} />
             )}
-          </FormGroup>
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            spacing={2}
-            alignItems={{ xs: "stretch", sm: "flex-end" }}
+          </Box>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+              flexWrap: "wrap",
+            }}
           >
-            <FormControl fullWidth size="small">
-              <InputLabel id="default-sort-column-label">
-                Default sort column
-              </InputLabel>
-              <Select
-                labelId="default-sort-column-label"
-                value={defaultSortPref.field}
-                label="Default sort column"
-                onChange={handleSortColumnChange}
-                disabled={prefsLoading || savingPrefs}
-              >
-                {SORTABLE_RECORD_TABLE_COLUMNS.map((column) => (
-                  <MenuItem key={column.key} value={column.key}>
-                    {column.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <FormControl fullWidth size="small">
-              <InputLabel id="default-sort-order-label">Sort order</InputLabel>
-              <Select
-                labelId="default-sort-order-label"
-                value={defaultSortPref.order}
-                label="Sort order"
-                onChange={handleSortOrderChange}
-                disabled={prefsLoading || savingPrefs}
-              >
-                <MenuItem value="asc">Ascending</MenuItem>
-                <MenuItem value="desc">Descending</MenuItem>
-              </Select>
-            </FormControl>
-          </Stack>
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            spacing={2}
-            justifyContent="flex-end"
-          >
-            <Button
-              variant="outlined"
-              onClick={handleResetPreferences}
-              disabled={prefsLoading || savingPrefs}
-            >
-              Reset to defaults
-            </Button>
-            <Button
-              variant="contained"
-              onClick={handleSavePreferences}
-              disabled={prefsLoading || savingPrefs}
-            >
-              {savingPrefs ? "Saving..." : "Save preferences"}
-            </Button>
-          </Stack>
+            <FormControlLabel
+              control={
+                <Switch
+                  color="primary"
+                  checked={isWishlistPrivate}
+                  onChange={handleToggleWishlistPrivacy}
+                  disabled={wishlistPrivacyLoading || wishlistPrivacySaving}
+                />
+              }
+              label="Private Wishlist"
+              sx={{ m: 0 }}
+            />
+            {(wishlistPrivacyLoading || wishlistPrivacySaving) && (
+              <CircularProgress size={22} sx={{ ml: { sm: 1 } }} />
+            )}
+          </Box>
         </Stack>
-      </Paper>
+      </Stack>
 
+      <Divider sx={{ my: 3 }} />
+
+      <Stack spacing={2}>
+        <Box>
+          <Typography variant="h6" gutterBottom>
+            Record Table Display
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Choose which columns appear by default when you open a collection,
+            and pick the column that should be pre-sorted.
+          </Typography>
+        </Box>
+        {prefsLoading && <LinearProgress sx={{ mt: 1 }} />}
+        <FormGroup row sx={{ flexWrap: "wrap" }}>
+          {RECORD_TABLE_COLUMNS.filter((column) => column.hideable).map(
+            (column) => (
+              <FormControlLabel
+                key={column.key}
+                control={
+                  <Switch
+                    checked={columnVisibility[column.key]}
+                    onChange={handleToggleColumn(column.key)}
+                    disabled={prefsLoading || savingPrefs}
+                  />
+                }
+                label={`${column.label}`}
+                sx={{
+                  minWidth: { xs: "33%", lg: "16.6%" },
+                  m: 0,
+                  mb: 1,
+                }}
+              />
+            )
+          )}
+        </FormGroup>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={2}
+          alignItems={{ xs: "stretch", sm: "flex-end" }}
+        >
+          <FormControl fullWidth size="small">
+            <InputLabel id="default-sort-column-label">
+              Default sort column
+            </InputLabel>
+            <Select
+              labelId="default-sort-column-label"
+              value={defaultSortPref.field}
+              label="Default sort column"
+              onChange={handleSortColumnChange}
+              disabled={prefsLoading || savingPrefs}
+            >
+              {SORTABLE_RECORD_TABLE_COLUMNS.map((column) => (
+                <MenuItem key={column.key} value={column.key}>
+                  {column.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <FormControl fullWidth size="small">
+            <InputLabel id="default-sort-order-label">Sort order</InputLabel>
+            <Select
+              labelId="default-sort-order-label"
+              value={defaultSortPref.order}
+              label="Sort order"
+              onChange={handleSortOrderChange}
+              disabled={prefsLoading || savingPrefs}
+            >
+              <MenuItem value="asc">Ascending</MenuItem>
+              <MenuItem value="desc">Descending</MenuItem>
+            </Select>
+          </FormControl>
+        </Stack>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={2}
+          sx={{ pt: 1 }}
+        >
+          <Button
+            variant="contained"
+            onClick={handleSavePreferences}
+            disabled={prefsLoading || savingPrefs}
+          >
+            {savingPrefs ? "Saving..." : "Save preferences"}
+          </Button>
+          <Button
+            variant="outlined"
+            onClick={handleResetPreferences}
+            disabled={prefsLoading || savingPrefs}
+          >
+            Reset to defaults
+          </Button>
+        </Stack>
+      </Stack>
+
+      <Divider sx={{ my: 3 }} />
+
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="h6" gutterBottom>
+          Import Discogs Collection
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          Import your Discogs collection directly into My Record Collection.
+          Export your{" "}
+          <Link
+            href="https://www.discogs.com/users/export"
+            sx={{ color: "primary.main" }}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Discogs collection
+          </Link>
+          , choose your exported Discogs CSV file below, optionally enrich
+          records with genre tags and date added values, and click import.
+        </Typography>
+      </Box>
       <Paper
         variant="outlined"
         sx={{
@@ -863,25 +860,6 @@ export default function CollectionSettings() {
         }}
       >
         <Stack direction="column" spacing={2} alignItems="stretch">
-          <Box>
-            <Typography variant="h6" gutterBottom>
-              Import Discogs Collection
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Import your Discogs collection directly into{" "}
-              <strong>{DEFAULT_COLLECTION}</strong>. Export your{" "}
-              <Link
-                href="https://www.discogs.com/users/export"
-                sx={{ color: "primary.main" }}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Discogs collection
-              </Link>
-              , choose your exported Discogs CSV file below, optionally enrich
-              records with genre tags, and let us do the rest.
-            </Typography>
-          </Box>
           <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
             <Button
               variant="contained"
