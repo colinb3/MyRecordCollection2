@@ -22,6 +22,7 @@ import {
   FormGroup,
   InputLabel,
   LinearProgress,
+  Link,
   List,
   ListItem,
   ListItemText,
@@ -449,7 +450,7 @@ export default function CollectionSettings() {
         rating: record.rating,
         release: record.release,
         tags,
-        dateAdded: useDateAdded ? record.rawDateAdded : null,
+        added: useDateAdded ? record.rawDateAdded : null,
       });
     }
 
@@ -636,9 +637,17 @@ export default function CollectionSettings() {
             </Typography>
             <Typography variant="body2" color="text.secondary">
               Import your Discogs collection directly into{" "}
-              <strong>{DEFAULT_COLLECTION}</strong>. Choose your Discogs CSV
-              export, optionally enrich records with Wikipedia tags, and let the
-              app add everything in one go.
+              <strong>{DEFAULT_COLLECTION}</strong>. Export your{" "}
+              <Link
+                href="https://www.discogs.com/users/export"
+                sx={{ color: "primary.main" }}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Discogs collection
+              </Link>
+              , choose your exported Discogs CSV file below, optionally enrich
+              records with genre tags, and let us do the rest.
             </Typography>
           </Box>
           <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
@@ -727,7 +736,7 @@ export default function CollectionSettings() {
             />
             <Typography variant="caption" display="block" sx={{ mt: 1 }}>
               {includeWikiTags && !submittingRecords
-                ? `Fetching wiki tags... ${tagProgress}%`
+                ? `Fetching wiki tags... ${tagProgress}% | Do not leave this page`
                 : "Submitting records to the server..."}
             </Typography>
           </Box>

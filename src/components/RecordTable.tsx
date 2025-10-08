@@ -98,9 +98,9 @@ const columns: GridColDef[] = [
     },
   },
   {
-    field: "dateAdded",
-    headerName: "Date Added",
-    flex: 0.75,
+    field: "added",
+    headerName: "Added",
+    flex: 0.6,
     minWidth: 100,
     renderCell: (params) => {
       const val = params.value;

@@ -483,7 +483,7 @@ export default function CommunityProfile() {
                           display: "flex",
                           gap: 0.5,
                           flexWrap: "wrap",
-                          mb: profile?.bio ? 0.6 : 0,
+                          mb: profile?.bio ? 1 : 0,
                         }}
                       >
                         {typeof profile?.isFollowing === "boolean" && (

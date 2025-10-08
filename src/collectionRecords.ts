@@ -49,11 +49,11 @@ export function normalizeApiRecord(raw: unknown): MrcRecord | null {
   const releaseValue = Number(releaseRaw);
   const release = Number.isFinite(releaseValue) ? releaseValue : 0;
 
-  const dateAdded =
-    typeof source.dateAdded === "string"
-      ? source.dateAdded
-      : typeof source.added === "string"
+  const added =
+    typeof source.added === "string"
       ? source.added
+      : typeof source.dateAdded === "string"
+      ? source.dateAdded
       : "";
 
   const cover =
@@ -69,7 +69,7 @@ export function normalizeApiRecord(raw: unknown): MrcRecord | null {
     rating,
     tags,
     release,
-    dateAdded,
+    added,
     tableId,
   };
 

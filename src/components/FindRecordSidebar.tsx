@@ -210,11 +210,13 @@ export default function FindRecordSidebar({
             max={10}
             step={1}
             sx={{
-              mx: 1.7,
-              width: "90%",
+              width: "86%",
               "& .MuiSlider-rail, & .MuiSlider-track": { height: 6 },
               height: 0,
-              "& .MuiSlider-thumb": { width: 18, height: 18 },
+              "& .MuiSlider-thumb": {
+                width: 18,
+                height: 18,
+              },
             }}
           />
         </Box>

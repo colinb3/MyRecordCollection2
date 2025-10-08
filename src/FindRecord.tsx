@@ -223,7 +223,7 @@ export default function FindRecord() {
         rating,
         tags: selectedTags,
         release: releaseYear,
-        dateAdded: new Date().toISOString().slice(0, 10),
+        added: new Date().toISOString().slice(0, 10),
         tableName,
       };
       const res = await fetch(apiUrl("/api/records/create"), {

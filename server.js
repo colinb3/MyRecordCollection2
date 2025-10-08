@@ -140,14 +140,14 @@ const RECORD_TABLE_COLUMN_KEYS = [
   "rating",
   "tags",
   "release",
-  "dateAdded",
+  "added",
 ];
 const SORTABLE_RECORD_TABLE_COLUMN_KEYS = [
   "record",
   "artist",
   "rating",
   "release",
-  "dateAdded",
+  "added",
 ];
 
 function createDefaultRecordTablePreferences() {
@@ -159,7 +159,7 @@ function createDefaultRecordTablePreferences() {
       rating: true,
       tags: true,
       release: true,
-      dateAdded: true,
+      added: true,
     },
     defaultSort: { field: "rating", order: "desc" },
   };
@@ -235,18 +235,18 @@ async function getProfileHighlightIds(pool, userUuid) {
 
 async function fetchRecordsWithTagsByIds(pool, userUuid, recordIds) {
   if (!Array.isArray(recordIds) || recordIds.length === 0) {
-    return [];
+     return [];
   }
 
   const placeholders = recordIds.map(() => "?").join(", ");
   const params = [userUuid, ...recordIds];
-  const [rows] = await pool.query(
-    `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as dateAdded, r.tableId, t.name as collectionName
-     FROM Record r
-     LEFT JOIN RecTable t ON r.tableId = t.id
-     WHERE r.userUuid = ? AND r.id IN (${placeholders})`,
-    params
-  );
+    const [rows] = await pool.query(
+    `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId, t.name as collectionName
+       FROM Record r
+       LEFT JOIN RecTable t ON r.tableId = t.id
+       WHERE r.userUuid = ? AND r.id IN (${placeholders})`,
+      params
+    );
 
   if (!rows || rows.length === 0) return [];
 
@@ -426,7 +426,7 @@ function getPool() {
 
 async function getUserTableId(pool, userUuid, tableName) {
   const [rows] = await pool.execute(
-    `SELECT id FROM RecTable WHERE userUuid = ? AND name = ? LIMIT 1`,
+     `SELECT id FROM RecTable WHERE userUuid = ? AND name = ? LIMIT 1`,
     [userUuid, tableName]
   );
   return rows.length > 0 ? rows[0].id : null;
@@ -530,7 +530,7 @@ app.get("/api/records", requireAuth, async (req, res) => {
     }
 
     const [rows] = await pool.query(
-      `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as dateAdded, r.tableId
+    `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId
        FROM Record r WHERE r.userUuid = ? AND r.tableId = ?`,
       [req.userUuid, tableId]
     );
@@ -574,7 +574,7 @@ app.get("/api/profile/recent", requireAuth, async (req, res) => {
     const pool = await getPool();
     // Only include records that are in the user's default collection (RecTable.name = DEFAULT_COLLECTION_NAME)
     const [rows] = await pool.query(
-      `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as dateAdded, r.tableId
+  `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId
        FROM Record r
        JOIN RecTable t ON r.tableId = t.id
        WHERE r.userUuid = ? AND t.name = ?
@@ -674,7 +674,7 @@ app.get("/api/community/users/:username", requireAuth, async (req, res) => {
     );
 
     const [recentRows] = await pool.query(
-      `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as dateAdded, r.tableId
+  `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId
        FROM Record r
        JOIN RecTable t ON r.tableId = t.id
        WHERE r.userUuid = ? AND t.name = ?
@@ -728,7 +728,7 @@ app.get(
       }
 
       const [rows] = await pool.query(
-        `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as dateAdded, r.tableId
+        `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId
          FROM Record r WHERE r.userUuid = ? AND r.tableId = ?`,
         [userRow.uuid, tableId]
       );
@@ -781,9 +781,9 @@ app.get("/api/community/feed", requireAuth, async (req, res) => {
   console.log("Fetching community feed...");
   try {
     const pool = await getPool();
-    const [rows] = await pool.query(
-      `SELECT r.id, r.name as record, r.artist, r.cover, r.rating,
-              r.release_year as 'release', r.added as dateAdded, r.tableId,
+      const [rows] = await pool.query(
+        `SELECT r.id, r.name as record, r.artist, r.cover, r.rating,
+              r.release_year as 'release', r.added as added, r.tableId,
               u.username, u.displayName, u.profilePic
        FROM Record r
        JOIN Follows f ON f.followsUuid = r.userUuid
@@ -811,24 +811,22 @@ app.get("/api/community/feed", requireAuth, async (req, res) => {
       const rating = Number.isFinite(ratingRaw) ? ratingRaw : 0;
       const releaseRaw = Number(row.release);
       const release = Number.isFinite(releaseRaw) ? releaseRaw : 0;
-      const dateAddedValue = row.dateAdded;
-      const dateAdded =
-        dateAddedValue instanceof Date
-          ? dateAddedValue.toISOString().slice(0, 10)
-          : dateAddedValue;
+      const addedValue = row.added;
+      const added =
+        addedValue instanceof Date ? addedValue.toISOString().slice(0, 10) : addedValue;
       const cover =
         typeof row.cover === "string" && row.cover ? row.cover : undefined;
       const tags = tagsByRecord[row.id] || [];
 
       const record = {
-        id: row.id,
-        record: row.record,
-        artist: row.artist,
-        rating,
-        release,
-        dateAdded,
-        tags,
-        tableId: row.tableId,
+  id: row.id,
+  record: row.record,
+  artist: row.artist,
+  rating,
+  release,
+  added,
+  tags,
+  tableId: row.tableId,
       };
 
       if (cover) {
@@ -985,7 +983,7 @@ app.post('/api/register', async (req, res) => {
     const pool = await getPool();
     await pool.execute(
       'INSERT INTO User (uuid, username, displayName, password, bio, profilePic) VALUES (?, ?, ?, ?, ?, ?)',
-      [userUuid, username, displayName, hashedPassword, null, null]
+      [userUuid, username.toLowerCase(), displayName, hashedPassword, null, null]
     );
     await pool.execute(
       `INSERT INTO RecTable (name, userUuid) VALUES (?, ?), (?, ?)`,
@@ -1340,7 +1338,7 @@ app.post('/api/records/update', requireAuth, async (req, res) => {
     }
     // Return updated record
     const [rows] = await pool.execute(
-      `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as dateAdded, r.tableId FROM Record r WHERE r.id = ? AND r.userUuid = ?`,
+      `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId FROM Record r WHERE r.id = ? AND r.userUuid = ?`,
       [id, req.userUuid]
     );
     const updated = rows[0];
@@ -1393,7 +1391,7 @@ app.post('/api/records/create', requireAuth, async (req, res) => {
     }
     // Return new record
     const [rows] = await pool.execute(
-      `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as dateAdded, r.tableId FROM Record r WHERE r.id = ? AND r.userUuid = ?`,
+      `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId FROM Record r WHERE r.id = ? AND r.userUuid = ?`,
       [newId, req.userUuid]
     );
     const created = rows[0];
@@ -1531,8 +1529,8 @@ app.post('/api/import/discogs', requireAuth, async (req, res) => {
       if (rating < 0) rating = 0;
       if (rating > 10) rating = 10;
 
-      const dateVal = typeof raw.dateAdded === 'string' ? raw.dateAdded.trim() : '';
-      const dateAdded = /^\d{4}-\d{2}-\d{2}$/.test(dateVal) ? dateVal : null;
+  const dateVal = typeof raw.added === 'string' ? raw.added.trim() : '';
+  const dateAdded = /^\d{4}-\d{2}-\d{2}$/.test(dateVal) ? dateVal : null;
 
       const tagsArray = Array.isArray(raw.tags) ? raw.tags : [];
       const cleanTags = Array.from(
@@ -1558,7 +1556,7 @@ app.post('/api/import/discogs', requireAuth, async (req, res) => {
         withoutCover += 1;
       }
 
-      const addedDate = dateAdded || new Date().toISOString().slice(0, 10);
+  const addedDate = dateAdded || new Date().toISOString().slice(0, 10);
       const [insertResult] = await pool.execute(
         `INSERT INTO Record (name, artist, cover, rating, release_year, tableId, userUuid, added) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [recordName, artist, cover || null, rating, release, tableId, req.userUuid, addedDate]

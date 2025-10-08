@@ -31,8 +31,8 @@ export default function RecordPreviewGrid({
         const coverSrc = record.cover || placeholderCover;
         const key = keyPrefix ? `${keyPrefix}-${record.id}` : record.id;
         const addedDateText =
-          showDateAdded && record.dateAdded
-            ? dateFormatter.format(new Date(record.dateAdded))
+          showDateAdded && record.added
+            ? dateFormatter.format(new Date(record.added))
             : null;
         return (
           <Grid size={{ xs: 6, sm: 3 }} key={key}>

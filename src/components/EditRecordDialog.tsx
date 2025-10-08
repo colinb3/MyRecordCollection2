@@ -262,7 +262,7 @@ export default function EditRecordDialog({
               }}
             />
             <Grid container spacing={2}>
-              <Grid size={{ xs: 6 }}>
+              <Grid size={{ xs: 4 }}>
                 <TextField
                   name="release"
                   label="Release Year"
@@ -278,14 +278,13 @@ export default function EditRecordDialog({
                   }}
                 />
               </Grid>
-              <Grid size={{ xs: 6 }}>
+              <Grid size={{ xs: 8 }}>
                 <Box
                   sx={{
                     display: "flex",
                     alignItems: "center",
                     gap: 2,
                     pt: 0.5,
-                    ml: -0.5,
                   }}
                 >
                   <Typography

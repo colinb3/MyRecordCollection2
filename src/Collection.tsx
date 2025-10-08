@@ -311,7 +311,7 @@ export default function Collection({ tableName, title }: CollectionProps) {
       rating: 0,
       tags: [],
       release: 2024,
-      dateAdded: new Date().toISOString().slice(0, 10),
+      added: new Date().toISOString().slice(0, 10),
     });
     setEditDialogOpen(true);
   };

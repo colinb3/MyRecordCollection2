@@ -6,7 +6,7 @@ export interface Record {
   rating: number;
   tags: string[];
   release: number;
-  dateAdded: string;
+  added: string;
   tableId?: number;
   collectionName?: string | null;
 }
@@ -24,10 +24,10 @@ export type RecordTableColumnKey =
   | "rating"
   | "tags"
   | "release"
-  | "dateAdded";
+  | "added";
 
 export interface RecordTableSortPreference {
-  field: Extract<RecordTableColumnKey, "record" | "artist" | "rating" | "release" | "dateAdded">;
+  field: Extract<RecordTableColumnKey, "record" | "artist" | "rating" | "release" | "added">;
   order: "asc" | "desc";
 }
 
@@ -50,7 +50,7 @@ export const RECORD_TABLE_COLUMNS: RecordTableColumnDefinition[] = [
   { key: "rating", label: "Rating", sortable: true, hideable: true },
   { key: "tags", label: "Tags", sortable: false, hideable: true },
   { key: "release", label: "Release", sortable: true, hideable: true },
-  { key: "dateAdded", label: "Date Added", sortable: true, hideable: true },
+  { key: "added", label: "Added", sortable: true, hideable: true },
 ];
 
 export const SORTABLE_RECORD_TABLE_COLUMNS = RECORD_TABLE_COLUMNS.filter(
@@ -72,7 +72,7 @@ export function createDefaultColumnVisibility(): ColumnVisibilityMap {
     rating: true,
     tags: true,
     release: true,
-    dateAdded: true,
+    added: true,
   };
   return visibility;
 }

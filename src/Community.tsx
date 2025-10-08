@@ -345,8 +345,8 @@ export default function Community() {
                         const avatarInitial = avatarSource
                           .charAt(0)
                           .toUpperCase();
-                        const addedDate = entry.record.dateAdded
-                          ? entry.record.dateAdded.slice(0, 10)
+                        const addedDate = entry.record.added
+                          ? entry.record.added.slice(0, 10)
                           : "";
                         const tagsLabel =
                           entry.record.tags && entry.record.tags.length > 0

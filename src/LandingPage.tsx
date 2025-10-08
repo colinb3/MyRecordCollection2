@@ -16,12 +16,13 @@ import "./LandingPage.css";
 import { darkTheme } from "./theme";
 import icon from "./assets/icon.png";
 import collectionViewImg from "./assets/collectionview.png";
-import discogsViewImg from "./assets/discogsview.png";
 import editViewImg from "./assets/editview.png";
+import profileViewImg from "./assets/profileview.png";
+import discogsViewImg from "./assets/discogsview.png";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import LibraryMusicIcon from "@mui/icons-material/LibraryMusic";
 import FilterAltIcon from "@mui/icons-material/FilterAlt";
-import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
+import PeopleAltIcon from "@mui/icons-material/PeopleAlt";
 import FavoriteIcon from "@mui/icons-material/Favorite";
 import LocalOfferIcon from "@mui/icons-material/LocalOffer";
 import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
@@ -41,26 +42,38 @@ export default function LandingPage() {
           "Lightning-fast searching and filtering of your entire collection",
         ],
         image: collectionViewImg,
-        imageAlt:
-          "Preview of the collection table highlighting sorting and cover wall",
+        imageAlt: "Preview of the collection table",
       },
       {
         title: "Build your collection like a pro",
         caption:
           "Create, find, and edit records with ease. Suggested tags make it easy to stay organized.",
         bullets: [
-          "Just enter an album and artist name to get genres like magic",
-          "Set an album cover from anywhere you find online",
-          "Quickly edit record details and metadata",
+          "Search the Last.FM database of millions of records",
+          "Create a custom record if you can't find that hidden gem of yours",
+          "Just enter an album and artist name to get suggested genre tags like magic",
         ],
         image: editViewImg,
         imageAlt:
           "Preview of the edit dialog showcasing quick tagging workflows",
       },
       {
+        title: "Create your profile and connect with friends",
+        caption:
+          "Show off your music taste and see what your friends are listening to.",
+        bullets: [
+          "Display your favourite records in your collection on your profile",
+          "Follow other collectors and see their collections",
+          "Easily see what records your friends have recently picked up",
+        ],
+        image: profileViewImg,
+        imageAlt:
+          "Preview of the Discogs import dialog with progress and summaries",
+      },
+      {
         title: "Discogs import that feels like magic",
         caption:
-          "Upload your CSV once—duplicates are skipped, tags can be suggested from Wikipedia, and cover art streams in from Last.fm.",
+          "Upload your CSV once—duplicates are skipped, tags can be suggested from album genres, and cover art streams in from Last.fm.",
         bullets: [
           "Batch processing with friendly summaries of what changed",
           "Optional tag enrichment allows you to filter your collection instantly",
@@ -104,38 +117,38 @@ export default function LandingPage() {
     {
       title: "Built for collectors",
       description:
-        "Rate every pressing, keep a wishlist, and track formats or variants all in one secure home.",
+        "Rate and tag every pressing in your collection, keep a wishlist, and see how your friends' collections compare.",
       Icon: LibraryMusicIcon,
+    },
+    {
+      title: "Create your profile",
+      description:
+        "Show off your favorite records, follow friends, and see recent additions to their collections.",
+      Icon: PeopleAltIcon,
     },
     {
       title: "Powerful filters & search",
       description:
-        "Slice your catalog by genre, decade, rating, or custom tags and find the perfect spin instantly.",
+        "Slice your collection by custom tags, rating, decade, or date added to help you find the perfect spin instantly.",
       Icon: FilterAltIcon,
     },
     {
       title: "Smart tagging tools",
       description:
-        "Bulk-manage tags, auto-suggest new ones from Wikipedia, and keep your taxonomy tidy.",
+        "Automatic tag suggestions from the record's genres to easily import and organize your collection.",
       Icon: LocalOfferIcon,
     },
     {
       title: "Organize your wishes",
       description:
-        "Always know what to look for next at the record store with a dedicated wishlist.",
+        "Always know what to look for at the record store next with a dedicated wishlist.",
       Icon: FavoriteIcon,
     },
     {
-      title: "Discogs import in minutes",
+      title: "Discogs import in seconds",
       description:
-        "Upload your Discogs collection and we handle covers, ratings, and tags automatically.",
+        "Import your Discogs collection and we handle covers, ratings, and tags automatically.",
       Icon: CloudUploadIcon,
-    },
-    {
-      title: "Gorgeous cover browsing",
-      description:
-        "See every album you own with rich cover artwork sourced from Last.fm.",
-      Icon: AutoAwesomeIcon,
     },
   ];
 
@@ -200,9 +213,8 @@ export default function LandingPage() {
                     maxWidth={600}
                     textAlign={{ xs: "center", md: "left" }}
                   >
-                    My Record Collection keeps every pressing, rating, and
-                    wishlist item beautifully organized—whether you have 50
-                    records or 5,000.
+                    My Record Collection keeps every pressing beautifully
+                    organized—whether you have 50 records or 5,000.
                   </Typography>
                   <Stack
                     direction={{ xs: "column", sm: "row" }}
@@ -214,7 +226,7 @@ export default function LandingPage() {
                       size="large"
                       onClick={() => navigate("/register")}
                     >
-                      Create a free account
+                      Create an account
                     </Button>
                     <Button
                       variant="outlined"
@@ -264,7 +276,7 @@ export default function LandingPage() {
         </Box>
 
         <Container maxWidth="lg" sx={{ py: { xs: 8, md: 10 } }}>
-          <Stack spacing={6}>
+          <Stack spacing={7}>
             <Box
               sx={{
                 position: "relative",
@@ -321,9 +333,6 @@ export default function LandingPage() {
               >
                 <Box>
                   <Stack spacing={2}>
-                    <Typography variant="overline" color="primary.light">
-                      Spotlight tour
-                    </Typography>
                     <Typography variant="h4" fontWeight={700}>
                       {currentSlide.title}
                     </Typography>
@@ -349,8 +358,8 @@ export default function LandingPage() {
                               height: 8,
                               borderRadius: "50%",
                               backgroundColor: "primary.main",
-                              mt: 0.75,
                               flexShrink: 0,
+                              alignSelf: "center",
                             }}
                           />
                           <Typography variant="body2" color="grey.200">
@@ -369,7 +378,7 @@ export default function LandingPage() {
                       backgroundColor: "transparent",
                       border: (theme) =>
                         `1px solid ${theme.palette.primary.main}40`,
-                      height: { xs: 240, sm: 280, md: 320 },
+                      height: { xs: 300, sm: 380, md: 320 },
                       overflow: "hidden",
                       display: "flex",
                       alignItems: "stretch",
@@ -443,15 +452,13 @@ export default function LandingPage() {
             </Box>
 
             <Box>
-              <Typography variant="overline" color="primary">
-                Highlights
-              </Typography>
               <Typography variant="h4" fontWeight={700} gutterBottom>
                 Everything you need to stay on top of your collection
               </Typography>
               <Typography variant="body1" color="text.secondary">
-                From lightning-fast imports to tag management and intelligent
-                filters, every feature is built with collectors in mind.
+                From showing off to your friends to tag management and
+                intelligent filters, every feature is built with collectors in
+                mind.
               </Typography>
             </Box>
 
@@ -586,7 +593,7 @@ export default function LandingPage() {
                   size="large"
                   onClick={() => navigate("/register")}
                 >
-                  Create a free account
+                  Create an account
                 </Button>
                 <Button
                   variant="outlined"
