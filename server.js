@@ -1865,18 +1865,36 @@ app.get('/api/collections', requireAuth, async (req, res) => {
 
 app.get('/api/collections/privacy', requireAuth, async (req, res) => {
   console.log('Fetching collection privacy state...');
-  const tableName =
-    typeof req.query.table === 'string' && req.query.table.trim()
-      ? req.query.table.trim()
-      : DEFAULT_COLLECTION_NAME;
   try {
     const pool = await getPool();
-    const tableRow = await getUserTableRow(pool, req.userUuid, tableName);
-    if (!tableRow) {
+    const [collectionRow, wishlistRow] = await Promise.all([
+      getUserTableRow(pool, req.userUuid, DEFAULT_COLLECTION_NAME),
+      getUserTableRow(pool, req.userUuid, WISHLIST_COLLECTION_NAME),
+    ]);
+
+    if (!collectionRow) {
       return res.status(404).json({ error: 'Collection not found' });
     }
-  const isPrivate = Number(tableRow.isPrivate) === 1;
-    res.json({ tableName: tableRow.name, isPrivate });
+
+    const collectionPrivacy = {
+      tableName: collectionRow.name,
+      isPrivate: Number(collectionRow.isPrivate) === 1,
+    };
+
+    const wishlistPrivacy = wishlistRow
+      ? {
+          tableName: wishlistRow.name,
+          isPrivate: Number(wishlistRow.isPrivate) === 1,
+        }
+      : {
+          tableName: WISHLIST_COLLECTION_NAME,
+          isPrivate: true,
+        };
+
+    res.json({
+      collection: collectionPrivacy,
+      wishlist: wishlistPrivacy,
+    });
   } catch (err) {
     console.error('Failed to fetch collection privacy state', err);
     res.status(500).json({ error: 'Failed to fetch collection privacy state' });

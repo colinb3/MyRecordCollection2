@@ -45,6 +45,11 @@ import apiUrl from "../../api";
 import { wikiGenres } from "../../wiki";
 import { clearCommunityCaches } from "../../communityUsers";
 import {
+  loadCollectionPrivacy,
+  updateCollectionPrivacyCache,
+  type CollectionPrivacyState,
+} from "../../collectionPrivacy";
+import {
   getCachedRecordTablePreferences,
   loadRecordTablePreferences,
   setCachedRecordTablePreferences,
@@ -253,64 +258,36 @@ export default function CollectionSettings() {
   useEffect(() => {
     let active = true;
 
-    const fetchPrivacyState = async (
-      tableName: string,
-      setValue: (next: boolean) => void,
-      setLoading: (next: boolean) => void,
-      fallbackValue: boolean
-    ) => {
-      setLoading(true);
-      try {
-        const res = await fetch(
-          apiUrl(
-            `/api/collections/privacy?table=${encodeURIComponent(tableName)}`
-          ),
-          { credentials: "include" }
-        );
-        const payload = (await res.json().catch(() => ({}))) as {
-          isPrivate?: unknown;
-          error?: unknown;
-        };
-        if (!res.ok) {
-          const message =
-            typeof payload.error === "string"
-              ? payload.error
-              : `Failed to load ${tableName} privacy`;
-          throw new Error(message);
-        }
+    setCollectionPrivacyLoading(true);
+    setWishlistPrivacyLoading(true);
+
+    loadCollectionPrivacy()
+      .then((privacy: CollectionPrivacyState) => {
         if (!active) return;
-        setValue(Boolean(payload.isPrivate));
-      } catch (err) {
+        setIsCollectionPrivate(Boolean(privacy.collection.isPrivate));
+        setIsWishlistPrivate(Boolean(privacy.wishlist.isPrivate));
+      })
+      .catch((err: unknown) => {
         if (!active) return;
         const message =
           err instanceof Error
             ? err.message
-            : `Failed to load ${tableName} privacy`;
-        setValue(fallbackValue);
+            : "Failed to load collection privacy";
+        setIsCollectionPrivate(false);
+        setIsWishlistPrivate(true);
         setSnackbar({
           open: true,
           message,
           severity: "error",
         });
-      } finally {
-        if (active) {
-          setLoading(false);
+      })
+      .finally(() => {
+        if (!active) {
+          return;
         }
-      }
-    };
-
-    void fetchPrivacyState(
-      DEFAULT_COLLECTION,
-      setIsCollectionPrivate,
-      setCollectionPrivacyLoading,
-      false
-    );
-    void fetchPrivacyState(
-      WISHLIST_COLLECTION,
-      setIsWishlistPrivate,
-      setWishlistPrivacyLoading,
-      true
-    );
+        setCollectionPrivacyLoading(false);
+        setWishlistPrivacyLoading(false);
+      });
 
     return () => {
       active = false;
@@ -343,6 +320,7 @@ export default function CollectionSettings() {
         const payload = (await res.json().catch(() => ({}))) as {
           error?: unknown;
           isPrivate?: unknown;
+          tableName?: unknown;
         };
         if (!res.ok) {
           const message =
@@ -350,6 +328,11 @@ export default function CollectionSettings() {
             "Failed to update privacy";
           throw new Error(message);
         }
+        const resolvedTableName =
+          typeof payload.tableName === "string" && payload.tableName.trim()
+            ? payload.tableName.trim()
+            : tableName;
+        updateCollectionPrivacyCache(resolvedTableName, checked);
         clearCommunityCaches();
         setSnackbar({
           open: true,
