@@ -26,7 +26,7 @@ export default function RecordPreviewGrid({
   }, []);
 
   return (
-    <Grid container spacing={2} maxWidth={800}>
+    <Grid container spacing={{ xs: 1, sm: 2 }}>
       {records.map((record) => {
         const coverSrc = record.cover || placeholderCover;
         const key = keyPrefix ? `${keyPrefix}-${record.id}` : record.id;
@@ -35,7 +35,7 @@ export default function RecordPreviewGrid({
             ? dateFormatter.format(new Date(record.added))
             : null;
         return (
-          <Grid size={{ xs: 6, sm: 3 }} key={key}>
+          <Grid size={4} key={key}>
             <Paper
               variant="outlined"
               sx={{
@@ -67,7 +67,7 @@ export default function RecordPreviewGrid({
                   }}
                 />
               </Box>
-              <Box sx={{ p: 1.5 }}>
+              <Box sx={{ p: { xs: 1, sm: 1.25, md: 1.5 } }}>
                 <Typography variant="subtitle1" noWrap>
                   {record.record}
                 </Typography>

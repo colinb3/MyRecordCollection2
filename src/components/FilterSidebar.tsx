@@ -11,6 +11,7 @@ import {
   TextField,
   Button,
   CircularProgress,
+  Slider,
 } from "@mui/material";
 import { type Filters } from "../types";
 import ReplayOutlinedIcon from "@mui/icons-material/ReplayOutlined";
@@ -39,6 +40,8 @@ export default function FilterSidebar({
 
   // Destructure values from props for easier use
   const { tags: checkedTags = [], rating, release } = currentFilters;
+  const ratingMin = Number.isFinite(rating?.min) ? rating!.min : 0;
+  const ratingMax = Number.isFinite(rating?.max) ? rating!.max : 10;
 
   const handleTagToggle = (tag: string) => {
     const newChecked = checkedTags.includes(tag)
@@ -121,38 +124,32 @@ export default function FilterSidebar({
         )}
 
         <Box sx={{ flex: "0 0 auto" }}>
-          <Typography variant="subtitle1" mt={1} mb={1}>
+          <Typography variant="subtitle1" mt={1}>
             Filter by Rating
           </Typography>
-          <Box sx={{ display: "flex", gap: 1 }}>
-            <TextField
-              label="Min"
-              type="number"
-              fullWidth
-              size="small"
-              slotProps={{ input: { inputProps: { min: 0, max: 10 } } }}
-              // Read value from props
-              value={rating.min}
-              onChange={(e) => {
-                const val = Number(e.target.value);
-                onFiltersChange({ rating: { min: val, max: rating.max } });
+          <Box sx={{ px: 0, width: "82%", justifySelf: "center" }}>
+            <Slider
+              value={[ratingMin, ratingMax]}
+              min={0}
+              max={10}
+              step={1}
+              valueLabelDisplay="auto"
+              onChange={(_, newValue) => {
+                if (!Array.isArray(newValue)) return;
+                const [minVal, maxVal] = newValue.map((v) => Number(v));
+                onFiltersChange({ rating: { min: minVal, max: maxVal } });
               }}
-              onFocus={(e) => e.target.select()}
             />
-            <TextField
-              label="Max"
-              type="number"
-              fullWidth
-              size="small"
-              slotProps={{ input: { inputProps: { min: 0, max: 10 } } }}
-              // Read value from props
-              value={rating.max}
-              onChange={(e) => {
-                const val = Number(e.target.value);
-                onFiltersChange({ rating: { min: rating.min, max: val } });
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                mt: -1,
               }}
-              onFocus={(e) => e.target.select()}
-            />
+            >
+              <Typography variant="caption">{ratingMin}</Typography>
+              <Typography variant="caption">{ratingMax}</Typography>
+            </Box>
           </Box>
 
           <Typography variant="subtitle1" mt={1} mb={1}>

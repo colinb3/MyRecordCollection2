@@ -2,7 +2,7 @@ import apiUrl from "./api";
 import type { Record as MrcRecord, ProfileHighlights } from "./types";
 import { normalizeApiRecord } from "./collectionRecords";
 
-const MAX_HIGHLIGHTS = 4;
+const MAX_HIGHLIGHTS = 3;
 
 let cachedHighlights: ProfileHighlights | null = null;
 let inFlight: Promise<ProfileHighlights | null> | null = null;

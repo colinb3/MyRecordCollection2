@@ -40,6 +40,9 @@ const createInitialFilters = (): Filters => ({
   release: { min: 1877, max: 2100 },
 });
 
+const DEFAULT_COLLECTION_NAME = "My Collection";
+const WISHLIST_COLLECTION_NAME = "Wishlist";
+
 export default function CommunityCollection() {
   const navigate = useNavigate();
   const params = useParams<{ username: string }>();
@@ -54,6 +57,20 @@ export default function CommunityCollection() {
   );
 
   const targetUsername = params.username ?? "";
+  const rawTableParam = (searchParams.get("table") ?? "").trim();
+  const activeTableName = useMemo(() => {
+    if (!rawTableParam) {
+      return DEFAULT_COLLECTION_NAME;
+    }
+    const normalized = rawTableParam.toLowerCase();
+    if (normalized === DEFAULT_COLLECTION_NAME.toLowerCase()) {
+      return DEFAULT_COLLECTION_NAME;
+    }
+    if (normalized === WISHLIST_COLLECTION_NAME.toLowerCase()) {
+      return WISHLIST_COLLECTION_NAME;
+    }
+    return rawTableParam;
+  }, [rawTableParam]);
 
   const [profile, setProfile] = useState<PublicUserProfile | null>(null);
   const [records, setRecords] = useState<MrcRecord[]>([]);
@@ -113,7 +130,7 @@ export default function CommunityCollection() {
 
     Promise.all([
       loadPublicUserProfile(targetUsername),
-      loadPublicUserCollection(targetUsername),
+      loadPublicUserCollection(targetUsername, activeTableName),
     ])
       .then(([profileData, collectionData]) => {
         if (cancelled) return;
@@ -145,7 +162,7 @@ export default function CommunityCollection() {
     return () => {
       cancelled = true;
     };
-  }, [targetUsername]);
+  }, [targetUsername, activeTableName]);
 
   const handleLogout = useCallback(async () => {
     await fetch(apiUrl("/api/logout"), {
@@ -227,6 +244,16 @@ export default function CommunityCollection() {
     .charAt(0)
     .toUpperCase();
   const initialSearchValue = searchParams.get("q") ?? "";
+  const isWishlistView = activeTableName === WISHLIST_COLLECTION_NAME;
+  const searchPlaceholder = isWishlistView
+    ? "Search Wishlist"
+    : "Search Collection";
+  const noMatchMessage = isWishlistView
+    ? "No wishlist records match these filters."
+    : "No records match these filters.";
+  const emptyCollectionMessage = isWishlistView
+    ? "No wishlist records to display."
+    : "No records to display.";
 
   return (
     <ThemeProvider theme={darkTheme}>
@@ -292,7 +319,9 @@ export default function CommunityCollection() {
                 </Avatar>
                 <Box>
                   <Typography variant="h5" sx={{ lineHeight: 1.2 }}>
-                    {targetDisplayName}'s Collection
+                    {isWishlistView
+                      ? `${targetDisplayName}'s Wishlist`
+                      : `${targetDisplayName}'s Collection`}
                   </Typography>
                   <Typography variant="subtitle2" color="text.secondary">
                     @{profile?.username ?? targetUsername}
@@ -328,7 +357,7 @@ export default function CommunityCollection() {
               >
                 <TextField
                   variant="outlined"
-                  placeholder="Search Collection"
+                  placeholder={searchPlaceholder}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   InputProps={{ type: "search" }}
@@ -365,8 +394,8 @@ export default function CommunityCollection() {
                   >
                     <Typography color="text.secondary" align="center">
                       {searchTerm.trim() || filters.tags.length > 0
-                        ? "No records match these filters."
-                        : "No records to display."}
+                        ? noMatchMessage
+                        : emptyCollectionMessage}
                     </Typography>
                   </Box>
                 ) : (

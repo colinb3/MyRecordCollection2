@@ -252,7 +252,8 @@ const profileCache = new Map<string, PublicUserProfile>();
 const profileInFlight = new Map<string, Promise<PublicUserProfile>>();
 
 export async function loadPublicUserProfile(
-  username: string
+  username: string,
+  forceRefresh = false
 ): Promise<PublicUserProfile> {
   const key = username.trim().toLowerCase();
   if (!key) {
@@ -260,16 +261,19 @@ export async function loadPublicUserProfile(
     (error as any).status = 400;
     throw error;
   }
-  if (profileCache.has(key)) {
-    const cached = profileCache.get(key)!;
-    return {
-      ...cached,
-      highlights: cloneRecords(cached.highlights),
-      recentRecords: cloneRecords(cached.recentRecords),
-    };
-  }
-  if (profileInFlight.has(key)) {
-    return profileInFlight.get(key)!;
+  if (!forceRefresh) {
+    if (profileCache.has(key)) {
+      const cached = profileCache.get(key)!;
+      return {
+        ...cached,
+        highlights: cloneRecords(cached.highlights),
+        recentRecords: cloneRecords(cached.recentRecords),
+        wishlistRecords: cloneRecords(cached.wishlistRecords),
+      };
+    }
+    if (profileInFlight.has(key)) {
+      return profileInFlight.get(key)!;
+    }
   }
 
   const fetchPromise = (async () => {
@@ -303,6 +307,7 @@ export async function loadPublicUserProfile(
         profilePicUrl: normalizeProfilePicUrl(data.profilePicUrl),
         highlights: normalizeRecords(data.highlights),
         recentRecords: normalizeRecords(data.recentRecords),
+        wishlistRecords: normalizeRecords(data.wishlistRecords),
         followersCount: normalizeCount(data.followersCount),
         followingCount: normalizeCount(data.followingCount),
         isFollowing:
@@ -310,19 +315,26 @@ export async function loadPublicUserProfile(
             ? data.isFollowing
             : null,
         joinedDate: normalizeDateString(data.joinedDate),
+        collectionPrivate: Boolean(data.collectionPrivate),
+        wishlistPrivate: Boolean(data.wishlistPrivate ?? true),
       };
       profileCache.set(key, {
         ...normalizedProfile,
         highlights: cloneRecords(normalizedProfile.highlights),
         recentRecords: cloneRecords(normalizedProfile.recentRecords),
+        wishlistRecords: cloneRecords(normalizedProfile.wishlistRecords),
       });
       return normalizedProfile;
     } finally {
-      profileInFlight.delete(key);
+      if (!forceRefresh) {
+        profileInFlight.delete(key);
+      }
     }
   })();
 
-  profileInFlight.set(key, fetchPromise);
+  if (!forceRefresh) {
+    profileInFlight.set(key, fetchPromise);
+  }
   return fetchPromise;
 }
 
@@ -412,7 +424,8 @@ function cloneFollowLists(lists: UserFollowLists): UserFollowLists {
 
 export async function loadPublicUserCollection(
   username: string,
-  tableName?: string
+  tableName?: string,
+  forceRefresh = false
 ): Promise<MrcRecord[]> {
   const normalizedUser = username.trim().toLowerCase();
   if (!normalizedUser) {
@@ -422,11 +435,13 @@ export async function loadPublicUserCollection(
   }
   const tableKey = tableName?.trim() || "";
   const cacheKey = `${normalizedUser}::${tableKey.toLowerCase()}`;
-  if (collectionCache.has(cacheKey)) {
-    return cloneRecords(collectionCache.get(cacheKey)!);
-  }
-  if (collectionInFlight.has(cacheKey)) {
-    return collectionInFlight.get(cacheKey)!;
+  if (!forceRefresh) {
+    if (collectionCache.has(cacheKey)) {
+      return cloneRecords(collectionCache.get(cacheKey)!);
+    }
+    if (collectionInFlight.has(cacheKey)) {
+      return collectionInFlight.get(cacheKey)!;
+    }
   }
 
   const searchParams = new URLSearchParams();
@@ -459,11 +474,15 @@ export async function loadPublicUserCollection(
       collectionCache.set(cacheKey, cloneRecords(normalized));
       return normalized;
     } finally {
-      collectionInFlight.delete(cacheKey);
+      if (!forceRefresh) {
+        collectionInFlight.delete(cacheKey);
+      }
     }
   })();
 
-  collectionInFlight.set(cacheKey, fetchPromise);
+  if (!forceRefresh) {
+    collectionInFlight.set(cacheKey, fetchPromise);
+  }
   return fetchPromise;
 }
 

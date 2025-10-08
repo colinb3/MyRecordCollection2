@@ -273,7 +273,7 @@ export default function Community() {
           initialSearchValue={rawQuery}
         />
         <Box sx={{ flex: 1, overflowY: "auto", pb: 3, px: 1 }}>
-          <Box maxWidth={720} mx="auto" sx={{ mt: 1 }}>
+          <Box maxWidth={800} mx="auto" sx={{ mt: 1 }}>
             <Paper
               variant="outlined"
               sx={{

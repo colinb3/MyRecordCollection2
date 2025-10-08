@@ -48,7 +48,7 @@ interface ProfileSettingsProps {
 
 const usernameRegex = /^[a-zA-Z0-9_]+$/;
 const passwordRegex = /(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9])/;
-const MAX_PROFILE_HIGHLIGHTS = 4;
+const MAX_PROFILE_HIGHLIGHTS = 3;
 const PROFILE_PIC_MAX_SIZE = 3 * 1024 * 1024; // 3 MB
 const ALLOWED_PROFILE_MIME_TYPES = [
   "image/jpeg",

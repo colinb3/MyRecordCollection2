@@ -22,6 +22,7 @@ import {
   FormGroup,
   InputLabel,
   LinearProgress,
+  CircularProgress,
   Link,
   List,
   ListItem,
@@ -42,6 +43,7 @@ import LocalOfferIcon from "@mui/icons-material/LocalOffer";
 import Papa, { type ParseResult } from "papaparse";
 import apiUrl from "../../api";
 import { wikiGenres } from "../../wiki";
+import { clearCommunityCaches } from "../../communityUsers";
 import {
   getCachedRecordTablePreferences,
   loadRecordTablePreferences,
@@ -59,6 +61,7 @@ import {
 } from "../../types";
 
 const DEFAULT_COLLECTION = "My Collection";
+const WISHLIST_COLLECTION = "Wishlist";
 const MIN_RELEASE_YEAR = 1877;
 const MAX_RELEASE_YEAR = 2100;
 
@@ -179,6 +182,17 @@ export default function CollectionSettings() {
     severity: "success" | "error" | "info";
   }>({ open: false, message: "", severity: "success" });
   const [importSummary, setImportSummary] = useState<ImportResult | null>(null);
+  const [isCollectionPrivate, setIsCollectionPrivate] =
+    useState<boolean>(false);
+  const [isWishlistPrivate, setIsWishlistPrivate] = useState<boolean>(true);
+  const [collectionPrivacyLoading, setCollectionPrivacyLoading] =
+    useState<boolean>(true);
+  const [collectionPrivacySaving, setCollectionPrivacySaving] =
+    useState<boolean>(false);
+  const [wishlistPrivacyLoading, setWishlistPrivacyLoading] =
+    useState<boolean>(true);
+  const [wishlistPrivacySaving, setWishlistPrivacySaving] =
+    useState<boolean>(false);
   const [clearingCollection, setClearingCollection] = useState(false);
   const [clearingTags, setClearingTags] = useState(false);
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
@@ -235,6 +249,166 @@ export default function CollectionSettings() {
       active = false;
     };
   }, [applyDefaultPreferences, hadCachedPreferences]);
+
+  useEffect(() => {
+    let active = true;
+
+    const fetchPrivacyState = async (
+      tableName: string,
+      setValue: (next: boolean) => void,
+      setLoading: (next: boolean) => void,
+      fallbackValue: boolean
+    ) => {
+      setLoading(true);
+      try {
+        const res = await fetch(
+          apiUrl(
+            `/api/collections/privacy?table=${encodeURIComponent(tableName)}`
+          ),
+          { credentials: "include" }
+        );
+        const payload = (await res.json().catch(() => ({}))) as {
+          isPrivate?: unknown;
+          error?: unknown;
+        };
+        if (!res.ok) {
+          const message =
+            typeof payload.error === "string"
+              ? payload.error
+              : `Failed to load ${tableName} privacy`;
+          throw new Error(message);
+        }
+        if (!active) return;
+        setValue(Boolean(payload.isPrivate));
+      } catch (err) {
+        if (!active) return;
+        const message =
+          err instanceof Error
+            ? err.message
+            : `Failed to load ${tableName} privacy`;
+        setValue(fallbackValue);
+        setSnackbar({
+          open: true,
+          message,
+          severity: "error",
+        });
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void fetchPrivacyState(
+      DEFAULT_COLLECTION,
+      setIsCollectionPrivate,
+      setCollectionPrivacyLoading,
+      false
+    );
+    void fetchPrivacyState(
+      WISHLIST_COLLECTION,
+      setIsWishlistPrivate,
+      setWishlistPrivacyLoading,
+      true
+    );
+
+    return () => {
+      active = false;
+    };
+  }, [setSnackbar]);
+
+  const updatePrivacy = useCallback(
+    async (
+      tableName: string,
+      checked: boolean,
+      previousValue: boolean,
+      setValue: (next: boolean) => void,
+      setSaving: (next: boolean) => void,
+      saving: boolean,
+      successMessage: { private: string; public: string }
+    ) => {
+      if (saving) return;
+      setValue(checked);
+      setSaving(true);
+      try {
+        const res = await fetch(apiUrl("/api/collections/privacy"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            tableName,
+            isPrivate: checked,
+          }),
+        });
+        const payload = (await res.json().catch(() => ({}))) as {
+          error?: unknown;
+          isPrivate?: unknown;
+        };
+        if (!res.ok) {
+          const message =
+            (typeof payload.error === "string" && payload.error) ||
+            "Failed to update privacy";
+          throw new Error(message);
+        }
+        clearCommunityCaches();
+        setSnackbar({
+          open: true,
+          message: checked ? successMessage.private : successMessage.public,
+          severity: "success",
+        });
+      } catch (err: unknown) {
+        setValue(previousValue);
+        const message =
+          err instanceof Error ? err.message : "Failed to update privacy";
+        setSnackbar({
+          open: true,
+          message,
+          severity: "error",
+        });
+      } finally {
+        setSaving(false);
+      }
+    },
+    [setSnackbar]
+  );
+
+  const handleToggleCollectionPrivacy = useCallback(
+    async (_event: ChangeEvent<HTMLInputElement>, checked: boolean) => {
+      const previous = isCollectionPrivate;
+      await updatePrivacy(
+        DEFAULT_COLLECTION,
+        checked,
+        previous,
+        setIsCollectionPrivate,
+        setCollectionPrivacySaving,
+        collectionPrivacySaving,
+        {
+          private: "Your collection is now private.",
+          public: "Your collection is now public.",
+        }
+      );
+    },
+    [collectionPrivacySaving, isCollectionPrivate, updatePrivacy]
+  );
+
+  const handleToggleWishlistPrivacy = useCallback(
+    async (_event: ChangeEvent<HTMLInputElement>, checked: boolean) => {
+      const previous = isWishlistPrivate;
+      await updatePrivacy(
+        WISHLIST_COLLECTION,
+        checked,
+        previous,
+        setIsWishlistPrivate,
+        setWishlistPrivacySaving,
+        wishlistPrivacySaving,
+        {
+          private: "Your wishlist is now private.",
+          public: "Your wishlist is now public.",
+        }
+      );
+    },
+    [isWishlistPrivate, updatePrivacy, wishlistPrivacySaving]
+  );
 
   const handleToggleColumn =
     (key: RecordTableColumnKey) => (event: ChangeEvent<HTMLInputElement>) => {
@@ -515,6 +689,81 @@ export default function CollectionSettings() {
           Make your collection your own.
         </Typography>
       </Box>
+
+      <Paper
+        variant="outlined"
+        sx={{
+          p: 3,
+          mb: 2,
+          borderRadius: 2,
+          backgroundColor: "background.paper",
+        }}
+      >
+        <Stack spacing={1.5}>
+          <Typography variant="h6">Privacy</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Control who can see your main collection and wishlist on your public
+            profile and in the community feed. Highlights stay visible even when
+            these collections are private.
+          </Typography>
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={1.5}
+            alignItems={{ xs: "flex-start", sm: "center" }}
+          >
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                flexWrap: "wrap",
+              }}
+            >
+              <FormControlLabel
+                control={
+                  <Switch
+                    color="primary"
+                    checked={isCollectionPrivate}
+                    onChange={handleToggleCollectionPrivacy}
+                    disabled={
+                      collectionPrivacyLoading || collectionPrivacySaving
+                    }
+                  />
+                }
+                label="Make my collection private"
+                sx={{ m: 0 }}
+              />
+              {(collectionPrivacyLoading || collectionPrivacySaving) && (
+                <CircularProgress size={22} sx={{ ml: { sm: 1 } }} />
+              )}
+            </Box>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                flexWrap: "wrap",
+              }}
+            >
+              <FormControlLabel
+                control={
+                  <Switch
+                    color="primary"
+                    checked={isWishlistPrivate}
+                    onChange={handleToggleWishlistPrivacy}
+                    disabled={wishlistPrivacyLoading || wishlistPrivacySaving}
+                  />
+                }
+                label="Make my wishlist private"
+                sx={{ m: 0 }}
+              />
+              {(wishlistPrivacyLoading || wishlistPrivacySaving) && (
+                <CircularProgress size={22} sx={{ ml: { sm: 1 } }} />
+              )}
+            </Box>
+          </Stack>
+        </Stack>
+      </Paper>
 
       <Paper
         variant="outlined"

@@ -40,9 +40,11 @@ const PORT = Number(process.env.PORT || 4000);
 const HOST = process.env.HOST || '0.0.0.0';
 const JWT_SECRET = process.env.JWT_SECRET;
 const DEFAULT_COLLECTION_NAME = "My Collection";
-const MAX_PROFILE_HIGHLIGHTS = 4;
-const PROFILE_RECENT_DEFAULT_LIMIT = 4;
+const WISHLIST_COLLECTION_NAME = "Wishlist";
+const MAX_PROFILE_HIGHLIGHTS = 3;
+const PROFILE_RECENT_DEFAULT_LIMIT = 3;
 const PROFILE_RECENT_MAX_LIMIT = 20;
+const PROFILE_WISHLIST_PREVIEW_LIMIT = 3;
 
 const fsPromises = fs.promises;
 const MIME_EXTENSION_MAP = new Map([
@@ -424,12 +426,19 @@ function getPool() {
   return _pool;
 }
 
-async function getUserTableId(pool, userUuid, tableName) {
+async function getUserTableRow(pool, userUuid, tableName) {
+  if (!tableName) return null;
   const [rows] = await pool.execute(
-     `SELECT id FROM RecTable WHERE userUuid = ? AND name = ? LIMIT 1`,
+    `SELECT id, name, isPrivate FROM RecTable WHERE userUuid = ? AND name = ? LIMIT 1`,
     [userUuid, tableName]
   );
-  return rows.length > 0 ? rows[0].id : null;
+  if (!rows || rows.length === 0) return null;
+  return rows[0];
+}
+
+async function getUserTableId(pool, userUuid, tableName) {
+  const row = await getUserTableRow(pool, userUuid, tableName);
+  return row ? row.id : null;
 }
 
 async function fetchLastFmCover(artist, record) {
@@ -667,34 +676,83 @@ app.get("/api/community/users/:username", requireAuth, async (req, res) => {
     }
 
     const highlightIds = await getProfileHighlightIds(pool, userRow.uuid);
-    const highlights = await fetchRecordsWithTagsByIds(
+
+    const defaultCollectionRow = await getUserTableRow(
       pool,
       userRow.uuid,
-      highlightIds
+      DEFAULT_COLLECTION_NAME
     );
+    const wishlistRow = await getUserTableRow(
+      pool,
+      userRow.uuid,
+      WISHLIST_COLLECTION_NAME
+    );
+    const isOwner = userRow.uuid === req.userUuid;
+    const collectionPrivate = defaultCollectionRow
+      ? Number(defaultCollectionRow.isPrivate) === 1
+      : false;
+    const wishlistPrivate = wishlistRow
+      ? Number(wishlistRow.isPrivate) === 1
+      : true;
 
-    const [recentRows] = await pool.query(
+    let highlights = [];
+    if (highlightIds.length > 0) {
+      const fetchedHighlights = await fetchRecordsWithTagsByIds(
+        pool,
+        userRow.uuid,
+        highlightIds
+      );
+      highlights = fetchedHighlights;
+    }
+
+    let recentRecords = [];
+    if (!collectionPrivate || isOwner) {
+      const [recentRows] = await pool.query(
   `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId
        FROM Record r
        JOIN RecTable t ON r.tableId = t.id
        WHERE r.userUuid = ? AND t.name = ?
        ORDER BY r.added DESC
        LIMIT ?`,
-      [userRow.uuid, DEFAULT_COLLECTION_NAME, PROFILE_RECENT_DEFAULT_LIMIT]
-    );
+        [userRow.uuid, DEFAULT_COLLECTION_NAME, PROFILE_RECENT_DEFAULT_LIMIT]
+      );
 
-    const recentRecordIds = recentRows.map((row) => row.id);
-    const tagsByRecord = await fetchTagsByRecordIds(pool, recentRecordIds);
-    const recentRecords = recentRows.map((row) => ({
-      ...row,
-      tags: tagsByRecord[row.id] || [],
-    }));
+      const recentRecordIds = recentRows.map((row) => row.id);
+      const tagsByRecord = await fetchTagsByRecordIds(pool, recentRecordIds);
+      recentRecords = recentRows.map((row) => ({
+        ...row,
+        tags: tagsByRecord[row.id] || [],
+      }));
+    }
+
+    let wishlistRecords = [];
+    if (wishlistRow && (!wishlistPrivate || isOwner)) {
+      const [wishlistRows] = await pool.query(
+        `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId
+       FROM Record r
+       JOIN RecTable t ON r.tableId = t.id
+       WHERE r.userUuid = ? AND t.name = ?
+       ORDER BY r.rating DESC, r.added DESC
+       LIMIT ?`,
+        [userRow.uuid, WISHLIST_COLLECTION_NAME, PROFILE_WISHLIST_PREVIEW_LIMIT]
+      );
+
+      const wishlistIds = wishlistRows.map((row) => row.id);
+      const wishlistTags = await fetchTagsByRecordIds(pool, wishlistIds);
+      wishlistRecords = wishlistRows.map((row) => ({
+        ...row,
+        tags: wishlistTags[row.id] || [],
+      }));
+    }
 
     res.json({
       ...publicUser,
       highlights,
       recentRecords,
       isFollowing,
+      collectionPrivate,
+      wishlistRecords,
+      wishlistPrivate,
     });
   } catch (error) {
     console.error("Failed to load public profile", error);
@@ -722,15 +780,19 @@ app.get(
         return res.status(404).json({ error: "User not found" });
       }
 
-      const tableId = await getUserTableId(pool, userRow.uuid, rawTable);
-      if (!tableId) {
+      const tableRow = await getUserTableRow(pool, userRow.uuid, rawTable);
+      if (!tableRow) {
         return res.status(404).json({ error: "Collection not found" });
+      }
+
+      if (tableRow.isPrivate && userRow.uuid !== req.userUuid) {
+        return res.status(403).json({ error: "This collection is private" });
       }
 
       const [rows] = await pool.query(
         `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId
          FROM Record r WHERE r.userUuid = ? AND r.tableId = ?`,
-        [userRow.uuid, tableId]
+        [userRow.uuid, tableRow.id]
       );
 
       const recordIds = rows.map((row) => row.id);
@@ -788,8 +850,8 @@ app.get("/api/community/feed", requireAuth, async (req, res) => {
        FROM Record r
        JOIN Follows f ON f.followsUuid = r.userUuid
        JOIN User u ON u.uuid = r.userUuid
-       JOIN RecTable t ON r.tableId = t.id
-       WHERE f.userUuid = ? AND t.name = ?
+  JOIN RecTable t ON r.tableId = t.id
+  WHERE f.userUuid = ? AND t.name = ? AND t.isPrivate = 0
        ORDER BY r.added DESC, r.id DESC
        LIMIT 20`,
       [req.userUuid, DEFAULT_COLLECTION_NAME]
@@ -986,8 +1048,8 @@ app.post('/api/register', async (req, res) => {
       [userUuid, username.toLowerCase(), displayName, hashedPassword, null, null]
     );
     await pool.execute(
-      `INSERT INTO RecTable (name, userUuid) VALUES (?, ?), (?, ?)`,
-      ["My Collection", userUuid, "Wishlist", userUuid]
+      `INSERT INTO RecTable (name, userUuid, isPrivate) VALUES (?, ?, ?), (?, ?, ?)`,
+      ["My Collection", userUuid, false, "Wishlist", userUuid, true]
     );
     const token = issueToken(userUuid);
   res.cookie('token', token, { httpOnly: true, sameSite: process.env.CROSS_SITE_COOKIES === 'true' ? 'none' : 'lax', secure: process.env.NODE_ENV === 'production', maxAge: 7*24*60*60*1000 });
@@ -1798,6 +1860,53 @@ app.get('/api/collections', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('Failed to list collections', err);
     res.status(500).json({ error: 'Failed to list collections' });
+  }
+});
+
+app.get('/api/collections/privacy', requireAuth, async (req, res) => {
+  console.log('Fetching collection privacy state...');
+  const tableName =
+    typeof req.query.table === 'string' && req.query.table.trim()
+      ? req.query.table.trim()
+      : DEFAULT_COLLECTION_NAME;
+  try {
+    const pool = await getPool();
+    const tableRow = await getUserTableRow(pool, req.userUuid, tableName);
+    if (!tableRow) {
+      return res.status(404).json({ error: 'Collection not found' });
+    }
+  const isPrivate = Number(tableRow.isPrivate) === 1;
+    res.json({ tableName: tableRow.name, isPrivate });
+  } catch (err) {
+    console.error('Failed to fetch collection privacy state', err);
+    res.status(500).json({ error: 'Failed to fetch collection privacy state' });
+  }
+});
+
+app.post('/api/collections/privacy', requireAuth, async (req, res) => {
+  console.log('Updating collection privacy state...');
+  const { tableName: rawTableName, isPrivate } = req.body || {};
+  if (typeof isPrivate !== 'boolean') {
+    return res.status(400).json({ error: 'isPrivate (boolean) is required' });
+  }
+  const tableName =
+    typeof rawTableName === 'string' && rawTableName.trim()
+      ? rawTableName.trim()
+      : DEFAULT_COLLECTION_NAME;
+  try {
+    const pool = await getPool();
+    const tableRow = await getUserTableRow(pool, req.userUuid, tableName);
+    if (!tableRow) {
+      return res.status(404).json({ error: 'Collection not found' });
+    }
+    await pool.execute(
+      `UPDATE RecTable SET isPrivate = ? WHERE id = ? AND userUuid = ?`,
+      [isPrivate ? 1 : 0, tableRow.id, req.userUuid]
+    );
+    res.json({ success: true, tableName: tableRow.name, isPrivate });
+  } catch (err) {
+    console.error('Failed to update collection privacy', err);
+    res.status(500).json({ error: 'Failed to update collection privacy' });
   }
 });
 

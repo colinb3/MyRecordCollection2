@@ -126,10 +126,13 @@ export interface PublicUserProfile {
   profilePicUrl: string | null;
   highlights: Record[];
   recentRecords: Record[];
+  wishlistRecords: Record[];
   followersCount: number;
   followingCount: number;
   isFollowing: boolean | null;
   joinedDate: string | null;
+  collectionPrivate: boolean;
+  wishlistPrivate: boolean;
 }
 
 export interface UserFollowLists {

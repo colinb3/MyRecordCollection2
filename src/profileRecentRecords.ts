@@ -2,7 +2,7 @@ import apiUrl from "./api";
 import type { Record as MrcRecord } from "./types";
 import { normalizeApiRecord } from "./collectionRecords";
 
-export const PROFILE_RECENT_DEFAULT_LIMIT = 4;
+export const PROFILE_RECENT_DEFAULT_LIMIT = 3;
 const PROFILE_RECENT_MAX_LIMIT = 20;
 
 function clampLimit(limit: number): number {

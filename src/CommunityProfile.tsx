@@ -27,13 +27,10 @@ import {
 } from "./userInfo";
 import { clearRecordTablePreferencesCache } from "./preferences";
 import { setUserId } from "./analytics";
-import {
-  clearProfileHighlightsCache,
-  loadProfileHighlights,
-} from "./profileHighlights";
+import { clearProfileHighlightsCache } from "./profileHighlights";
 import { clearCollectionRecordsCache } from "./collectionRecords";
 import RecordPreviewGrid from "./components/RecordPreviewGrid";
-import type { PublicUserProfile, Record as MrcRecord } from "./types";
+import type { PublicUserProfile } from "./types";
 import {
   clearCommunityCaches,
   followUser,
@@ -41,10 +38,10 @@ import {
   unfollowUser,
 } from "./communityUsers";
 import apiUrl from "./api";
-import { loadRecentRecords } from "./profileRecentRecords";
 import SettingsIcon from "@mui/icons-material/Settings";
 
-const OWN_PREVIEW_LIMIT = 4;
+const OWN_PREVIEW_LIMIT = 3;
+const WISHLIST_COLLECTION_NAME = "Wishlist";
 
 interface SectionCardProps {
   title: string;
@@ -131,83 +128,47 @@ export default function CommunityProfile() {
     let cancelled = false;
 
     if (isViewingOwnProfile && !username) {
-      return;
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const effectiveUsername = isViewingOwnProfile ? username : targetUsername;
+    if (!effectiveUsername) {
+      setProfile(null);
+      setError("Failed to load profile");
+      setLoading(false);
+      return () => {
+        cancelled = true;
+      };
     }
 
     setLoading(true);
     setError(null);
 
-    const loadData = async () => {
-      if (isViewingOwnProfile) {
-        try {
-          const userInfo = await loadUserInfo();
-          if (cancelled) return;
-          if (!userInfo) {
-            setProfile(null);
-            setError("Failed to load profile");
-            return;
-          }
-          const [highlightsData, recentData] = await Promise.all([
-            loadProfileHighlights().catch((err) => {
-              console.warn("Failed to load profile highlights", err);
-              return null;
-            }),
-            loadRecentRecords().catch((err) => {
-              console.warn("Failed to load recent records", err);
-              return [] as MrcRecord[];
-            }),
-          ]);
-          if (cancelled) return;
-          setProfile({
-            username: userInfo.username,
-            displayName: userInfo.displayName ?? null,
-            bio: userInfo.bio ?? null,
-            profilePicUrl: userInfo.profilePicUrl ?? null,
-            highlights: highlightsData?.records ?? [],
-            recentRecords: recentData ?? [],
-            followersCount: userInfo.followersCount,
-            followingCount: userInfo.followingCount,
-            isFollowing: null,
-            joinedDate: userInfo.joinedDate ?? null,
-          });
-          setError(null);
-        } catch (err: unknown) {
-          if (cancelled) return;
-          const message =
-            err instanceof Error ? err.message : "Failed to load profile";
-          setProfile(null);
-          setError(message);
-        } finally {
-          if (!cancelled) {
-            setLoading(false);
-          }
+    loadPublicUserProfile(effectiveUsername, isViewingOwnProfile)
+      .then((data) => {
+        if (cancelled) return;
+        setProfile(data);
+        setError(null);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        const message =
+          err instanceof Error ? err.message : "Failed to load profile";
+        setProfile(null);
+        setError(message);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
         }
-      } else {
-        try {
-          const data = await loadPublicUserProfile(targetUsername);
-          if (cancelled) return;
-          setProfile(data);
-          setError(null);
-        } catch (err: unknown) {
-          if (cancelled) return;
-          const message =
-            err instanceof Error ? err.message : "Failed to load profile";
-          setProfile(null);
-          setError(message);
-        } finally {
-          if (!cancelled) {
-            setLoading(false);
-          }
-        }
-      }
-    };
-
-    loadData();
+      });
 
     return () => {
       cancelled = true;
     };
-  }, [isViewingOwnProfile, normalizedTarget, targetUsername, username]);
+  }, [isViewingOwnProfile, targetUsername, username]);
 
   const highlights = useMemo(() => {
     const records = profile?.highlights ?? [];
@@ -216,6 +177,11 @@ export default function CommunityProfile() {
 
   const recentRecords = useMemo(() => {
     const records = profile?.recentRecords ?? [];
+    return isViewingOwnProfile ? records.slice(0, OWN_PREVIEW_LIMIT) : records;
+  }, [profile, isViewingOwnProfile]);
+
+  const wishlistRecords = useMemo(() => {
+    const records = profile?.wishlistRecords ?? [];
     return isViewingOwnProfile ? records.slice(0, OWN_PREVIEW_LIMIT) : records;
   }, [profile, isViewingOwnProfile]);
 
@@ -308,6 +274,17 @@ export default function CommunityProfile() {
     navigate(`/community/${encodeURIComponent(profileUsername)}/collection`);
   }, [isViewingOwnProfile, navigate, profileUsername]);
 
+  const handleSeeWishlist = useCallback(() => {
+    if (isViewingOwnProfile) {
+      navigate("/wishlist");
+      return;
+    }
+    if (!profileUsername) return;
+    const base = `/community/${encodeURIComponent(profileUsername)}/collection`;
+    const params = new URLSearchParams({ table: WISHLIST_COLLECTION_NAME });
+    navigate(`${base}?${params.toString()}`);
+  }, [isViewingOwnProfile, navigate, profileUsername]);
+
   const handleViewFollows = useCallback(
     (tab: "followers" | "following") => {
       if (!profileUsername) return;
@@ -378,13 +355,22 @@ export default function CommunityProfile() {
 
   const seeCollectionLabel = isViewingOwnProfile
     ? "Go to My Collection"
-    : "See Full Collection";
+    : "View Collection";
   const highlightEmptyCopy = isViewingOwnProfile
     ? "No Highlights Set"
     : "No highlights shared yet.";
   const recentEmptyCopy = isViewingOwnProfile
     ? "No recent additions yet."
     : "No recent additions available.";
+  const showRecentSection = isViewingOwnProfile || !profile?.collectionPrivate;
+  const wishlistTitle = isViewingOwnProfile ? "My Wishlist" : "Wishlist";
+  const wishlistEmptyCopy = isViewingOwnProfile
+    ? "No wishlist records yet."
+    : "No wishlist shared yet.";
+  const showWishlistSection = isViewingOwnProfile || !profile?.wishlistPrivate;
+  const seeWishlistLabel = isViewingOwnProfile
+    ? "Go to Wishlist"
+    : "View Wishlist";
 
   return (
     <ThemeProvider theme={darkTheme}>
@@ -406,198 +392,235 @@ export default function CommunityProfile() {
           onLogout={handleLogout}
           {...topBarProps}
         />
-        <Box sx={{ flex: 1, overflowY: "auto", pb: 3, pr: 1 }}>
-          <Grid container spacing={2}>
-            <Grid size={{ xs: 12 }}>
-              <Paper
-                sx={{
-                  p: { xs: 2, md: 3 },
-                  borderRadius: 2,
-                  display: "flex",
-                  flexDirection: { xs: "column", sm: "row" },
-                  alignItems: "flex-start",
-                  gap: 3,
-                  position: "relative",
-                }}
-              >
-                {loading ? (
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 2,
-                    }}
-                  >
-                    <CircularProgress size={24} />
-                    <Typography color="text.secondary">
-                      Loading profile…
-                    </Typography>
-                  </Box>
-                ) : error ? (
-                  <Typography color="error">{error}</Typography>
-                ) : profile ? (
-                  <>
-                    {isViewingOwnProfile && (
-                      <IconButton
-                        color="inherit"
-                        aria-label="Open profile settings"
-                        onClick={handleOpenProfileSettings}
-                        sx={{ position: "absolute", top: 16, right: 16 }}
-                      >
-                        <SettingsIcon />
-                      </IconButton>
-                    )}
-                    <Avatar
-                      variant="rounded"
+        <Box sx={{ flex: 1, overflowY: "auto", pb: 3, px: 1 }}>
+          <Box maxWidth={800} mx="auto" sx={{ mt: 1 }}>
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12 }}>
+                <Paper
+                  sx={{
+                    p: { xs: 2, md: 3 },
+                    borderRadius: 2,
+                    display: "flex",
+                    flexDirection: { xs: "column", sm: "row" },
+                    alignItems: "flex-start",
+                    gap: 3,
+                    position: "relative",
+                  }}
+                >
+                  {loading ? (
+                    <Box
                       sx={{
-                        width: 120,
-                        height: 120,
-                        bgcolor: "grey.700",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 2,
                       }}
-                      src={profile.profilePicUrl ?? undefined}
                     >
-                      {!profile.profilePicUrl && targetAvatarInitial}
-                    </Avatar>
-                    <Box>
-                      <Typography variant="h4" mt={{ xs: -2, sm: 0 }}>
-                        {targetDisplayName}
+                      <CircularProgress size={24} />
+                      <Typography color="text.secondary">
+                        Loading profile…
                       </Typography>
-                      <Typography
-                        variant="subtitle1"
-                        color="text.secondary"
-                        sx={{ pb: joinedDateDisplay ? 0.3 : 0.8 }}
-                      >
-                        @{profileUsername}
-                      </Typography>
-                      {joinedDateDisplay && (
-                        <Typography
-                          variant="body2"
-                          color="text.secondary"
-                          sx={{ pb: 0.6 }}
+                    </Box>
+                  ) : error ? (
+                    <Typography color="error">{error}</Typography>
+                  ) : profile ? (
+                    <>
+                      {isViewingOwnProfile && (
+                        <IconButton
+                          color="inherit"
+                          aria-label="Open profile settings"
+                          onClick={handleOpenProfileSettings}
+                          sx={{ position: "absolute", top: 16, right: 16 }}
                         >
-                          Joined {joinedDateDisplay}
-                        </Typography>
+                          <SettingsIcon />
+                        </IconButton>
                       )}
-                      <Box
+                      <Avatar
+                        variant="rounded"
                         sx={{
-                          display: "flex",
-                          gap: 0.5,
-                          flexWrap: "wrap",
-                          mb: profile?.bio ? 1 : 0,
+                          width: 120,
+                          height: 120,
+                          bgcolor: "grey.700",
                         }}
+                        src={profile.profilePicUrl ?? undefined}
                       >
-                        {typeof profile?.isFollowing === "boolean" && (
+                        {!profile.profilePicUrl && targetAvatarInitial}
+                      </Avatar>
+                      <Box>
+                        <Typography variant="h4" mt={{ xs: -2, sm: 0 }}>
+                          {targetDisplayName}
+                        </Typography>
+                        <Typography
+                          variant="subtitle1"
+                          color="text.secondary"
+                          sx={{ pb: joinedDateDisplay ? 0.3 : 0.8 }}
+                        >
+                          @{profileUsername}
+                        </Typography>
+                        {joinedDateDisplay && (
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            sx={{ pb: 1 }}
+                          >
+                            Joined {joinedDateDisplay}
+                          </Typography>
+                        )}
+                        <Box
+                          sx={{
+                            display: "flex",
+                            gap: 0.5,
+                            flexWrap: "wrap",
+                            mb: profile?.bio ? 1 : 0,
+                          }}
+                        >
+                          {typeof profile?.isFollowing === "boolean" && (
+                            <Button
+                              variant={
+                                profile.isFollowing ? "outlined" : "contained"
+                              }
+                              size="small"
+                              onClick={handleToggleFollow}
+                              disabled={followPending}
+                              sx={{ textTransform: "none", minWidth: 0 }}
+                            >
+                              {followPending
+                                ? "Updating…"
+                                : profile.isFollowing
+                                ? "Unfollow"
+                                : "Follow"}
+                            </Button>
+                          )}
                           <Button
-                            variant={
-                              profile.isFollowing ? "outlined" : "contained"
-                            }
+                            variant="text"
                             size="small"
-                            onClick={handleToggleFollow}
-                            disabled={followPending}
+                            onClick={() => handleViewFollows("followers")}
                             sx={{ textTransform: "none", minWidth: 0 }}
                           >
-                            {followPending
-                              ? "Updating…"
-                              : profile.isFollowing
-                              ? "Unfollow"
-                              : "Follow"}
+                            {profile?.followersCount.toLocaleString()} Followers
                           </Button>
+                          <Button
+                            variant="text"
+                            size="small"
+                            onClick={() => handleViewFollows("following")}
+                            sx={{ textTransform: "none", minWidth: 0 }}
+                          >
+                            {profile?.followingCount.toLocaleString()} Following
+                          </Button>
+                        </Box>
+                        {followError && (
+                          <Typography
+                            variant="body2"
+                            color="error"
+                            sx={{ mt: 0.5 }}
+                          >
+                            {followError}
+                          </Typography>
                         )}
-                        <Button
-                          variant="text"
-                          size="small"
-                          onClick={() => handleViewFollows("followers")}
-                          sx={{ textTransform: "none", minWidth: 0 }}
-                        >
-                          {profile?.followersCount.toLocaleString()} Followers
-                        </Button>
-                        <Button
-                          variant="text"
-                          size="small"
-                          onClick={() => handleViewFollows("following")}
-                          sx={{ textTransform: "none", minWidth: 0 }}
-                        >
-                          {profile?.followingCount.toLocaleString()} Following
-                        </Button>
+                        {profile.bio && profile.bio.trim().length > 0 && (
+                          <Typography
+                            variant="body1"
+                            sx={{ whiteSpace: "pre-line" }}
+                            color="text.primary"
+                          >
+                            {profile.bio}
+                          </Typography>
+                        )}
                       </Box>
-                      {followError && (
-                        <Typography
-                          variant="body2"
-                          color="error"
-                          sx={{ mt: 0.5 }}
-                        >
-                          {followError}
-                        </Typography>
-                      )}
-                      {profile.bio && profile.bio.trim().length > 0 && (
-                        <Typography
-                          variant="body1"
-                          sx={{ whiteSpace: "pre-line" }}
-                          color="text.primary"
-                        >
-                          {profile.bio}
-                        </Typography>
-                      )}
+                    </>
+                  ) : (
+                    <Typography color="text.secondary">
+                      No profile information available.
+                    </Typography>
+                  )}
+                </Paper>
+              </Grid>
+
+              <Grid size={{ xs: 12 }}>
+                <SectionCard title="Collection Highlights">
+                  {loading ? (
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                      <CircularProgress size={20} />
+                      <Typography color="text.secondary">
+                        Loading highlights…
+                      </Typography>
                     </Box>
-                  </>
-                ) : (
-                  <Typography color="text.secondary">
-                    No profile information available.
-                  </Typography>
-                )}
-              </Paper>
-            </Grid>
-
-            <Grid size={{ xs: 12 }}>
-              <SectionCard title="Collection Highlights">
-                {loading ? (
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                    <CircularProgress size={20} />
+                  ) : highlights.length === 0 ? (
                     <Typography color="text.secondary">
-                      Loading highlights…
+                      {highlightEmptyCopy}
                     </Typography>
-                  </Box>
-                ) : highlights.length === 0 ? (
-                  <Typography color="text.secondary">
-                    {highlightEmptyCopy}
-                  </Typography>
-                ) : (
-                  <RecordPreviewGrid
-                    records={highlights}
-                    keyPrefix="highlight"
-                  />
-                )}
-              </SectionCard>
-            </Grid>
+                  ) : (
+                    <RecordPreviewGrid
+                      records={highlights}
+                      keyPrefix="highlight"
+                    />
+                  )}
+                </SectionCard>
+              </Grid>
 
-            <Grid size={{ xs: 12 }}>
-              <SectionCard title="Recently Added">
-                {loading ? (
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                    <CircularProgress size={20} />
-                    <Typography color="text.secondary">
-                      Loading recent records…
-                    </Typography>
-                  </Box>
-                ) : recentRecords.length === 0 ? (
-                  <Typography color="text.secondary">
-                    {recentEmptyCopy}
-                  </Typography>
-                ) : (
-                  <RecordPreviewGrid
-                    records={recentRecords}
-                    keyPrefix="recent"
-                    showDateAdded
-                  />
-                )}
-                <Box sx={{ mt: 1 }}>
-                  <Button variant="contained" onClick={handleSeeCollection}>
-                    {seeCollectionLabel}
-                  </Button>
-                </Box>
-              </SectionCard>
+              {showRecentSection && (
+                <Grid size={{ xs: 12 }}>
+                  <SectionCard title="Recently Added">
+                    {loading ? (
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 2 }}
+                      >
+                        <CircularProgress size={20} />
+                        <Typography color="text.secondary">
+                          Loading recent records…
+                        </Typography>
+                      </Box>
+                    ) : recentRecords.length === 0 ? (
+                      <Typography color="text.secondary">
+                        {recentEmptyCopy}
+                      </Typography>
+                    ) : (
+                      <RecordPreviewGrid
+                        records={recentRecords}
+                        keyPrefix="recent"
+                        showDateAdded
+                      />
+                    )}
+                    <Box>
+                      <Button variant="contained" onClick={handleSeeCollection}>
+                        {seeCollectionLabel}
+                      </Button>
+                    </Box>
+                  </SectionCard>
+                </Grid>
+              )}
+
+              {showWishlistSection && (
+                <Grid size={{ xs: 12 }}>
+                  <SectionCard title={wishlistTitle}>
+                    {loading ? (
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 2 }}
+                      >
+                        <CircularProgress size={20} />
+                        <Typography color="text.secondary">
+                          Loading wishlist…
+                        </Typography>
+                      </Box>
+                    ) : wishlistRecords.length === 0 ? (
+                      <Typography color="text.secondary">
+                        {wishlistEmptyCopy}
+                      </Typography>
+                    ) : (
+                      <RecordPreviewGrid
+                        records={wishlistRecords}
+                        keyPrefix="wishlist"
+                      />
+                    )}
+                    <Box>
+                      <Button variant="contained" onClick={handleSeeWishlist}>
+                        {seeWishlistLabel}
+                      </Button>
+                    </Box>
+                  </SectionCard>
+                </Grid>
+              )}
             </Grid>
-          </Grid>
+          </Box>
         </Box>
       </Box>
     </ThemeProvider>
