@@ -704,9 +704,6 @@ export default function CollectionSettings() {
               label="Private Collection"
               sx={{ m: 0 }}
             />
-            {(collectionPrivacyLoading || collectionPrivacySaving) && (
-              <CircularProgress size={22} sx={{ ml: { sm: 1 } }} />
-            )}
           </Box>
           <Box
             sx={{
@@ -728,7 +725,10 @@ export default function CollectionSettings() {
               label="Private Wishlist"
               sx={{ m: 0 }}
             />
-            {(wishlistPrivacyLoading || wishlistPrivacySaving) && (
+            {(collectionPrivacyLoading ||
+              collectionPrivacySaving ||
+              wishlistPrivacyLoading ||
+              wishlistPrivacySaving) && (
               <CircularProgress size={22} sx={{ ml: { sm: 1 } }} />
             )}
           </Box>
