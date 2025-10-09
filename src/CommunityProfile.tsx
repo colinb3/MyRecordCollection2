@@ -385,7 +385,7 @@ export default function CommunityProfile() {
         }}
       >
         <TopBar
-          title={isViewingOwnProfile ? "Your Profile" : "Community"}
+          title={isViewingOwnProfile ? "My Profile" : "Community"}
           username={username}
           displayName={displayName}
           profilePicUrl={profilePicUrl ?? undefined}
