@@ -16,6 +16,7 @@ import CommunityFollows from "./CommunityFollows";
 import { useLocation } from "react-router-dom";
 import { trackPage } from "./analytics";
 import { loadUserInfo } from "./userInfo";
+import RecordPage from "./Record";
 
 // Component that prevents authenticated users from seeing auth pages
 function RedirectIfAuthed({ children }: { children: React.ReactNode }) {
@@ -73,6 +74,14 @@ export default function AppRouter() {
           }
         />
         <Route path="/findrecord" element={<Navigate to="/search" replace />} />
+        <Route
+          path="/record"
+          element={
+            <RequireAuth>
+              <RecordPage />
+            </RequireAuth>
+          }
+        />
         <Route
           path="/settings"
           element={

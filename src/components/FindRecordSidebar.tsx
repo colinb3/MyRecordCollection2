@@ -92,7 +92,7 @@ export default function FindRecordSidebar({
           overflowX: "hidden",
           flex: 1,
           py: 2,
-          px: { xs: 1.3, sm: 1.5, md: 2 },
+          px: 2,
           minHeight: 0,
           display: "flex",
           flexDirection: "column",
@@ -233,7 +233,7 @@ export default function FindRecordSidebar({
           type="number"
           size="small"
           onChange={(e) => onReleaseYearChange(Number(e.target.value))}
-          sx={{ mb: 1, width: "60%" }}
+          sx={{ mb: 1, width: "50%" }}
           slotProps={{ input: { inputProps: { min: 1877, max: 2100 } } }}
         />
       </Box>

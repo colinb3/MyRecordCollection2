@@ -12,7 +12,6 @@ import {
   Box,
   CircularProgress,
   Alert,
-  Snackbar,
   Tabs,
   Tab,
   Divider,
@@ -24,17 +23,11 @@ import {
   Avatar,
   ListItemText,
 } from "@mui/material";
-import Grid from "@mui/material/Grid";
-import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import TopBar from "./components/TopBar";
 import { darkTheme } from "./theme";
 import { setUserId } from "./analytics";
-import { wikiGenres } from "./wiki";
 import placeholderCover from "./assets/missingImg.jpg";
-import FindRecordSidebar, {
-  type AlbumListItem,
-} from "./components/FindRecordSidebar";
 import {
   clearUserInfoCache,
   getCachedUserInfo,
@@ -52,12 +45,16 @@ interface AlbumResult {
   image?: { ["#text"]: string; size: string }[];
 }
 
-const DEFAULT_COLLECTION_NAME = "My Collection";
-const WISHLIST_COLLECTION_NAME = "Wishlist";
+interface RecordListItem {
+  id: string;
+  record: string;
+  artist: string;
+  cover: string;
+}
+
 const MIN_USER_QUERY_LENGTH = 2;
 const SEARCH_TAB_VALUES = ["records", "users"] as const;
 type SearchTab = (typeof SEARCH_TAB_VALUES)[number];
-const RECORD_PANEL_HEIGHT = 280; // Height (px) for stacked layout below md breakpoints
 
 export default function Search() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -86,22 +83,7 @@ export default function Search() {
     let cancelled = false;
 
     (async () => {
-      const [info, tags] = await Promise.all([
-        loadUserInfo(),
-        (async () => {
-          try {
-            const res = await fetch(apiUrl("/api/tags"), {
-              credentials: "include",
-            });
-            if (!res.ok) {
-              return null;
-            }
-            return (await res.json()) as string[];
-          } catch {
-            return null;
-          }
-        })(),
-      ]);
+      const info = await loadUserInfo();
 
       if (cancelled) return;
 
@@ -117,9 +99,6 @@ export default function Search() {
         setUserId(info.userUuid);
       } catch {
         /* ignore analytics errors */
-      }
-      if (Array.isArray(tags)) {
-        setAvailableTags(tags);
       }
     })();
 
@@ -160,30 +139,12 @@ export default function Search() {
   const [recordSearchInput, setRecordSearchInput] = useState(paramQuery);
   const [recordLoading, setRecordLoading] = useState(false);
   const [recordError, setRecordError] = useState<string | null>(null);
-  const [selectedAlbumId, setSelectedAlbumId] = useState<string | undefined>();
-  const [availableTags, setAvailableTags] = useState<string[]>([]);
-  const [wikiTags, setWikiTags] = useState<string[]>([]);
-  const [wikiLoading, setWikiLoading] = useState<boolean>(false);
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [rating, setRating] = useState<number>(0);
-  const [releaseYear, setReleaseYear] = useState<number>(
-    new Date().getFullYear()
-  );
-  const [adding, setAdding] = useState(false);
-  const [addError, setAddError] = useState<string | null>(null);
-  const [snackbar, setSnackbar] = useState<{
-    open: boolean;
-    message: string;
-    severity: "success" | "error";
-  }>({ open: false, message: "", severity: "success" });
 
   const handleRecordsSearchSubmit = useCallback(async (value: string) => {
     const trimmed = value.trim();
     if (!trimmed) {
       setRecordResults([]);
       setRecordError(null);
-      setSelectedAlbumId(undefined);
-      setWikiTags([]);
       return;
     }
     setRecordLoading(true);
@@ -209,115 +170,12 @@ export default function Search() {
     }
   }, []);
 
-  useEffect(() => {
-    if (selectedAlbumId) {
-      setRating(0);
-      setReleaseYear(new Date().getFullYear());
-      setSelectedTags([]);
-      setAddError(null);
-    }
-  }, [selectedAlbumId]);
-
-  const handleToggleTag = useCallback((tag: string) => {
-    setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
-    );
-  }, []);
-
-  const handleAddNewTag = useCallback((tag: string) => {
-    setAvailableTags((prev) => (prev.includes(tag) ? prev : [...prev, tag]));
-    setSelectedTags((prev) => (prev.includes(tag) ? prev : [...prev, tag]));
-  }, []);
-
-  const rows = useMemo(() => {
-    return recordResults.map((a, idx) => {
-      const nonEmpty = (a.image || []).filter((im) => im["#text"]);
-      const largePref =
-        nonEmpty.find((im) => im.size === "extralarge") ||
-        nonEmpty.find((im) => im.size === "mega") ||
-        nonEmpty[nonEmpty.length - 1] ||
-        nonEmpty[0];
-      const cover = largePref?.["#text"] || "";
-      return {
-        id: `${a.name}-${a.artist}-${idx}`,
-        cover,
-        record: a.name,
-        artist: a.artist,
-      } as AlbumListItem & { record: string };
-    });
-  }, [recordResults]);
-
-  const submitRecord = useCallback(
-    async (tableName: string, redirectPath: string, successMessage: string) => {
-      if (!selectedAlbumId) return;
-      const selectedRow = rows.find((r) => r.id === selectedAlbumId);
-      if (!selectedRow) return;
-      setAdding(true);
-      setAddError(null);
-      try {
-        const payload = {
-          id: -1,
-          cover: selectedRow.cover,
-          record: selectedRow.record,
-          artist: selectedRow.artist,
-          rating,
-          tags: selectedTags,
-          release: releaseYear,
-          added: new Date().toISOString().slice(0, 10),
-          tableName,
-        };
-        const res = await fetch(apiUrl("/api/records/create"), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify(payload),
-        });
-        if (res.ok) {
-          await res.json().catch(() => null);
-          navigate(redirectPath, { state: { message: successMessage } });
-        } else {
-          const problem = await res.json().catch(() => ({}));
-          const msg = problem.error || `Failed to add record (${res.status})`;
-          setAddError(msg);
-          setSnackbar({ open: true, message: msg, severity: "error" });
-        }
-      } catch (error) {
-        console.error(error);
-        setAddError("Network error adding record");
-        setSnackbar({
-          open: true,
-          message: "Network error adding record",
-          severity: "error",
-        });
-      } finally {
-        setAdding(false);
-      }
-    },
-    [navigate, releaseYear, rows, selectedAlbumId, selectedTags]
-  );
-
-  const handleAddRecord = useCallback(
-    () =>
-      submitRecord(DEFAULT_COLLECTION_NAME, "/mycollection", "Record added"),
-    [submitRecord]
-  );
-
-  const handleAddWishlistRecord = useCallback(
-    () =>
-      submitRecord(WISHLIST_COLLECTION_NAME, "/wishlist", "Added to wishlist"),
-    [submitRecord]
-  );
-
   const handleRecordsClear = useCallback(
     (updateUrl = true) => {
       setRecordSearchInput("");
       setRecordResults([]);
       setRecordError(null);
       setRecordLoading(false);
-      setSelectedAlbumId(undefined);
-      setWikiTags([]);
-      setWikiLoading(false);
-      setAddError(null);
       if (updateUrl) {
         updateSearchParams("records", "");
       }
@@ -325,54 +183,32 @@ export default function Search() {
     [updateSearchParams]
   );
 
-  const recordColumns: GridColDef[] = [
-    {
-      field: "cover",
-      headerName: "",
-      width: 110,
-      sortable: false,
-      renderCell: (params) => {
-        const src = params.value || placeholderCover;
-        const title = params.row.record ?? "cover";
-        return (
-          <img
-            src={src}
-            alt={title}
-            style={{
-              maxWidth: 100,
-              maxHeight: 100,
-              objectFit: "cover",
-              borderRadius: 4,
-            }}
-          />
-        );
-      },
+  const recordItems = useMemo<RecordListItem[]>(() => {
+    return recordResults.map((album, index) => {
+      const images = (album.image || []).filter((img) => img["#text"]);
+      const preferredImage =
+        images.find((img) => img.size === "extralarge") ||
+        images.find((img) => img.size === "mega") ||
+        images[images.length - 1] ||
+        images[0];
+      return {
+        id: `${album.name}-${album.artist}-${index}`,
+        record: album.name,
+        artist: album.artist,
+        cover: preferredImage?.["#text"] || "",
+      };
+    });
+  }, [recordResults]);
+
+  const handleRecordSelect = useCallback(
+    (item: RecordListItem) => {
+      // Pass the submitted query (from URL param) so the record page can
+      // restore it when navigating back to Search.
+      const submitted = (searchParams.get("q") ?? "").trim();
+      navigate("/record", { state: { album: item, query: submitted } });
     },
-    {
-      field: "record",
-      headerName: "Album",
-      flex: 1.5,
-      minWidth: 100,
-      cellClassName: "wrapCell",
-      renderCell: (params) => (
-        <div className="wrapText" style={{ width: "100%" }}>
-          {params.value}
-        </div>
-      ),
-    },
-    {
-      field: "artist",
-      headerName: "Artist",
-      flex: 1,
-      minWidth: 100,
-      cellClassName: "wrapCell",
-      renderCell: (params) => (
-        <div className="wrapText" style={{ width: "100%" }}>
-          {params.value}
-        </div>
-      ),
-    },
-  ];
+    [navigate, searchParams]
+  );
 
   const [userResults, setUserResults] = useState<CommunityUserSummary[]>([]);
   const [userStatus, setUserStatus] = useState<
@@ -507,6 +343,10 @@ export default function Search() {
     runUserSearch,
   ]);
 
+  // Use the submitted query from the URL (not the live input) to decide
+  // whether to show the "No records matched" empty-state message.
+  const submittedRecordQuery = paramQuery.trim();
+
   return (
     <ThemeProvider theme={darkTheme}>
       <CssBaseline />
@@ -541,17 +381,17 @@ export default function Search() {
             overflowY: { xs: "auto", md: "hidden" },
             pb: 3,
             px: 1,
+            mt: 1,
           }}
         >
-          <Box maxWidth={1200} mx="auto" sx={{ mt: 1, height: { md: "100%" } }}>
+          <Box maxWidth={800} mx="auto" sx={{ height: { md: "100%" } }}>
             <Paper
               variant="outlined"
               sx={{
                 borderRadius: 2,
                 display: "flex",
                 flexDirection: "column",
-                minHeight: { xs: 420, md: 560 },
-                height: { md: "100%" },
+                height: "100%",
               }}
             >
               <Tabs
@@ -571,7 +411,8 @@ export default function Search() {
                     flex: 1,
                     display: "flex",
                     flexDirection: "column",
-                    p: { xs: 1.5, md: 2 },
+                    px: { xs: 1.5, md: 2 },
+                    py: 1,
                     minHeight: 0,
                     overflow: "hidden",
                   }}
@@ -581,177 +422,110 @@ export default function Search() {
                       {recordError}
                     </Alert>
                   )}
-                  <Grid
-                    container
-                    spacing={2}
+                  <Box
                     sx={{
                       flex: 1,
-                      minHeight: 0,
-                      overflow: "hidden",
-                      height: { xs: RECORD_PANEL_HEIGHT, md: "100%" },
+                      // Ensure there's space for the absolute spinner when loading
+                      // and there are no items yet (otherwise height could collapse to 0)
+                      minHeight:
+                        recordLoading && recordItems.length === 0 ? 240 : 0,
+                      position: "relative",
                     }}
                   >
-                    <Grid
-                      size={{ xs: 12, md: 8 }}
-                      borderRadius={2}
-                      sx={{
-                        display: "flex",
-                        flexDirection: "column",
-                        minHeight: 0,
-                        height: { xs: RECORD_PANEL_HEIGHT, md: "100%" },
-                        maxHeight: {
-                          xs: RECORD_PANEL_HEIGHT,
-                          md: "100%",
-                        },
-                        overflow: "hidden",
-                        pb: { xs: 2, md: 0 },
-                      }}
-                    >
+                    {!recordLoading && recordItems.length === 0 ? (
                       <Box
                         sx={{
-                          flex: 1,
-                          minHeight: 0,
-                          position: "relative",
                           height: "100%",
-                          maxHeight: "100%",
-                          overflow: "hidden",
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          textAlign: "center",
+                          px: 2,
+                          py: 4,
                         }}
                       >
-                        <DataGrid
-                          rows={rows}
-                          columns={recordColumns}
-                          density="comfortable"
-                          hideFooter
-                          rowHeight={90}
-                          onRowClick={async (params) => {
-                            const id = params.id as string;
-                            setWikiTags([]);
-                            setSelectedAlbumId(id);
-                            setWikiLoading(true);
-                            try {
-                              const selectedRow = rows.find((r) => r.id === id);
-                              if (!selectedRow) return;
-                              const genres = await wikiGenres(
-                                selectedRow.record,
-                                selectedRow.artist,
-                                true
-                              );
-                              if (genres && genres.length > 0) {
-                                const first = genres[0];
-                                const yearNum =
-                                  first && /^\d{4}$/.test(first)
-                                    ? Number(first)
-                                    : null;
-                                if (
-                                  yearNum &&
-                                  yearNum >= 1800 &&
-                                  yearNum <= 2100
-                                ) {
-                                  setReleaseYear(yearNum);
-                                  setWikiTags(
-                                    genres.slice(1).filter((tag) => !!tag)
-                                  );
-                                } else {
-                                  setWikiTags(genres.filter((tag) => !!tag));
-                                }
-                              } else {
-                                setWikiTags([]);
-                              }
-                            } catch (error) {
-                              console.error(error);
-                              setWikiTags([]);
-                            } finally {
-                              setWikiLoading(false);
-                            }
-                          }}
-                          getRowClassName={(params) =>
-                            params.id === selectedAlbumId ? "selected-row" : ""
-                          }
-                          sx={{
-                            border: "none",
-                            height: "100%",
-                            "& .MuiDataGrid-cell": {
-                              display: "flex",
-                              alignItems: "center",
-                              py: 1,
-                              minWidth: 0,
-                            },
-                            "& .wrapCell .MuiDataGrid-cellContent": {
-                              whiteSpace: "normal",
-                              overflow: "hidden",
-                              textOverflow: "clip",
-                              overflowWrap: "anywhere",
-                              lineHeight: 1.2,
-                              display: "block",
-                            },
-                            "& .wrapCell": {
-                              whiteSpace: "normal !important",
-                            },
-                            "& .wrapCell .wrapText": {
-                              whiteSpace: "normal",
-                              overflowWrap: "anywhere",
-                              wordBreak: "break-word",
-                              lineHeight: 1.2,
-                              alignSelf: "center",
-                            },
-                            "& .selected-row": {
-                              bgcolor: (theme) =>
-                                `${theme.palette.action.selected} !important`,
-                            },
-                          }}
-                        />
-                        {recordLoading && (
-                          <Box
-                            sx={{
-                              position: "absolute",
-                              inset: 0,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              bgcolor: "rgba(0,0,0,0.35)",
-                            }}
-                          >
-                            <CircularProgress />
-                          </Box>
+                        <Typography variant="h6" gutterBottom>
+                          {submittedRecordQuery
+                            ? `No records matched “${submittedRecordQuery}”.`
+                            : "Search for a record to get started."}
+                        </Typography>
+                        {!submittedRecordQuery && (
+                          <Typography color="text.secondary">
+                            Use the search box above to search for records.
+                          </Typography>
                         )}
                       </Box>
-                    </Grid>
-                    <Grid
-                      size={{ xs: 12, md: 4 }}
-                      sx={{
-                        height: { xs: 600, md: "100%" },
-                        minHeight: 0,
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 1,
-                        pb: { xs: 2, md: 0 },
-                      }}
-                    >
-                      <Box sx={{ flex: 1, minHeight: 0 }}>
-                        <FindRecordSidebar
-                          availableTags={availableTags}
-                          selectedTags={selectedTags}
-                          onToggleTag={handleToggleTag}
-                          onAddNewTag={handleAddNewTag}
-                          wikiTags={wikiTags}
-                          wikiLoading={wikiLoading}
-                          rating={rating}
-                          onRatingChange={setRating}
-                          releaseYear={releaseYear}
-                          onReleaseYearChange={setReleaseYear}
-                          canAdd={!!selectedAlbumId && !adding}
-                          onAddRecord={handleAddRecord}
-                          onWishlistRecord={handleAddWishlistRecord}
-                        />
+                    ) : (
+                      <List
+                        disablePadding
+                        sx={{
+                          height: "100%",
+                          overflowY: "auto",
+                          pr: 1,
+                        }}
+                      >
+                        {recordItems.map((item) => (
+                          <ListItemButton
+                            key={item.id}
+                            onClick={() => handleRecordSelect(item)}
+                            divider
+                            sx={{ alignItems: "flex-start", gap: 2 }}
+                          >
+                            <ListItemAvatar>
+                              <Avatar
+                                variant="square"
+                                src={item.cover || placeholderCover}
+                                alt={item.record}
+                                sx={{
+                                  width: { xs: 90, md: 120 },
+                                  height: { xs: 90, md: 120 },
+                                  borderRadius: 1,
+                                  bgcolor: "grey.900",
+                                }}
+                              />
+                            </ListItemAvatar>
+                            <ListItemText
+                              sx={{ alignSelf: "center" }}
+                              primary={
+                                <Typography
+                                  variant="subtitle1"
+                                  fontWeight={700}
+                                >
+                                  {item.record}
+                                </Typography>
+                              }
+                              secondary={
+                                <Typography color="text.secondary">
+                                  {item.artist}
+                                </Typography>
+                              }
+                            />
+                          </ListItemButton>
+                        ))}
+                      </List>
+                    )}
+                    {recordLoading && (
+                      <Box
+                        sx={{
+                          position: "absolute",
+                          inset: 0,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          bgcolor: "rgba(0,0,0,0.35)",
+                        }}
+                      >
+                        <CircularProgress />
                       </Box>
-                      {addError && <Alert severity="error">{addError}</Alert>}
-                    </Grid>
-                  </Grid>
+                    )}
+                  </Box>
                 </Box>
               ) : (
                 <Box
                   sx={{
-                    p: { xs: 1.5, md: 2 },
+                    px: { xs: 1.5, md: 2 },
+                    py: 1,
                     display: "flex",
                     flexDirection: "column",
                     gap: 2,
@@ -761,10 +535,25 @@ export default function Search() {
                   }}
                 >
                   {userStatus === "idle" && (
-                    <Typography color="text.secondary" mt={1}>
-                      Use the search bar above to search for a username or
-                      display name.
-                    </Typography>
+                    <Box
+                      sx={{
+                        height: "100%",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        textAlign: "center",
+                        px: 2,
+                        py: 4,
+                      }}
+                    >
+                      <Typography variant="h6" gutterBottom>
+                        Search for a user to get started.
+                      </Typography>
+                      <Typography color="text.secondary">
+                        Use the search box above to search for users.
+                      </Typography>
+                    </Box>
                   )}
                   {userStatus === "loading" && (
                     <Box
@@ -786,20 +575,25 @@ export default function Search() {
                     <Alert severity="error">{userError}</Alert>
                   )}
                   {userStatus === "ready" && userResults.length === 0 && (
-                    <>
-                      <Typography variant="h6" fontWeight={600}>
-                        Search Results
-                      </Typography>
-                      <Typography color="text.secondary">
+                    <Box
+                      sx={{
+                        height: "100%",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        textAlign: "center",
+                        px: 2,
+                        py: 4,
+                      }}
+                    >
+                      <Typography variant="h6" gutterBottom>
                         No users matched “{userSubmittedQuery}”.
                       </Typography>
-                    </>
+                    </Box>
                   )}
                   {userStatus === "ready" && userResults.length > 0 && (
                     <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
-                      <Typography variant="h6" fontWeight={600} mb={1}>
-                        Search Results
-                      </Typography>
                       <List disablePadding>
                         {userResults.map((user) => {
                           const primary =
@@ -823,7 +617,11 @@ export default function Search() {
                                 </Avatar>
                               </ListItemAvatar>
                               <ListItemText
-                                primary={primary}
+                                primary={
+                                  <span style={{ fontWeight: 700 }}>
+                                    {primary}
+                                  </span>
+                                }
                                 secondary={
                                   <Typography
                                     component="span"
@@ -834,7 +632,6 @@ export default function Search() {
                                     @{user.username}
                                   </Typography>
                                 }
-                                primaryTypographyProps={{ fontWeight: 600 }}
                               />
                             </ListItemButton>
                           );
@@ -847,23 +644,6 @@ export default function Search() {
             </Paper>
           </Box>
         </Box>
-        <Snackbar
-          open={snackbar.open}
-          autoHideDuration={4000}
-          onClose={(_, reason) => {
-            if (reason !== "clickaway")
-              setSnackbar((prev) => ({ ...prev, open: false }));
-          }}
-          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-        >
-          <Alert
-            severity={snackbar.severity}
-            variant="filled"
-            onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
-          >
-            {snackbar.message}
-          </Alert>
-        </Snackbar>
       </Box>
     </ThemeProvider>
   );
