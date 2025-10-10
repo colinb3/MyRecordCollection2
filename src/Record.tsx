@@ -354,6 +354,7 @@ export default function Record() {
                   flexGrow: 1,
                   p: { xs: 2, md: 3 },
                   mt: { xs: -1, md: 0 },
+                  mb: { xs: 2, md: 0 },
                   maxHeight: { xs: 700, md: "none" },
                   display: "flex",
                   flexDirection: "column",
