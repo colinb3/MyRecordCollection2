@@ -4,7 +4,6 @@ import type { UIEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import EditIcon from "@mui/icons-material/Edit";
 import AddIcon from "@mui/icons-material/Add";
-import ZoomInIcon from "@mui/icons-material/ZoomIn";
 import DeleteIcon from "@mui/icons-material/Delete";
 import DriveFileMoveIcon from "@mui/icons-material/DriveFileMove";
 
@@ -27,7 +26,6 @@ export default function ButtonBar({
   editEnabled,
   collectionTitle,
 }: ButtonBarProps) {
-  const navigate = useNavigate();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [showLeftFade, setShowLeftFade] = useState(false);
   const [showRightFade, setShowRightFade] = useState(false);
