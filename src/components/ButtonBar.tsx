@@ -1,4 +1,4 @@
-import { Box, Button } from "@mui/material";
+import { Box, Button, TextField } from "@mui/material";
 import { useRef, useState, useEffect } from "react";
 import type { UIEvent } from "react";
 import { useNavigate } from "react-router-dom";
@@ -9,24 +9,29 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import DriveFileMoveIcon from "@mui/icons-material/DriveFileMove";
 
 interface ButtonBarProps {
+  onSearchChange?: (value: string) => void;
   onEditRecord?: () => void;
   onCreateRecord?: () => void;
   onDeleteRecord?: () => void;
   onMoveRecord?: () => void;
   editEnabled?: boolean; // indicates a record is selected
+  collectionTitle?: string; // title of the current collection
 }
 
 export default function ButtonBar({
+  onSearchChange = () => {},
   onEditRecord,
   onCreateRecord,
   onDeleteRecord,
   onMoveRecord,
   editEnabled,
+  collectionTitle,
 }: ButtonBarProps) {
   const navigate = useNavigate();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [showLeftFade, setShowLeftFade] = useState(false);
   const [showRightFade, setShowRightFade] = useState(false);
+  const [text, setText] = useState("");
 
   const evaluateFades = () => {
     const el = scrollRef.current;
@@ -34,6 +39,12 @@ export default function ButtonBar({
     const { scrollLeft, scrollWidth, clientWidth } = el;
     setShowLeftFade(scrollLeft > 0);
     setShowRightFade(scrollLeft + clientWidth < scrollWidth - 1);
+  };
+
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const v = event.target.value;
+    setText(v);
+    onSearchChange(v);
   };
 
   useEffect(() => {
@@ -61,7 +72,7 @@ export default function ButtonBar({
         sx={{
           display: "flex",
           alignItems: "center",
-          gap: 1,
+          gap: 0.7,
           overflowX: "auto",
           overflowY: "hidden",
           scrollbarWidth: "thin",
@@ -92,22 +103,21 @@ export default function ButtonBar({
           },
         }}
       >
-        <Button
-          variant="contained"
-          color="primary"
-          size="small"
-          className="action-btn"
-          startIcon={<ZoomInIcon />}
-          onClick={() => navigate("/findrecord")}
-        >
-          Find New
-        </Button>
+        <TextField
+          variant="outlined"
+          placeholder={`Search ${collectionTitle}`}
+          sx={{ minWidth: 200, width: 300 }}
+          value={text}
+          onChange={handleSearchChange}
+          type="search"
+        />
         <Button
           variant="outlined"
           onClick={onCreateRecord}
           size="small"
           className="action-btn"
           startIcon={<AddIcon />}
+          sx={{ height: 40 }}
         >
           Custom
         </Button>
@@ -119,6 +129,7 @@ export default function ButtonBar({
           size="small"
           className="action-btn"
           startIcon={<EditIcon />}
+          sx={{ height: 40 }}
         >
           Edit
         </Button>
@@ -130,6 +141,7 @@ export default function ButtonBar({
           size="small"
           className="action-btn"
           startIcon={<DriveFileMoveIcon />}
+          sx={{ height: 40 }}
         >
           Move
         </Button>
@@ -141,6 +153,7 @@ export default function ButtonBar({
           size="small"
           className="action-btn"
           startIcon={<DeleteIcon />}
+          sx={{ height: 40 }}
         >
           Delete
         </Button>
@@ -156,10 +169,10 @@ export default function ButtonBar({
           width: 32,
           bottom: 0,
           opacity: showLeftFade ? 1 : 0,
-          transition: "opacity 500ms ease",
+          transition: "opacity 300ms ease",
           willChange: "opacity",
           background: (theme) =>
-            `linear-gradient(to right, ${theme.palette.background.default} 0%, ${theme.palette.background.default}CC 10%, transparent 50%)`,
+            `linear-gradient(to right, ${theme.palette.background.default} 0%, ${theme.palette.background.default}CC 7%, transparent 30%)`,
         }}
       />
       {/* Right fade (animated) */}
@@ -173,10 +186,10 @@ export default function ButtonBar({
           width: 32,
           bottom: 0,
           opacity: showRightFade ? 1 : 0,
-          transition: "opacity 500ms ease",
+          transition: "opacity 300ms ease",
           willChange: "opacity",
           background: (theme) =>
-            `linear-gradient(to left, ${theme.palette.background.default} 0%, ${theme.palette.background.default}CC 10%, transparent 50%)`,
+            `linear-gradient(to left, ${theme.palette.background.default} 0%, ${theme.palette.background.default}CC 7%, transparent 30%)`,
         }}
       />
     </Box>

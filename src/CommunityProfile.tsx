@@ -17,7 +17,7 @@ import {
   IconButton,
 } from "@mui/material";
 import Grid from "@mui/material/Grid";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import TopBar from "./components/TopBar";
 import { darkTheme } from "./theme";
 import {
@@ -76,7 +76,6 @@ function SectionCard({ title, children }: SectionCardProps) {
 export default function CommunityProfile() {
   const navigate = useNavigate();
   const params = useParams<{ username: string }>();
-  const [searchParams] = useSearchParams();
   const cachedUser = getCachedUserInfo();
   const [username, setUsername] = useState<string>(cachedUser?.username ?? "");
   const [displayName, setDisplayName] = useState<string>(
@@ -253,18 +252,6 @@ export default function CommunityProfile() {
     navigate("/settings");
   }, [navigate]);
 
-  const handleCommunitySearch = useCallback(
-    (value: string) => {
-      const trimmed = value.trim();
-      if (!trimmed) {
-        navigate("/community");
-      } else {
-        navigate(`/community?q=${encodeURIComponent(trimmed)}`);
-      }
-    },
-    [navigate]
-  );
-
   const handleSeeCollection = useCallback(() => {
     if (isViewingOwnProfile) {
       navigate("/mycollection");
@@ -345,14 +332,6 @@ export default function CommunityProfile() {
     setFollowPending(false);
   }, [profile?.username]);
 
-  const initialSearchValue = searchParams.get("q") ?? "";
-  const topBarProps = {
-    onSearchChange: handleCommunitySearch,
-    searchMode: "submit" as const,
-    searchPlaceholder: "Search for users",
-    initialSearchValue,
-  };
-
   const seeCollectionLabel = isViewingOwnProfile
     ? "Go to My Collection"
     : "View Collection";
@@ -390,7 +369,6 @@ export default function CommunityProfile() {
           displayName={displayName}
           profilePicUrl={profilePicUrl ?? undefined}
           onLogout={handleLogout}
-          {...topBarProps}
         />
         <Box sx={{ flex: 1, overflowY: "auto", pb: 3, px: 1 }}>
           <Box maxWidth={800} mx="auto" sx={{ mt: 1 }}>

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import LandingPage from "./LandingPage";
 import Collection from "./Collection";
-import FindRecord from "./FindRecord";
+import Search from "./Search";
 import Login from "./Login";
 import Register from "./Register";
 import RequireAuth from "./RequireAuth";
@@ -65,13 +65,14 @@ export default function AppRouter() {
           }
         />
         <Route
-          path="/findrecord"
+          path="/search"
           element={
             <RequireAuth>
-              <FindRecord />
+              <Search />
             </RequireAuth>
           }
         />
+        <Route path="/findrecord" element={<Navigate to="/search" replace />} />
         <Route
           path="/settings"
           element={

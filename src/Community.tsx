@@ -1,10 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  type SyntheticEvent,
-} from "react";
+import { useCallback, useEffect, useState, type SyntheticEvent } from "react";
 import {
   ThemeProvider,
   CssBaseline,
@@ -13,9 +7,7 @@ import {
   Paper,
   Avatar,
   List,
-  ListItemAvatar,
   ListItemButton,
-  ListItemText,
   CircularProgress,
   Tabs,
   Tab,
@@ -34,19 +26,43 @@ import { clearRecordTablePreferencesCache } from "./preferences";
 import { setUserId } from "./analytics";
 import { clearProfileHighlightsCache } from "./profileHighlights";
 import { clearCollectionRecordsCache } from "./collectionRecords";
-import type { CommunityFeedEntry, CommunityUserSummary } from "./types";
-import {
-  clearCommunityCaches,
-  loadCommunityFeed,
-  searchCommunityUsers,
-} from "./communityUsers";
+import type { CommunityFeedEntry } from "./types";
+import { clearCommunityCaches, loadCommunityFeed } from "./communityUsers";
 import apiUrl from "./api";
 import placeholderCover from "./assets/missingImg.jpg";
+import { Grid } from "@mui/system";
 
-const MIN_QUERY_LENGTH = 2;
+type CommunityView = "feed" | "search";
 
-const TAB_VALUES = ["feed", "search"] as const;
-type CommunityView = (typeof TAB_VALUES)[number];
+// Format an ISO date (YYYY-MM-DD) to a human friendly form like "Jan 2, 2025".
+function formatDateDisplay(isoDate: string): string {
+  if (!isoDate) return "";
+  const parts = isoDate.split("-").map((p) => Number(p));
+  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) {
+    // fallback to the original string if parsing fails
+    return isoDate;
+  }
+  const [year, month, day] = parts;
+  // Use UTC to avoid local timezone shifting when creating Date from YYYY-MM-DD
+  const d = new Date(Date.UTC(year, month - 1, day));
+  const monthNames = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
+  return `${
+    monthNames[d.getUTCMonth()]
+  } ${d.getUTCDate()}, ${d.getUTCFullYear()}`;
+}
 
 export default function Community() {
   const navigate = useNavigate();
@@ -60,19 +76,8 @@ export default function Community() {
   );
 
   const [searchParams, setSearchParams] = useSearchParams();
-  const rawQuery = searchParams.get("q") ?? "";
-  const normalizedQuery = useMemo(() => rawQuery.trim(), [rawQuery]);
-  const queryView = searchParams.get("view") ?? "";
-  const activeView: CommunityView = useMemo(() => {
-    if (queryView && TAB_VALUES.includes(queryView as CommunityView)) {
-      return queryView as CommunityView;
-    }
-    if (normalizedQuery) {
-      return "search";
-    }
-    return "feed";
-  }, [queryView, normalizedQuery]);
-  const [submittedQuery, setSubmittedQuery] = useState(normalizedQuery);
+  const rawView = searchParams.get("view");
+  const activeView: CommunityView = rawView === "search" ? "search" : "feed";
 
   const updateSearchParams = useCallback(
     (updates: Record<string, string | null>) => {
@@ -89,20 +94,11 @@ export default function Community() {
     [searchParams, setSearchParams]
   );
 
-  const [results, setResults] = useState<CommunityUserSummary[]>([]);
-  const [status, setStatus] = useState<"idle" | "loading" | "error" | "ready">(
-    "idle"
-  );
-  const [error, setError] = useState<string | null>(null);
   const [feedEntries, setFeedEntries] = useState<CommunityFeedEntry[]>([]);
   const [feedStatus, setFeedStatus] = useState<
     "idle" | "loading" | "error" | "ready"
   >("loading");
   const [feedError, setFeedError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setSubmittedQuery(normalizedQuery);
-  }, [normalizedQuery]);
 
   useEffect(() => {
     let cancelled = false;
@@ -156,70 +152,9 @@ export default function Community() {
     };
   }, [feedStatus, loadCommunityFeed]);
 
-  useEffect(() => {
-    if (activeView !== "search") {
-      setResults([]);
-      setStatus("idle");
-      setError(null);
-      return;
-    }
-
-    let cancelled = false;
-    const query = submittedQuery;
-    if (!query) {
-      setResults([]);
-      setStatus("idle");
-      setError(null);
-      return () => {
-        cancelled = true;
-      };
-    }
-    if (query.length < MIN_QUERY_LENGTH) {
-      setResults([]);
-      setStatus("error");
-      setError(`Enter at least ${MIN_QUERY_LENGTH} characters to search.`);
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    setStatus("loading");
-    setError(null);
-
-    searchCommunityUsers(query)
-      .then((data) => {
-        if (cancelled) return;
-        setResults(data);
-        setStatus("ready");
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        const message =
-          err instanceof Error ? err.message : "Failed to search users";
-        setError(message);
-        setStatus("error");
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [submittedQuery, activeView]);
-
-  const handleSearchSubmit = useCallback(
-    (value: string) => {
-      const trimmed = value.trim();
-      if (!trimmed) {
-        updateSearchParams({ q: null, view: "feed" });
-      } else {
-        updateSearchParams({ q: trimmed, view: "search" });
-      }
-    },
-    [updateSearchParams]
-  );
-
   const handleTabChange = useCallback(
     (_event: SyntheticEvent, value: CommunityView) => {
-      updateSearchParams({ view: value });
+      updateSearchParams({ view: value === "feed" ? null : value });
     },
     [updateSearchParams]
   );
@@ -267,10 +202,6 @@ export default function Community() {
           displayName={displayName}
           profilePicUrl={profilePicUrl ?? undefined}
           onLogout={handleLogout}
-          onSearchChange={handleSearchSubmit}
-          searchMode="submit"
-          searchPlaceholder="Search for users"
-          initialSearchValue={rawQuery}
         />
         <Box sx={{ flex: 1, overflowY: "auto", pb: 3, px: 1 }}>
           <Box maxWidth={800} mx="auto" sx={{ mt: 1 }}>
@@ -346,7 +277,7 @@ export default function Community() {
                           .charAt(0)
                           .toUpperCase();
                         const addedDate = entry.record.added
-                          ? entry.record.added.slice(0, 10)
+                          ? formatDateDisplay(entry.record.added.slice(0, 10))
                           : "";
                         const tagsLabel =
                           entry.record.tags && entry.record.tags.length > 0
@@ -367,38 +298,17 @@ export default function Community() {
                               alignItems: "stretch",
                               display: "flex",
                               gap: 2,
-                              p: { xs: 1, sm: 2 },
-                              py: { xs: 2 },
+                              px: { xs: 1, sm: 2 },
+                              pt: 1.5,
+                              pb: 2,
                             }}
                           >
-                            <Box
-                              component="img"
-                              src={coverSrc}
-                              alt={`${entry.record.record} cover`}
-                              sx={{
-                                maxWidth: { xs: 125, sm: 200 },
-                                maxHeight: { xs: 125, sm: 200 },
-                                objectFit: "cover",
-                                borderRadius: 1,
-                                flexShrink: 0,
-                                boxShadow: 1,
-                                bgcolor: "grey.900",
-                              }}
-                            />
-                            <Box
-                              sx={{
-                                flex: 1,
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: 1,
-                                minWidth: 0,
-                              }}
-                            >
-                              <Box
+                            <Grid container spacing={2} width={"100%"}>
+                              <Grid
+                                size={12}
                                 sx={{
                                   display: "flex",
                                   alignItems: "center",
-                                  pt: 1,
                                   gap: 0.5,
                                 }}
                               >
@@ -416,58 +326,86 @@ export default function Community() {
                                 <Typography
                                   variant="subtitle1"
                                   fontWeight={700}
-                                  pl={0.5}
+                                  fontSize={"1rem"}
+                                  pl={0.75}
                                 >
                                   {ownerDisplay}
                                 </Typography>
-                              </Box>
-                              <Typography
-                                variant="h6"
-                                component="div"
+                                {addedDate && (
+                                  <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                    ml={"auto"}
+                                    textAlign={"right"}
+                                  >
+                                    {addedDate}
+                                  </Typography>
+                                )}
+                              </Grid>
+                              <Box
+                                component="img"
+                                src={coverSrc}
+                                alt={`${entry.record.record} cover`}
                                 sx={{
-                                  fontWeight: 600,
-                                  lineHeight: 1.2,
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                  display: "-webkit-box",
-                                  WebkitLineClamp: 2,
-                                  WebkitBoxOrient: "vertical",
+                                  maxWidth: { xs: 125, sm: 160, md: 200 },
+                                  maxHeight: { xs: 125, sm: 160, md: 200 },
+                                  objectFit: "cover",
+                                  borderRadius: 1,
+                                  flexShrink: 0,
+                                  boxShadow: 1,
+                                  bgcolor: "grey.900",
+                                }}
+                              />
+                              <Box
+                                sx={{
+                                  flex: 1,
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: 1,
+                                  minWidth: 0,
                                 }}
                               >
-                                {entry.record.record}
-                              </Typography>
-                              <Typography
-                                variant="body2"
-                                color="text.secondary"
-                                sx={{ display: "block" }}
-                              >
-                                by {entry.record.artist || "Unknown Artist"}
-                              </Typography>
-                              {addedDate && (
+                                <Typography
+                                  variant="h6"
+                                  component="div"
+                                  sx={{
+                                    fontWeight: 600,
+                                    lineHeight: 1.2,
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    display: "-webkit-box",
+                                    WebkitLineClamp: 2,
+                                    WebkitBoxOrient: "vertical",
+                                  }}
+                                >
+                                  {entry.record.record}
+                                </Typography>
                                 <Typography
                                   variant="body2"
                                   color="text.secondary"
+                                  sx={{ display: "block" }}
                                 >
-                                  Added on {addedDate}
+                                  by {entry.record.artist || "Unknown Artist"}
                                 </Typography>
-                              )}
-                              {entry.record.rating > 0 && (
-                                <Typography
-                                  variant="body2"
-                                  color="text.secondary"
-                                >
-                                  Rating: {entry.record.rating}/10
-                                </Typography>
-                              )}
-                              {tagsLabel && (
-                                <Typography
-                                  variant="body2"
-                                  color="text.secondary"
-                                >
-                                  Tags: {tagsLabel}
-                                </Typography>
-                              )}
-                            </Box>
+                                {entry.record.rating > 0 && (
+                                  <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                  >
+                                    Rating: {entry.record.rating}/10
+                                  </Typography>
+                                )}
+                                {tagsLabel && (
+                                  <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                  >
+                                    Tags: {tagsLabel}
+                                  </Typography>
+                                )}
+                                {/*review text*/}
+                              </Box>
+                            </Grid>
                           </ListItemButton>
                         );
                       })}
@@ -475,89 +413,31 @@ export default function Community() {
                   )}
                 </Box>
               ) : (
-                <Box sx={{ p: { xs: 3, sm: 4 } }}>
-                  {status === "idle" && (
-                    <Typography color="text.secondary">
-                      Search for a username or display name in the search bar
-                      above.
-                    </Typography>
-                  )}
-                  {status === "loading" && (
-                    <Box
-                      sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 2,
-                        justifyContent: "center",
-                        py: 4,
-                      }}
-                    >
-                      <CircularProgress size={24} />
-                      <Typography color="text.secondary">
-                        Searching community…
-                      </Typography>
-                    </Box>
-                  )}
-                  {status === "error" && error && (
-                    <Typography color="error">{error}</Typography>
-                  )}
-                  {status === "ready" && results.length === 0 && (
-                    <>
-                      <Typography variant="h5" mb={1}>
-                        Search Results
-                      </Typography>
-                      <Typography color="text.secondary">
-                        No users matched “{submittedQuery}”.
-                      </Typography>
-                    </>
-                  )}
-                  {status === "ready" && results.length > 0 && (
-                    <>
-                      <Typography variant="h5" mb={1}>
-                        Search Results
-                      </Typography>
-                      <List disablePadding>
-                        {results.map((user) => {
-                          const primary =
-                            user.displayName || `@${user.username}`;
-                          return (
-                            <ListItemButton
-                              key={user.username}
-                              onClick={() => handleResultClick(user.username)}
-                              sx={{ borderRadius: 1 }}
-                            >
-                              <ListItemAvatar>
-                                <Avatar
-                                  src={user.profilePicUrl ?? undefined}
-                                  alt={primary}
-                                  sx={{ bgcolor: "grey.700" }}
-                                >
-                                  {!user.profilePicUrl &&
-                                    (user.displayName || user.username)
-                                      .charAt(0)
-                                      .toUpperCase()}
-                                </Avatar>
-                              </ListItemAvatar>
-                              <ListItemText
-                                primary={primary}
-                                secondary={
-                                  <Typography
-                                    component="span"
-                                    variant="body2"
-                                    color="text.secondary"
-                                    sx={{ display: "block" }}
-                                  >
-                                    @{user.username}
-                                  </Typography>
-                                }
-                                primaryTypographyProps={{ fontWeight: 600 }}
-                              />
-                            </ListItemButton>
-                          );
-                        })}
-                      </List>
-                    </>
-                  )}
+                <Box
+                  sx={{
+                    p: { xs: 1.5, sm: 3 },
+                    minHeight: 320,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 2,
+                    alignItems: { xs: "stretch", sm: "flex-start" },
+                    justifyContent: "center",
+                  }}
+                >
+                  <Typography variant="h5" fontWeight={600}>
+                    User Search Moved
+                  </Typography>
+                  <Typography color="text.secondary">
+                    Community user search now lives on the dedicated Search
+                    page.
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    onClick={() => navigate("/search?tab=users")}
+                    sx={{ alignSelf: { xs: "stretch", sm: "flex-start" } }}
+                  >
+                    Go to Search
+                  </Button>
                 </Box>
               )}
             </Paper>

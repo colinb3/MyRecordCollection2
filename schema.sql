@@ -29,6 +29,7 @@ CREATE TABLE Record (
     release_year YEAR,
     userUuid CHAR(36),
     tableId INT,
+    review TEXT,
     FOREIGN KEY (userUuid) REFERENCES User(uuid) ON DELETE CASCADE,
     FOREIGN KEY (tableId) REFERENCES RecTable(id) ON DELETE CASCADE
 );

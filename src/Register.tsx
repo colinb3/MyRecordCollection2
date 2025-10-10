@@ -102,11 +102,6 @@ export default function Register() {
 
   return (
     <>
-      <style>
-        {
-          "@import url('https://fonts.googleapis.com/css2?family=Bungee&family=Saira+Extra+Condensed:wght@100;200;300;400;500;600;700;800;900&display=swap');"
-        }
-      </style>
       <ThemeProvider theme={darkTheme}>
         <CssBaseline />
         <div
@@ -127,10 +122,10 @@ export default function Register() {
             <Typography
               variant="h5"
               sx={{
-                fontFamily: "Bungee, sans-serif",
                 mb: 0,
                 cursor: "pointer",
                 color: "#fff",
+                fontWeight: "700",
               }}
             >
               My Record Collection

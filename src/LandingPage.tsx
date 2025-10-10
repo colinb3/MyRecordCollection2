@@ -251,15 +251,7 @@ export default function LandingPage() {
                     alignItems: "center",
                     justifyContent: "center",
                     boxShadow: (theme) =>
-                      `0 0 60px ${theme.palette.primary.main}80`,
-                    "&::after": {
-                      content: "''",
-                      position: "absolute",
-                      borderRadius: "50%",
-                      border: (theme) =>
-                        `1px solid ${theme.palette.primary.main}66`,
-                      opacity: 0.7,
-                    },
+                      `0 0 80px ${theme.palette.primary.main}99`,
                   }}
                 >
                   <img

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
   Avatar,
   Box,
@@ -21,63 +21,67 @@ import PeopleAltIcon from "@mui/icons-material/PeopleAlt";
 import { useNavigate } from "react-router-dom";
 
 interface TopBarProps {
-  onSearchChange?: (value: string) => void;
   onLogout?: () => void;
   title: string;
   username?: string;
   displayName?: string;
   profilePicUrl?: string | null;
-  /** When set to 'submit', only fire onSearchChange when user presses Enter */
-  searchMode?: "change" | "submit";
   /** Optional placeholder override */
   searchPlaceholder?: string;
-  searchBar?: boolean;
-  /** Optional initial search value to sync with the input */
-  initialSearchValue?: string;
+  /** Controlled search value for pages that manage the query in state */
+  searchValue?: string;
+  /** Optional callback when the search textbox changes */
+  onSearchChange?: (value: string) => void;
+  /** Optional callback when user presses enter in the search textbox */
+  onSearchSubmit?: (value: string) => void;
 }
 
 export default function TopBar({
-  onSearchChange = () => {},
   onLogout,
   title,
   username,
   displayName,
   profilePicUrl,
-  searchMode = "change",
   searchPlaceholder,
-  searchBar = true,
-  initialSearchValue,
+  searchValue,
+  onSearchChange,
+  onSearchSubmit,
 }: TopBarProps) {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
-  const [text, setText] = useState(initialSearchValue ?? "");
-
-  useEffect(() => {
-    if (initialSearchValue === undefined) return;
-    setText(initialSearchValue);
-  }, [initialSearchValue]);
-
-  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const v = event.target.value;
-    setText(v);
-    if (searchMode === "change") {
-      onSearchChange(v);
-    }
-  };
+  const [internalValue, setInternalValue] = useState("");
+  const isControlled = typeof searchValue === "string";
+  const value = isControlled ? searchValue : internalValue;
 
   const navigate = useNavigate();
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (searchMode === "submit" && e.key === "Enter") {
-      e.preventDefault();
-      onSearchChange(text.trim());
-      // On mobile the keyboard's 'Next' can move focus to the next input.
-      // Blur the input after handling Enter so the keyboard hides and focus doesn't jump.
-      try {
-        (e.currentTarget as HTMLInputElement).blur();
-      } catch {
-        /* ignore */
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    if (onSearchSubmit) {
+      onSearchSubmit(value);
+    } else {
+      const trimmed = value.trim();
+      if (trimmed) {
+        navigate(`/search?q=${encodeURIComponent(trimmed)}`);
+      } else {
+        navigate("/search");
       }
+    }
+    try {
+      (e.currentTarget as HTMLInputElement).blur();
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const nextValue = event.target.value;
+    if (!isControlled) {
+      setInternalValue(nextValue);
+    }
+    if (onSearchChange) {
+      onSearchChange(nextValue);
     }
   };
 
@@ -117,18 +121,16 @@ export default function TopBar({
         >
           {title}
         </Typography>
-        {searchBar && (
-          <TextField
-            variant="outlined"
-            placeholder={searchPlaceholder || "Search My Collection"}
-            sx={{ width: 300 }}
-            value={text}
-            onChange={handleSearchChange}
-            onKeyDown={handleKeyDown}
-            type="search"
-            inputProps={{ enterKeyHint: "search" }}
-          />
-        )}
+        <TextField
+          variant="outlined"
+          placeholder={searchPlaceholder || "Search Records or Users"}
+          sx={{ width: 300 }}
+          value={value}
+          onChange={handleChange}
+          onKeyDown={handleKeyDown}
+          type="search"
+          inputProps={{ enterKeyHint: "search" }}
+        />
         {username && (
           <Box sx={{ mx: -1 }}>
             <IconButton

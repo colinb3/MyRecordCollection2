@@ -79,8 +79,6 @@ export default function FindRecordSidebar({
   return (
     <Paper
       sx={{
-        py: 2,
-        px: { xs: 1.3, sm: 1.5, md: 2 },
         display: "flex",
         flexDirection: "column",
         height: "100%",
@@ -91,7 +89,10 @@ export default function FindRecordSidebar({
       <Box
         sx={{
           overflowY: "auto",
+          overflowX: "hidden",
           flex: 1,
+          py: 2,
+          px: { xs: 1.3, sm: 1.5, md: 2 },
           minHeight: 0,
           display: "flex",
           flexDirection: "column",
@@ -201,7 +202,7 @@ export default function FindRecordSidebar({
           inputProps={{ enterKeyHint: "done", autoComplete: "off" }}
         />
         <Typography variant="subtitle1">Rating</Typography>
-        <Box sx={{ display: "flex", justifyContent: "center", width: "100%" }}>
+        <Box sx={{ justifySelf: "center", width: { xs: "94%", md: "90%" } }}>
           <Slider
             value={rating}
             onChange={handleSlider}
@@ -210,7 +211,7 @@ export default function FindRecordSidebar({
             max={10}
             step={1}
             sx={{
-              width: "86%",
+              ml: { xs: "3%", md: "5%" },
               "& .MuiSlider-rail, & .MuiSlider-track": { height: 6 },
               height: 0,
               "& .MuiSlider-thumb": {
@@ -236,7 +237,7 @@ export default function FindRecordSidebar({
           slotProps={{ input: { inputProps: { min: 1877, max: 2100 } } }}
         />
       </Box>
-      <Box sx={{ mt: 1 }}>
+      <Box sx={{ mx: { xs: 1.3, sm: 1.5, md: 2 }, mb: 1 }}>
         <Button
           disabled={!canAdd}
           variant="outlined"
@@ -248,7 +249,7 @@ export default function FindRecordSidebar({
           Add to Wishlist
         </Button>
       </Box>
-      <Box sx={{ mt: 1 }}>
+      <Box sx={{ mx: { xs: 1.3, sm: 1.5, md: 2 }, mb: 2 }}>
         <Button
           disabled={!canAdd}
           variant="contained"

@@ -143,18 +143,6 @@ export default function CommunityFollows() {
     navigate("/login");
   }, [navigate]);
 
-  const handleSearchSubmit = useCallback(
-    (value: string) => {
-      const trimmed = value.trim();
-      if (!trimmed) {
-        navigate("/community");
-      } else {
-        navigate(`/community?q=${encodeURIComponent(trimmed)}`);
-      }
-    },
-    [navigate]
-  );
-
   const handleTabChange = useCallback(
     (_event: SyntheticEvent, value: FollowTab) => {
       setSearchParams({ tab: value }, { replace: true });
@@ -196,9 +184,6 @@ export default function CommunityFollows() {
           displayName={displayName}
           profilePicUrl={profilePicUrl ?? undefined}
           onLogout={handleLogout}
-          onSearchChange={handleSearchSubmit}
-          searchMode="submit"
-          searchPlaceholder="Search for users"
         />
         <Box sx={{ flex: 1, overflowY: "auto", pb: 3, px: 1 }}>
           <Box maxWidth={720} mx="auto" sx={{ mt: 1 }}>

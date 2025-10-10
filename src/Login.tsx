@@ -60,11 +60,6 @@ export default function Login() {
 
   return (
     <>
-      <style>
-        {
-          "@import url('https://fonts.googleapis.com/css2?family=Bungee&family=Saira+Extra+Condensed:wght@100;200;300;400;500;600;700;800;900&display=swap');"
-        }
-      </style>
       <ThemeProvider theme={darkTheme}>
         <CssBaseline />
         <Box
@@ -95,9 +90,9 @@ export default function Login() {
               <Typography
                 variant="h5"
                 sx={{
-                  fontFamily: "Bungee, sans-serif",
                   mb: 0,
                   cursor: "pointer",
+                  fontWeight: "700",
                   color: "#fff",
                 }}
               >

@@ -180,7 +180,6 @@ export default function Settings() {
           username={username}
           displayName={displayName}
           profilePicUrl={profilePicUrl ?? undefined}
-          searchBar={false}
         />
 
         {!isLargeScreen && (

@@ -63,7 +63,6 @@ const initialFilters: Filters = {
 };
 
 export default function Collection({ tableName, title }: CollectionProps) {
-  const searchPlaceholder = `Search ${title ?? tableName}`;
   const cachedRecordTablePreferences = getCachedRecordTablePreferences();
   const cachedUserInfo = getCachedUserInfo();
   const [records, setRecords] = useState<Record[]>([]);
@@ -475,25 +474,25 @@ export default function Collection({ tableName, title }: CollectionProps) {
           flexDirection: "column",
         }}
       >
-        <Box sx={{ flex: "0 0 auto" }}>
+        <Box sx={{ flex: "0 0 auto", mb: -0.5 }}>
           <TopBar
-            onSearchChange={setSearchTerm}
             onLogout={handleLogout}
             title={title ?? tableName}
             username={username}
             displayName={displayName}
             profilePicUrl={profilePicUrl ?? undefined}
-            searchPlaceholder={searchPlaceholder}
           />
         </Box>
 
-        <Box sx={{ flex: "0 0 auto" }}>
+        <Box sx={{ flex: "0 0 auto", mb: 1 }}>
           <ButtonBar
+            onSearchChange={setSearchTerm}
             onEditRecord={handleEditRecord}
             onCreateRecord={handleCreateRecord}
             onDeleteRecord={handleDeleteRecord}
             onMoveRecord={handleMoveRecord}
             editEnabled={!!selectedRecord}
+            collectionTitle={title ?? tableName}
           />
         </Box>
         <Grid

@@ -182,18 +182,6 @@ export default function CommunityCollection() {
     navigate("/login");
   }, [navigate]);
 
-  const handleCommunitySearch = useCallback(
-    (value: string) => {
-      const trimmed = value.trim();
-      if (!trimmed) {
-        navigate("/community");
-      } else {
-        navigate(`/community?q=${encodeURIComponent(trimmed)}`);
-      }
-    },
-    [navigate]
-  );
-
   const handleFilterChange = useCallback((updated: Partial<Filters>) => {
     setFilters((prev) => ({
       tags: updated.tags ?? prev.tags,
@@ -243,7 +231,6 @@ export default function CommunityCollection() {
   const targetAvatarInitial = (profile?.displayName || targetUsername)
     .charAt(0)
     .toUpperCase();
-  const initialSearchValue = searchParams.get("q") ?? "";
   const isWishlistView = activeTableName === WISHLIST_COLLECTION_NAME;
   const searchPlaceholder = isWishlistView
     ? "Search Wishlist"
@@ -273,10 +260,6 @@ export default function CommunityCollection() {
           displayName={displayName}
           profilePicUrl={profilePicUrl ?? undefined}
           onLogout={handleLogout}
-          onSearchChange={handleCommunitySearch}
-          searchMode="submit"
-          searchPlaceholder="Search for users"
-          initialSearchValue={initialSearchValue}
         />
         <Box
           sx={{

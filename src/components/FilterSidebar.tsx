@@ -54,7 +54,6 @@ export default function FilterSidebar({
   return (
     <Paper
       sx={{
-        p: 2,
         display: "flex",
         flexDirection: "column",
         height: "100%",
@@ -63,7 +62,15 @@ export default function FilterSidebar({
         overflow: "hidden",
       }}
     >
-      <Box sx={{ overflowY: "auto", pr: 1, flex: 1, minHeight: 0 }}>
+      <Box
+        sx={{
+          overflowY: "auto",
+          overflowX: "hidden",
+          p: 2,
+          flex: 1,
+          minHeight: 0,
+        }}
+      >
         <Typography
           variant="subtitle1"
           component="div"
@@ -127,7 +134,7 @@ export default function FilterSidebar({
           <Typography variant="subtitle1" mt={1}>
             Filter by Rating
           </Typography>
-          <Box sx={{ px: 0, width: "82%", justifySelf: "center" }}>
+          <Box sx={{ px: 0, width: "90%", justifySelf: "center" }}>
             <Slider
               value={[ratingMin, ratingMax]}
               min={0}
@@ -189,7 +196,7 @@ export default function FilterSidebar({
       </Box>
       <Button
         variant="contained"
-        sx={{ mt: 2, fontWeight: 700 }}
+        sx={{ m: 2, fontWeight: 700 }}
         onClick={onResetFilters}
         endIcon={<ReplayOutlinedIcon />}
       >
