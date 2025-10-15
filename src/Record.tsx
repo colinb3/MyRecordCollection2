@@ -754,7 +754,11 @@ export default function Record() {
                 <Stack direction={{ xs: "row", md: "column" }}>
                   <Box
                     component="img"
-                    src={masterInfo?.cover || album.cover || placeholderCover}
+                    src={
+                      initialAlbum
+                        ? album.cover || placeholderCover
+                        : masterInfo?.cover || placeholderCover
+                    }
                     alt={album.record}
                     sx={{
                       width: 180,
