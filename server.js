@@ -1063,6 +1063,9 @@ app.get("/api/community/feed", requireAuth, async (req, res) => {
       const rating = Number.isFinite(ratingRaw) ? ratingRaw : 0;
       const releaseRaw = Number(row.release);
       const release = Number.isFinite(releaseRaw) ? releaseRaw : 0;
+      const masterIdRaw = Number(row.masterId);
+      const masterId =
+        Number.isInteger(masterIdRaw) && masterIdRaw > 0 ? masterIdRaw : null;
       const addedValue = row.added;
       const added =
         addedValue instanceof Date ? addedValue.toISOString().slice(0, 10) : addedValue;
@@ -1085,6 +1088,8 @@ app.get("/api/community/feed", requireAuth, async (req, res) => {
       if (cover) {
         record.cover = cover;
       }
+
+      record.masterId = masterId;
 
       return {
         owner: {

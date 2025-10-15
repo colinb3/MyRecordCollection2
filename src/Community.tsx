@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useState, type SyntheticEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useState,
+  type MouseEvent,
+  type SyntheticEvent,
+} from "react";
 import {
   ThemeProvider,
   CssBaseline,
@@ -14,7 +20,7 @@ import {
   Divider,
   Button,
 } from "@mui/material";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import TopBar from "./components/TopBar";
 import { darkTheme } from "./theme";
 import {
@@ -66,6 +72,7 @@ function formatDateDisplay(isoDate: string): string {
 
 export default function Community() {
   const navigate = useNavigate();
+  const location = useLocation();
   const cachedUser = getCachedUserInfo();
   const [username, setUsername] = useState<string>(cachedUser?.username ?? "");
   const [displayName, setDisplayName] = useState<string>(
@@ -177,11 +184,43 @@ export default function Community() {
     navigate("/login");
   }, [navigate]);
 
-  const handleResultClick = useCallback(
-    (targetUsername: string) => {
-      navigate(`/community/${encodeURIComponent(targetUsername)}`);
+  const handleOwnerClick = useCallback(
+    (event: MouseEvent, ownerUsername: string) => {
+      event.preventDefault();
+      event.stopPropagation();
+      navigate(`/community/${encodeURIComponent(ownerUsername)}`);
     },
     [navigate]
+  );
+
+  const handleRecordNavigate = useCallback(
+    (entry: CommunityFeedEntry) => {
+      const masterId = Number(entry.record.masterId);
+      if (!Number.isInteger(masterId) || masterId <= 0) {
+        return;
+      }
+
+      const albumPayload = {
+        id: `community-${entry.record.id}`,
+        record: entry.record.record,
+        artist: entry.record.artist,
+        cover: entry.record.cover || "",
+      };
+
+      const originPath = `${location.pathname}${location.search}${location.hash}`;
+
+      navigate(`/record?q=${masterId}`, {
+        state: {
+          album: albumPayload,
+          masterId,
+          fromCollection: {
+            path: originPath,
+            title: "Community Feed",
+          },
+        },
+      });
+    },
+    [location.hash, location.pathname, location.search, navigate]
   );
 
   return (
@@ -286,12 +325,18 @@ export default function Community() {
                         const coverSrc = entry.record.cover
                           ? entry.record.cover
                           : placeholderCover;
+                        const canNavigateToRecord =
+                          Number.isInteger(entry.record.masterId) &&
+                          Number(entry.record.masterId) > 0;
+
                         return (
                           <ListItemButton
                             key={`${entry.owner.username}-${entry.record.id}`}
-                            onClick={() =>
-                              handleResultClick(entry.owner.username)
-                            }
+                            onClick={() => {
+                              if (canNavigateToRecord) {
+                                handleRecordNavigate(entry);
+                              }
+                            }}
                             sx={{
                               borderRadius: 1,
                               mb: 1,
@@ -301,6 +346,10 @@ export default function Community() {
                               px: { xs: 1, sm: 2 },
                               pt: 1.5,
                               pb: 2,
+                              cursor: canNavigateToRecord
+                                ? "pointer"
+                                : "default",
+                              opacity: canNavigateToRecord ? 1 : 0.85,
                             }}
                           >
                             <Grid container spacing={2} width={"100%"}>
@@ -323,14 +372,29 @@ export default function Community() {
                                 >
                                   {!entry.owner.profilePicUrl && avatarInitial}
                                 </Avatar>
-                                <Typography
-                                  variant="subtitle1"
-                                  fontWeight={700}
-                                  fontSize={"1rem"}
-                                  pl={0.75}
+                                <Button
+                                  variant="text"
+                                  size="small"
+                                  onClick={(event) =>
+                                    handleOwnerClick(
+                                      event,
+                                      entry.owner.username
+                                    )
+                                  }
+                                  sx={{
+                                    textTransform: "none",
+                                    fontWeight: 700,
+                                    fontSize: "1rem",
+                                    pl: 0.75,
+                                    minWidth: 0,
+                                    color: "text.primary",
+                                    ":hover": {
+                                      backgroundColor: "action.hover",
+                                    },
+                                  }}
                                 >
                                   {ownerDisplay}
-                                </Typography>
+                                </Button>
                                 {addedDate && (
                                   <Typography
                                     variant="body2"
