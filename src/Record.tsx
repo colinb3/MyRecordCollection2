@@ -752,23 +752,40 @@ export default function Record() {
                   {backButtonLabel}
                 </Button>
                 <Stack direction={{ xs: "row", md: "column" }}>
-                  <Box
-                    component="img"
-                    src={
-                      initialAlbum
-                        ? album.cover || placeholderCover
-                        : masterInfo?.cover || placeholderCover
-                    }
-                    alt={album.record}
-                    sx={{
-                      width: 180,
-                      height: 180,
-                      objectFit: "cover",
-                      borderRadius: 2,
-                      bgcolor: "grey.900",
-                      mb: { xs: 0, md: 1.5 },
-                    }}
-                  />
+                  {fromCollection && (masterLoading || !masterInfo) ? (
+                    <Box
+                      sx={{
+                        width: 180,
+                        height: 180,
+                        borderRadius: 2,
+                        bgcolor: "grey.900",
+                        mb: { xs: 0, md: 1.5 },
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <CircularProgress />
+                    </Box>
+                  ) : (
+                    <Box
+                      component="img"
+                      src={
+                        !fromCollection
+                          ? album.cover || placeholderCover
+                          : masterInfo?.cover || placeholderCover
+                      }
+                      alt={album.record}
+                      sx={{
+                        width: 180,
+                        height: 180,
+                        objectFit: "cover",
+                        borderRadius: 2,
+                        bgcolor: "grey.900",
+                        mb: { xs: 0, md: 1.5 },
+                      }}
+                    />
+                  )}
                   <Box sx={{ ml: { xs: 2, md: 0 } }}>
                     <Typography variant="h5" fontWeight={700}>
                       {album.record}
