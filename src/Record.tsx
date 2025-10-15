@@ -676,6 +676,12 @@ export default function Record() {
         {histogramCounts ? <RatingsHistogram counts={histogramCounts} /> : null}
       </Box>
     );
+  } else if (masterInfo) {
+    masterRatingContent = (
+      <Typography color="text.secondary">
+        No master for this release. Ratings unavailable.
+      </Typography>
+    );
   }
 
   return (
