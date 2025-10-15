@@ -45,6 +45,10 @@ const MAX_PROFILE_HIGHLIGHTS = 3;
 const PROFILE_RECENT_DEFAULT_LIMIT = 3;
 const PROFILE_RECENT_MAX_LIMIT = 20;
 const PROFILE_WISHLIST_PREVIEW_LIMIT = 3;
+const DISCOGS_API_URL = "https://api.discogs.com/database/search";
+const DISCOGS_USER_AGENT = process.env.DISCOGS_USER_AGENT || "MyRecordCollection/1.0 (+https://myrecordcollection.app)";
+const DISCOGS_API_KEY = process.env.DISCOGS_API_KEY || "";
+const DISCOGS_API_SECRET = process.env.DISCOGS_API_SECRET || "";
 
 const fsPromises = fs.promises;
 const MIME_EXTENSION_MAP = new Map([
@@ -243,7 +247,7 @@ async function fetchRecordsWithTagsByIds(pool, userUuid, recordIds) {
   const placeholders = recordIds.map(() => "?").join(", ");
   const params = [userUuid, ...recordIds];
     const [rows] = await pool.query(
-    `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId, t.name as collectionName
+  `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId, r.isCustom as isCustom, r.masterId as masterId, t.name as collectionName
        FROM Record r
        LEFT JOIN RecTable t ON r.tableId = t.id
        WHERE r.userUuid = ? AND r.id IN (${placeholders})`,
@@ -381,6 +385,78 @@ async function fetchTagsByRecordIds(pool, recordIds) {
     tagsByRecord[recordId].push(row.name);
   }
   return tagsByRecord;
+}
+
+function buildDiscogsSearchUrl(artist, record) {
+  const url = new URL(DISCOGS_API_URL);
+  url.searchParams.set("type", "master");
+  url.searchParams.set("release_title", record);
+  url.searchParams.set("artist", artist);
+  if (DISCOGS_API_KEY && DISCOGS_API_SECRET) {
+    url.searchParams.set("key", DISCOGS_API_KEY);
+    url.searchParams.set("secret", DISCOGS_API_SECRET);
+  }
+  return url.toString();
+}
+
+function normalizeDiscogsReleaseYear(raw) {
+  const year = Number(raw);
+  if (Number.isInteger(year) && year >= 1800 && year <= 2100) {
+    return year;
+  }
+  return null;
+}
+
+async function lookupDiscogsMaster(artist, record) {
+  const trimmedArtist = typeof artist === "string" ? artist.trim() : "";
+  const trimmedRecord = typeof record === "string" ? record.trim() : "";
+  if (!trimmedArtist || !trimmedRecord) {
+    return null;
+  }
+
+  const requestUrl = buildDiscogsSearchUrl(trimmedArtist, trimmedRecord);
+
+  try {
+    const response = await fetch(requestUrl, {
+      headers: {
+        "User-Agent": DISCOGS_USER_AGENT,
+        Accept: "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const status = response.status;
+      const text = await response.text().catch(() => "");
+      throw new Error(`Discogs request failed (${status}): ${text}`);
+    }
+
+    const data = await response.json();
+    if (!data || !Array.isArray(data.results) || data.results.length === 0) {
+      return null;
+    }
+
+    const result = data.results[0];
+    const masterIdRaw = result?.master_id ?? result?.id;
+    const masterId = Number(masterIdRaw);
+    if (!Number.isInteger(masterId) || masterId <= 0) {
+      return null;
+    }
+
+    const cover =
+      typeof result?.cover_image === "string" && result.cover_image.trim()
+        ? result.cover_image.trim()
+        : null;
+    const year = normalizeDiscogsReleaseYear(result?.year);
+
+    return {
+      masterId,
+      releaseYear: year,
+      cover,
+    };
+  } catch (error) {
+    console.warn("Discogs lookup failed", error);
+    throw error;
+  }
 }
 
 async function getUserFollowCounts(pool, userUuid) {
@@ -538,9 +614,9 @@ app.get("/api/records", requireAuth, async (req, res) => {
       return res.status(404).json({ error: "Collection not found" });
     }
 
-    const [rows] = await pool.query(
-    `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId
-       FROM Record r WHERE r.userUuid = ? AND r.tableId = ?`,
+   const [rows] = await pool.query(
+   `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId, r.isCustom as isCustom, r.masterId as masterId
+     FROM Record r WHERE r.userUuid = ? AND r.tableId = ?`,
       [req.userUuid, tableId]
     );
 
@@ -571,6 +647,120 @@ app.get("/api/records", requireAuth, async (req, res) => {
   }
 });
 
+app.get("/api/records/master-info", requireAuth, async (req, res) => {
+  console.log("Fetching master info...");
+
+  const masterIdParam = Number(req.query.masterId);
+  const hasMasterId = Number.isInteger(masterIdParam) && masterIdParam > 0;
+
+  if (hasMasterId) {
+    try {
+      const pool = await getPool();
+      const [rows] = await pool.query(
+        `SELECT id, name, artist, cover, release_year, ratingAve,
+                rating1, rating2, rating3, rating4, rating5,
+                rating6, rating7, rating8, rating9, rating10
+           FROM Master
+           WHERE id = ?
+           LIMIT 1`,
+        [masterIdParam]
+      );
+      if (!rows || rows.length === 0) {
+        return res.json({
+          masterId: masterIdParam,
+          releaseYear: null,
+          ratingAverage: null,
+          cover: null,
+          ratingCounts: null,
+          record: null,
+          artist: null,
+        });
+      }
+
+      const row = rows[0];
+      const ratingAverageRaw = row.ratingAve;
+      const ratingAverage = ratingAverageRaw != null ? Number(ratingAverageRaw) : null;
+      const releaseYearValue = row.release_year != null ? Number(row.release_year) : null;
+      const coverValue =
+        typeof row.cover === "string" && row.cover.trim() ? row.cover.trim() : null;
+      const ratingCounts = Array.from({ length: 10 }, (_unused, index) => {
+        const value = row[`rating${index + 1}`];
+        const num = Number(value);
+        return Number.isFinite(num) && num >= 0 ? num : 0;
+      });
+
+      return res.json({
+        masterId: row.id,
+        releaseYear: Number.isInteger(releaseYearValue) ? releaseYearValue : null,
+        ratingAverage: Number.isFinite(ratingAverage) ? ratingAverage : null,
+        cover: coverValue,
+        ratingCounts,
+        record: typeof row.name === "string" ? row.name : null,
+        artist: typeof row.artist === "string" ? row.artist : null,
+      });
+    } catch (error) {
+      console.error("Failed to load master info", error);
+      return res.status(502).json({ error: "Failed to fetch master information" });
+    }
+  }
+
+  const artist = typeof req.query.artist === "string" ? req.query.artist.trim() : "";
+  const recordName = typeof req.query.record === "string" ? req.query.record.trim() : "";
+
+  if (!artist || !recordName) {
+    return res.status(400).json({ error: "artist and record are required" });
+  }
+
+  try {
+    const result = await lookupDiscogsMaster(artist, recordName);
+    console.log("Fetching discogs result");
+
+    if (!result) {
+      return res.json({
+        masterId: null,
+        releaseYear: null,
+        ratingAverage: null,
+        cover: null,
+        ratingCounts: null,
+        record: recordName,
+        artist,
+      });
+    }
+
+    const pool = await getPool();
+    const [rows] = await pool.query(
+      `SELECT ratingAve, rating1, rating2, rating3, rating4, rating5, rating6, rating7, rating8, rating9, rating10
+         FROM Master
+         WHERE id = ?
+         LIMIT 1`,
+      [result.masterId]
+    );
+    const ratingAveRow = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+    const ratingAverageRaw = ratingAveRow ? ratingAveRow.ratingAve : null;
+    const ratingAverage = ratingAverageRaw != null ? Number(ratingAverageRaw) : null;
+    const ratingCounts = ratingAveRow
+      ? Array.from({ length: 10 }, (_unused, index) => {
+          const value = ratingAveRow[`rating${index + 1}`];
+          const num = Number(value);
+          return Number.isFinite(num) && num >= 0 ? num : 0;
+        })
+      : null;
+
+    res.json({
+      masterId: result.masterId,
+      releaseYear: result.releaseYear,
+      ratingAverage: Number.isFinite(ratingAverage) ? ratingAverage : null,
+      cover: result.cover,
+      ratingCounts,
+      record: recordName,
+      artist,
+    });
+  } catch (error) {
+    console.error("Failed to load master info", error);
+    res.status(502).json({ error: "Failed to fetch master information" });
+  }
+});
+
 app.get("/api/profile/recent", requireAuth, async (req, res) => {
   console.log("Fetching recent profile records...");
   try {
@@ -583,7 +773,7 @@ app.get("/api/profile/recent", requireAuth, async (req, res) => {
     const pool = await getPool();
     // Only include records that are in the user's default collection (RecTable.name = DEFAULT_COLLECTION_NAME)
     const [rows] = await pool.query(
-  `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId
+  `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId, r.isCustom as isCustom, r.masterId as masterId
        FROM Record r
        JOIN RecTable t ON r.tableId = t.id
        WHERE r.userUuid = ? AND t.name = ?
@@ -707,8 +897,8 @@ app.get("/api/community/users/:username", requireAuth, async (req, res) => {
 
     let recentRecords = [];
     if (!collectionPrivate || isOwner) {
-      const [recentRows] = await pool.query(
-  `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId
+    const [recentRows] = await pool.query(
+  `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId, r.isCustom as isCustom, r.masterId as masterId
        FROM Record r
        JOIN RecTable t ON r.tableId = t.id
        WHERE r.userUuid = ? AND t.name = ?
@@ -728,7 +918,7 @@ app.get("/api/community/users/:username", requireAuth, async (req, res) => {
     let wishlistRecords = [];
     if (wishlistRow && (!wishlistPrivate || isOwner)) {
       const [wishlistRows] = await pool.query(
-        `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId
+  `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId, r.isCustom as isCustom, r.masterId as masterId
        FROM Record r
        JOIN RecTable t ON r.tableId = t.id
        WHERE r.userUuid = ? AND t.name = ?
@@ -790,7 +980,7 @@ app.get(
       }
 
       const [rows] = await pool.query(
-        `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId
+        `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId, r.isCustom as isCustom, r.masterId as masterId
          FROM Record r WHERE r.userUuid = ? AND r.tableId = ?`,
         [userRow.uuid, tableRow.id]
       );
@@ -844,8 +1034,8 @@ app.get("/api/community/feed", requireAuth, async (req, res) => {
   try {
     const pool = await getPool();
       const [rows] = await pool.query(
-        `SELECT r.id, r.name as record, r.artist, r.cover, r.rating,
-              r.release_year as 'release', r.added as added, r.tableId,
+    `SELECT r.id, r.name as record, r.artist, r.cover, r.rating,
+      r.release_year as 'release', r.added as added, r.tableId, r.isCustom as isCustom, r.masterId as masterId,
               u.username, u.displayName, u.profilePic
        FROM Record r
        JOIN Follows f ON f.followsUuid = r.userUuid
@@ -885,6 +1075,7 @@ app.get("/api/community/feed", requireAuth, async (req, res) => {
   record: row.record,
   artist: row.artist,
   rating,
+  isCustom: Boolean(row.isCustom),
   release,
   added,
   tags,
@@ -1369,24 +1560,53 @@ app.post('/api/records/update', requireAuth, async (req, res) => {
   console.log("Updating record...");
   const { id, record, artist, cover, rating, tags, release } = req.body;
   if (!id || !record) return res.status(400).json({ error: 'Missing id or record name' });
-  // Validate release year
+
   const releaseNum = Number(release);
   if (!Number.isInteger(releaseNum) || releaseNum < 1877 || releaseNum > 2100) {
     return res.status(400).json({ error: 'Invalid release year' });
   }
+
+  const ratingNum = Number(rating);
+  if (!Number.isInteger(ratingNum) || ratingNum < 0 || ratingNum > 10) {
+    return res.status(400).json({ error: 'Invalid rating' });
+  }
+
   try {
     const pool = await getPool();
-    // Update main record and ensure it belongs to the authenticated user.
+    const [existingRows] = await pool.execute(
+      `SELECT name, artist, isCustom FROM Record WHERE id = ? AND userUuid = ? LIMIT 1`,
+      [id, req.userUuid]
+    );
+
+    if (!existingRows || existingRows.length === 0) {
+      return res.status(404).json({ error: 'Record not found' });
+    }
+
+    const existing = existingRows[0];
+    const isCustom = Boolean(existing.isCustom);
+
+    if (!isCustom) {
+      const currentName = existing.name || "";
+      const currentArtist = existing.artist || "";
+      if (currentName !== record || currentArtist !== artist) {
+        return res.status(400).json({ error: 'Only custom records can edit the title or artist.' });
+      }
+    }
+
+    const nextName = isCustom ? record : existing.name;
+    const nextArtist = isCustom ? artist : existing.artist;
+
     const [updateResult] = await pool.execute(
       `UPDATE Record SET name = ?, artist = ?, cover = ?, rating = ?, release_year = ? WHERE id = ? AND userUuid = ?`,
-      [record, artist, cover, rating, releaseNum, id, req.userUuid]
+      [nextName, nextArtist, cover, ratingNum, releaseNum, id, req.userUuid]
     );
+
     if (!updateResult || updateResult.affectedRows === 0) {
       return res.status(404).json({ error: 'Record not found' });
     }
-    // Remove old tags for this record (safe because we own the record)
+
     await pool.execute(`DELETE FROM Tagged WHERE recordId = ?`, [id]);
-    // Add new tags (create if missing)
+
     for (const tagName of tags || []) {
       let [tagRows] = await pool.execute(`SELECT id FROM Tag WHERE name = ? AND userUuid = ?`, [tagName, req.userUuid]);
       let tagId;
@@ -1398,18 +1618,20 @@ app.post('/api/records/update', requireAuth, async (req, res) => {
       }
       await pool.execute(`INSERT IGNORE INTO Tagged (recordId, tagId) VALUES (?, ?)`, [id, tagId]);
     }
-    // Return updated record
+
     const [rows] = await pool.execute(
-      `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId FROM Record r WHERE r.id = ? AND r.userUuid = ?`,
+      `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId, r.isCustom as isCustom, r.masterId as masterId FROM Record r WHERE r.id = ? AND r.userUuid = ?`,
       [id, req.userUuid]
     );
+
     const updated = rows[0];
-    // Get tags
+
     const [tagRows] = await pool.execute(
       `SELECT t.name FROM Tag t JOIN Tagged tg ON t.id = tg.tagId WHERE tg.recordId = ?`,
       [id]
     );
     updated.tags = tagRows.map((t) => t.name);
+
     res.json(updated);
   } catch (err) {
     res.status(500).json({ error: 'Failed to update record' });
@@ -1423,20 +1645,63 @@ app.post('/api/records/create', requireAuth, async (req, res) => {
   if (!tableName || typeof tableName !== 'string') {
     return res.status(400).json({ error: 'tableName is required' });
   }
-  // Validate release year
+  const recordName = typeof record === "string" ? record.trim() : "";
+  const artistName = typeof artist === "string" ? artist.trim() : "";
+
   const releaseNum = Number(release);
   if (!Number.isInteger(releaseNum) || releaseNum < 1877 || releaseNum > 2100) {
     return res.status(400).json({ error: 'invalid release year' });
   }
+  const ratingNum = Number(rating);
+  if (!Number.isInteger(ratingNum) || ratingNum < 0 || ratingNum > 10) {
+    return res.status(400).json({ error: 'invalid rating' });
+  }
+
+  const rawIsCustom = req.body ? req.body.isCustom : undefined;
+  const isCustom = rawIsCustom === true || rawIsCustom === 1 || rawIsCustom === "1";
+
+  const masterIdRaw = req.body ? req.body.masterId : undefined;
+  const masterId = Number(masterIdRaw);
+  const hasMaster = Number.isInteger(masterId) && masterId > 0;
+
+  let masterReleaseYear = null;
+  if (hasMaster) {
+    const masterReleaseRaw = req.body?.masterReleaseYear;
+    const masterReleaseNum = Number(masterReleaseRaw);
+    if (Number.isInteger(masterReleaseNum) && masterReleaseNum >= 1800 && masterReleaseNum <= 2100) {
+      masterReleaseYear = masterReleaseNum;
+    }
+  }
+
+  const masterCoverRaw = req.body?.masterCover;
+  const masterCover = typeof masterCoverRaw === "string" && masterCoverRaw.trim() ? masterCoverRaw.trim() : null;
+  const cleanCover = typeof cover === "string" && cover.trim() ? cover.trim() : null;
+
   try {
     const pool = await getPool();
     const tableId = await getUserTableId(pool, req.userUuid, tableName);
     if (!tableId) {
       return res.status(404).json({ error: 'Collection not found' });
     }
+
+    if (hasMaster) {
+      const masterCoverValue = masterCover || cleanCover || null;
+      await pool.execute(
+        `INSERT INTO Master (id, artist, cover, name, release_year)
+         VALUES (?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           artist = VALUES(artist),
+           cover = CASE WHEN VALUES(cover) IS NOT NULL THEN VALUES(cover) ELSE cover END,
+           name = VALUES(name),
+           release_year = COALESCE(VALUES(release_year), release_year)`,
+        [masterId, artistName, masterCoverValue, recordName, masterReleaseYear]
+      );
+    }
+
     const [result] = await pool.execute(
-      `INSERT INTO Record (name, artist, cover, rating, release_year, tableId, userUuid, added) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
-      [record, artist, cover, rating, releaseNum, tableId, req.userUuid]
+      `INSERT INTO Record (name, artist, cover, rating, release_year, tableId, userUuid, added, isCustom, masterId)
+       VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?)`,
+      [recordName, artistName, cleanCover, ratingNum, releaseNum, tableId, req.userUuid, isCustom, hasMaster ? masterId : null]
     );
     const newId = result.insertId;
     // Add tags (create if missing)
@@ -1453,7 +1718,7 @@ app.post('/api/records/create', requireAuth, async (req, res) => {
     }
     // Return new record
     const [rows] = await pool.execute(
-      `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId FROM Record r WHERE r.id = ? AND r.userUuid = ?`,
+      `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId, r.isCustom as isCustom, r.masterId as masterId FROM Record r WHERE r.id = ? AND r.userUuid = ?`,
       [newId, req.userUuid]
     );
     const created = rows[0];
@@ -1465,6 +1730,7 @@ app.post('/api/records/create', requireAuth, async (req, res) => {
     created.tags = tagRows.map((t) => t.name);
     res.json(created);
   } catch (err) {
+    console.error('Failed to create record', err);
     res.status(500).json({ error: 'Failed to create record' });
   }
 });

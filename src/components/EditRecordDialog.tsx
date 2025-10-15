@@ -45,7 +45,7 @@ export default function EditRecordDialog({
   // When the dialog opens or the record prop changes, reset the internal state
   useEffect(() => {
     if (record) {
-      setEditedRecord(record);
+      setEditedRecord({ ...record, isCustom: record.isCustom ?? false });
       setImageUrl(record.cover || "");
     } else {
       setEditedRecord(null);
@@ -186,6 +186,8 @@ export default function EditRecordDialog({
     editedRecord.tags.map((tag) => tag.toLowerCase())
   );
 
+  const titleArtistLocked = !editedRecord.isCustom && editedRecord.id !== -1;
+
   return (
     <Dialog
       open={open}
@@ -239,6 +241,12 @@ export default function EditRecordDialog({
               size="small"
               value={editedRecord.record}
               onChange={handleChange}
+              disabled={titleArtistLocked}
+              helperText={
+                titleArtistLocked
+                  ? "Can only edit the title for custom records."
+                  : undefined
+              }
               sx={{
                 mb: 2,
                 "& .MuiOutlinedInput-root": {
@@ -254,6 +262,12 @@ export default function EditRecordDialog({
               size="small"
               value={editedRecord.artist}
               onChange={handleChange}
+              disabled={titleArtistLocked}
+              helperText={
+                titleArtistLocked
+                  ? "Can only edit the artist for custom records."
+                  : undefined
+              }
               sx={{
                 mb: 2,
                 "& .MuiOutlinedInput-root": {

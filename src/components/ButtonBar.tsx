@@ -1,10 +1,11 @@
-import { Box, Button, TextField } from "@mui/material";
+import { Box, Button, TextField, Tooltip } from "@mui/material";
 import { useRef, useState, useEffect } from "react";
 import type { UIEvent } from "react";
 import EditIcon from "@mui/icons-material/Edit";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import DriveFileMoveIcon from "@mui/icons-material/DriveFileMove";
+import LaunchIcon from "@mui/icons-material/Launch";
 
 interface ButtonBarProps {
   onSearchChange?: (value: string) => void;
@@ -12,7 +13,9 @@ interface ButtonBarProps {
   onCreateRecord?: () => void;
   onDeleteRecord?: () => void;
   onMoveRecord?: () => void;
+  onViewMaster?: () => void;
   editEnabled?: boolean; // indicates a record is selected
+  viewMasterEnabled?: boolean;
   collectionTitle?: string; // title of the current collection
 }
 
@@ -22,7 +25,9 @@ export default function ButtonBar({
   onCreateRecord,
   onDeleteRecord,
   onMoveRecord,
+  onViewMaster,
   editEnabled,
+  viewMasterEnabled,
   collectionTitle,
 }: ButtonBarProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -77,8 +82,8 @@ export default function ButtonBar({
           pb: 1,
           px: 0.5,
           flexWrap: "nowrap",
-          // Ensure child buttons don't shrink and text stays inside
-          "& > .action-btn": {
+          // Ensure action buttons retain sizing even when wrapped
+          "& .action-btn": {
             flexShrink: 0,
             whiteSpace: "nowrap",
             textOverflow: "clip",
@@ -142,6 +147,36 @@ export default function ButtonBar({
         >
           Move
         </Button>
+        {viewMasterEnabled ? (
+          <Button
+            variant="outlined"
+            color="primary"
+            onClick={onViewMaster}
+            size="small"
+            className="action-btn"
+            startIcon={<LaunchIcon />}
+            sx={{ height: 40 }}
+          >
+            View
+          </Button>
+        ) : (
+          <Tooltip title="This record does not have an associated master">
+            <span style={{ display: "inline-flex" }}>
+              <Button
+                variant="outlined"
+                color="primary"
+                onClick={onViewMaster}
+                disabled
+                size="small"
+                className="action-btn"
+                startIcon={<LaunchIcon />}
+                sx={{ height: 40 }}
+              >
+                View
+              </Button>
+            </span>
+          </Tooltip>
+        )}
         <Button
           variant="outlined"
           color="error"

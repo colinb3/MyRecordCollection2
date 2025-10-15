@@ -1,4 +1,10 @@
-import { useState, useEffect, useCallback } from "react";
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  type ReactNode,
+} from "react";
 import {
   ThemeProvider,
   CssBaseline,
@@ -9,6 +15,7 @@ import {
   Alert,
   Snackbar,
   Stack,
+  CircularProgress,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import apiUrl from "./api";
@@ -37,19 +44,142 @@ interface RecordListItem {
 interface LocationState {
   album?: RecordListItem;
   query?: string;
+  masterId?: number;
+  fromCollection?: {
+    path: string;
+    title?: string;
+    tableName?: string;
+  };
+}
+
+interface MasterInfo {
+  masterId: number | null;
+  ratingAverage: number | null;
+  releaseYear: number | null;
+  cover: string | null;
+  ratingCounts: number[] | null;
 }
 
 const DEFAULT_COLLECTION_NAME = "My Collection";
 const WISHLIST_COLLECTION_NAME = "Wishlist";
+
+function RatingsHistogram({ counts }: { counts: number[] }) {
+  if (!Array.isArray(counts) || counts.length === 0) {
+    return null;
+  }
+
+  const maxValue = counts.reduce(
+    (max, current) =>
+      Number.isFinite(current) && current > max ? current : max,
+    0
+  );
+  const safeMax = maxValue > 0 ? maxValue : 1;
+
+  return (
+    <Box sx={{ alignSelf: { xs: "flex-start", md: "flex" } }}>
+      <Box
+        sx={{
+          width: "100%",
+          display: "grid",
+          gridTemplateColumns: "repeat(10, minmax(0, 1fr))",
+          columnGap: 0.75,
+          alignItems: "end",
+          minHeight: 96,
+        }}
+      >
+        {counts.map((count, index) => {
+          const safeCount = Number.isFinite(count) && count > 0 ? count : 0;
+          const ratio = safeCount / safeMax;
+          const barHeight = Math.max(Math.round(ratio * 80), 4);
+          return (
+            <Box
+              key={index}
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                width: 28,
+                minWidth: 0,
+              }}
+            >
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ whiteSpace: "nowrap" }}
+              >
+                {safeCount}
+              </Typography>
+              <Box
+                sx={{
+                  width: "100%",
+                  height: `${barHeight}px`,
+                  bgcolor: "primary.main",
+                  borderRadius: 1,
+                  transition: "height 0.2s ease",
+                  mt: 0.5,
+                }}
+              />
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ mt: 0.5, whiteSpace: "nowrap" }}
+              >
+                {index + 1}
+              </Typography>
+            </Box>
+          );
+        })}
+      </Box>
+    </Box>
+  );
+}
 
 export default function Record() {
   const navigate = useNavigate();
   const location = useLocation();
   const locationState = (location.state as LocationState | undefined) ?? {};
   const initialAlbum = locationState.album ?? null;
+  const fromCollection = locationState.fromCollection;
+  const fromCollectionPath =
+    typeof fromCollection?.path === "string"
+      ? fromCollection.path.trim() || null
+      : null;
+  const fromCollectionTitle = (() => {
+    if (typeof fromCollection?.title === "string") {
+      const trimmed = fromCollection.title.trim();
+      if (trimmed.length > 0) return trimmed;
+    }
+    if (typeof fromCollection?.tableName === "string") {
+      const trimmed = fromCollection.tableName.trim();
+      if (trimmed.length > 0) return trimmed;
+    }
+    return null;
+  })();
+  const searchQuery =
+    typeof locationState.query === "string" ? locationState.query.trim() : "";
+  const backButtonLabel = fromCollectionTitle
+    ? `Back to ${fromCollectionTitle}`
+    : "Back to Search";
   const cachedUser = getCachedUserInfo();
 
+  const parseMasterId = (value: string | null | undefined): number | null => {
+    if (!value) return null;
+    const numeric = Number(value);
+    return Number.isInteger(numeric) && numeric > 0 ? numeric : null;
+  };
+
+  const masterIdFromQuery = parseMasterId(
+    new URLSearchParams(location.search).get("q")
+  );
+  const initialMasterId =
+    typeof locationState.masterId === "number" && locationState.masterId > 0
+      ? locationState.masterId
+      : masterIdFromQuery;
+
   const [album, setAlbum] = useState<RecordListItem | null>(initialAlbum);
+  const [masterIdOverride, setMasterIdOverride] = useState<number | null>(
+    initialMasterId ?? null
+  );
   const [username, setUsername] = useState<string>(cachedUser?.username ?? "");
   const [displayName, setDisplayName] = useState<string>(
     cachedUser?.displayName ?? ""
@@ -71,12 +201,47 @@ export default function Record() {
     message: string;
     severity: "success" | "error";
   }>({ open: false, message: "", severity: "success" });
+  const [masterInfo, setMasterInfo] = useState<MasterInfo | null>(null);
+  const [masterLoading, setMasterLoading] = useState(false);
+  const [masterError, setMasterError] = useState<string | null>(null);
+  const [releaseYearTouched, setReleaseYearTouched] = useState(false);
+  const isMountedRef = useRef(true);
+  const releaseYearTouchedRef = useRef(false);
+  const skipNextMasterFetchRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    releaseYearTouchedRef.current = releaseYearTouched;
+  }, [releaseYearTouched]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const queryMasterId = parseMasterId(params.get("q"));
+    const stateMasterId =
+      typeof locationState.masterId === "number" && locationState.masterId > 0
+        ? locationState.masterId
+        : null;
+    const nextMasterId = stateMasterId ?? queryMasterId ?? null;
+    setMasterIdOverride((prev) =>
+      prev === nextMasterId ? prev : nextMasterId
+    );
+  }, [location.search, locationState.masterId]);
 
   useEffect(() => {
     if (!locationState.album) {
-      navigate("/search", { replace: true });
+      const params = new URLSearchParams(location.search);
+      const hasMasterQuery = parseMasterId(params.get("q"));
+      if (!hasMasterQuery) {
+        navigate("/search", { replace: true });
+      }
     }
-  }, [locationState.album, navigate]);
+  }, [locationState.album, navigate, location.search]);
 
   useEffect(() => {
     if (locationState.album) {
@@ -137,6 +302,9 @@ export default function Record() {
     setAddError(null);
     setWikiTags([]);
     setWikiLoading(true);
+    setMasterError(null);
+    setReleaseYearTouched(false);
+    releaseYearTouchedRef.current = false;
     let cancelled = false;
 
     (async () => {
@@ -146,12 +314,15 @@ export default function Record() {
         if (genres && genres.length > 0) {
           const first = genres[0];
           const yearNum = first && /^\d{4}$/.test(first) ? Number(first) : null;
-          if (yearNum && yearNum >= 1800 && yearNum <= 2100) {
-            setReleaseYear(yearNum);
-            setWikiTags(genres.slice(1).filter((tag) => !!tag));
-          } else {
-            setWikiTags(genres.filter((tag) => !!tag));
+          const withinRange =
+            yearNum && yearNum >= 1800 && yearNum <= 2100 ? yearNum : null;
+          if (withinRange && !releaseYearTouchedRef.current) {
+            setReleaseYear(withinRange);
           }
+          const tagsOnly = withinRange
+            ? genres.slice(1).filter((tag) => !!tag)
+            : genres.filter((tag) => !!tag);
+          setWikiTags(tagsOnly);
         } else {
           setWikiTags([]);
         }
@@ -199,22 +370,222 @@ export default function Record() {
     setSelectedTags((prev) => (prev.includes(tag) ? prev : [...prev, tag]));
   }, []);
 
+  const handleReleaseYearChange = useCallback((value: number) => {
+    if (Number.isFinite(value)) {
+      setReleaseYear(value);
+    }
+    setReleaseYearTouched(true);
+  }, []);
+
+  const loadMasterInfo = useCallback(
+    async (options?: { preserveReleaseYear?: boolean }) => {
+      const masterIdToUse = masterIdOverride;
+      const preserveReleaseYear =
+        options?.preserveReleaseYear ?? releaseYearTouchedRef.current;
+      const targetAlbumId =
+        album?.id ?? (masterIdToUse ? `master-${masterIdToUse}` : null);
+
+      if (!album && !masterIdToUse) {
+        return;
+      }
+
+      let endpoint: string | null = null;
+      if (masterIdToUse) {
+        endpoint = apiUrl(`/api/records/master-info?masterId=${masterIdToUse}`);
+      } else if (album) {
+        const params = new URLSearchParams({
+          artist: album.artist,
+          record: album.record,
+        });
+        endpoint = apiUrl(`/api/records/master-info?${params.toString()}`);
+      }
+
+      if (!endpoint) {
+        return;
+      }
+
+      setMasterLoading(true);
+      setMasterError(null);
+      setMasterInfo(null);
+
+      try {
+        const response = await fetch(endpoint, { credentials: "include" });
+
+        if (!response.ok) {
+          let message = "Failed to load community rating";
+          try {
+            const problem = await response.json();
+            if (problem?.error) {
+              message = problem.error;
+            }
+          } catch {
+            /* ignore json errors */
+          }
+          throw new Error(message);
+        }
+
+        const data = await response.json();
+
+        if (!isMountedRef.current) {
+          return;
+        }
+
+        const masterIdValue = Number(data?.masterId);
+        const ratingAverageValue =
+          data?.ratingAverage !== null && data?.ratingAverage !== undefined
+            ? Number(data.ratingAverage)
+            : null;
+        const releaseYearValue =
+          data?.releaseYear !== null && data?.releaseYear !== undefined
+            ? Number(data.releaseYear)
+            : null;
+        const coverValue =
+          typeof data?.cover === "string" && data.cover.trim()
+            ? data.cover.trim()
+            : null;
+        const ratingCountsValue = Array.isArray(data?.ratingCounts)
+          ? data.ratingCounts.slice(0, 10).map((value: unknown) => {
+              const num = Number(value);
+              return Number.isFinite(num) && num >= 0 ? num : 0;
+            })
+          : null;
+
+        const normalized: MasterInfo = {
+          masterId:
+            Number.isInteger(masterIdValue) && masterIdValue > 0
+              ? masterIdValue
+              : null,
+          ratingAverage:
+            ratingAverageValue !== null && Number.isFinite(ratingAverageValue)
+              ? Math.round(ratingAverageValue * 10) / 10
+              : null,
+          releaseYear:
+            releaseYearValue !== null && Number.isInteger(releaseYearValue)
+              ? releaseYearValue
+              : null,
+          cover: coverValue,
+          ratingCounts:
+            ratingCountsValue && ratingCountsValue.length === 10
+              ? ratingCountsValue
+              : null,
+        };
+
+        if (!album) {
+          const nameFromResponse =
+            typeof data?.record === "string" && data.record.trim()
+              ? data.record.trim()
+              : null;
+          const artistFromResponse =
+            typeof data?.artist === "string" && data.artist.trim()
+              ? data.artist.trim()
+              : null;
+
+          if (nameFromResponse || artistFromResponse) {
+            setAlbum({
+              id:
+                targetAlbumId ?? `master-${normalized.masterId ?? Date.now()}`,
+              record: nameFromResponse ?? "Unknown Record",
+              artist: artistFromResponse ?? "Unknown Artist",
+              cover: coverValue ?? "",
+            });
+          }
+        }
+
+        if (normalized.masterId && normalized.masterId !== masterIdOverride) {
+          skipNextMasterFetchRef.current = normalized.masterId;
+          setMasterIdOverride(normalized.masterId);
+        }
+
+        if (album && coverValue && (!album.cover || album.cover.length === 0)) {
+          setAlbum((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  cover: coverValue,
+                }
+              : prev
+          );
+        }
+
+        const currentAlbumId = album?.id ?? targetAlbumId;
+        if (
+          targetAlbumId &&
+          currentAlbumId &&
+          targetAlbumId !== currentAlbumId
+        ) {
+          setMasterLoading(false);
+          return;
+        }
+
+        setMasterInfo(normalized);
+        setMasterLoading(false);
+
+        if (
+          !preserveReleaseYear &&
+          normalized.releaseYear &&
+          normalized.releaseYear >= 1800 &&
+          normalized.releaseYear <= 2100
+        ) {
+          setReleaseYear(normalized.releaseYear);
+          setReleaseYearTouched(true);
+          releaseYearTouchedRef.current = true;
+        }
+      } catch (error) {
+        if (!isMountedRef.current) {
+          return;
+        }
+        console.warn("Failed to load master info", error);
+        setMasterInfo(null);
+        setMasterError(
+          error instanceof Error
+            ? error.message
+            : "Failed to load community rating"
+        );
+        setMasterLoading(false);
+      }
+    },
+    [album, masterIdOverride]
+  );
+
+  useEffect(() => {
+    if (!album && !masterIdOverride) {
+      setMasterInfo(null);
+      setMasterError(null);
+      return;
+    }
+    if (
+      skipNextMasterFetchRef.current !== null &&
+      masterIdOverride === skipNextMasterFetchRef.current
+    ) {
+      skipNextMasterFetchRef.current = null;
+      return;
+    }
+    void loadMasterInfo({ preserveReleaseYear: false });
+  }, [album, masterIdOverride, loadMasterInfo]);
+
   const submitRecord = useCallback(
     async (tableName: string, successMessage: string) => {
       if (!album) return;
       setAdding(true);
       setAddError(null);
       try {
+        const normalizedCover =
+          album.cover && album.cover.trim().length > 0 ? album.cover : null;
+        const payloadMasterCover = normalizedCover ?? masterInfo?.cover ?? null;
         const payload = {
           id: -1,
-          cover: album.cover,
+          cover: normalizedCover,
           record: album.record,
           artist: album.artist,
           rating,
+          isCustom: false,
           tags: selectedTags,
           release: releaseYear,
           added: new Date().toISOString().slice(0, 10),
           tableName,
+          masterId: masterInfo?.masterId ?? masterIdOverride ?? null,
+          masterReleaseYear: masterInfo?.releaseYear ?? null,
+          masterCover: payloadMasterCover,
         };
         const res = await fetch(apiUrl("/api/records/create"), {
           method: "POST",
@@ -243,7 +614,7 @@ export default function Record() {
         setAdding(false);
       }
     },
-    [album, rating, releaseYear, selectedTags]
+    [album, rating, releaseYear, selectedTags, masterInfo, masterIdOverride]
   );
 
   const handleAddRecord = useCallback(() => {
@@ -255,16 +626,56 @@ export default function Record() {
   }, [submitRecord]);
 
   const handleBack = useCallback(() => {
-    const q = (locationState.query || "").trim();
-    if (q) {
-      navigate(`/search?tab=records&q=${encodeURIComponent(q)}`);
+    if (fromCollectionPath) {
+      navigate(fromCollectionPath);
+      return;
+    }
+    if (searchQuery) {
+      navigate(`/search?tab=records&q=${encodeURIComponent(searchQuery)}`);
     } else {
       navigate("/search");
     }
-  }, [navigate, locationState.query]);
+  }, [navigate, fromCollectionPath, searchQuery]);
 
   if (!album) {
     return null;
+  }
+
+  let masterRatingContent: ReactNode = null;
+  if (masterLoading) {
+    masterRatingContent = (
+      <Typography color="text.secondary">
+        Loading community rating… <CircularProgress size={20} />
+      </Typography>
+    );
+  } else if (masterError) {
+    masterRatingContent = <Typography color="error">{masterError}</Typography>;
+  } else if (masterInfo) {
+    const histogramCounts =
+      Array.isArray(masterInfo.ratingCounts) &&
+      masterInfo.ratingCounts.length === 10
+        ? masterInfo.ratingCounts
+        : null;
+    masterRatingContent = (
+      <Box sx={{ display: "flex", flexDirection: "column" }}>
+        {masterInfo.ratingAverage !== null ? (
+          <Typography
+            color="text.secondary"
+            sx={{ mb: histogramCounts ? 0.7 : 0 }}
+          >
+            Average rating: {masterInfo.ratingAverage.toFixed(1)}
+          </Typography>
+        ) : (
+          <Typography
+            color="text.secondary"
+            sx={{ mb: histogramCounts ? 0.7 : 0 }}
+          >
+            Be the first to rate!
+          </Typography>
+        )}
+        {histogramCounts ? <RatingsHistogram counts={histogramCounts} /> : null}
+      </Box>
+    );
   }
 
   return (
@@ -313,7 +724,7 @@ export default function Record() {
                   p: { xs: 2, md: 3 },
                   display: "flex",
                   flexDirection: "column",
-                  gap: 2,
+                  gap: 1.25,
                 }}
               >
                 <Button
@@ -322,7 +733,7 @@ export default function Record() {
                   variant="text"
                   sx={{ alignSelf: "flex-start" }}
                 >
-                  Back to Search
+                  {backButtonLabel}
                 </Button>
                 <Stack direction={{ xs: "row", md: "column" }} spacing={2}>
                   <Box
@@ -346,6 +757,9 @@ export default function Record() {
                     </Typography>
                   </Box>
                 </Stack>
+                {masterRatingContent && (
+                  <Box sx={{ mt: 1 }}>{masterRatingContent}</Box>
+                )}
                 {addError && <Alert severity="error">{addError}</Alert>}
               </Box>
               <Box
@@ -370,7 +784,7 @@ export default function Record() {
                   rating={rating}
                   onRatingChange={setRating}
                   releaseYear={releaseYear}
-                  onReleaseYearChange={setReleaseYear}
+                  onReleaseYearChange={handleReleaseYearChange}
                   canAdd={!adding}
                   onAddRecord={handleAddRecord}
                   onWishlistRecord={handleAddWishlistRecord}

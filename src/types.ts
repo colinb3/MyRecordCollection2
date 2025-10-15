@@ -4,11 +4,13 @@ export interface Record {
   record: string;
   artist: string;
   rating: number;
+  isCustom: boolean;
   tags: string[];
   release: number;
   added: string;
   tableId?: number;
   collectionName?: string | null;
+  masterId?: number | null;
 }
 
 export interface Filters {

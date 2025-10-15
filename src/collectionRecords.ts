@@ -62,11 +62,24 @@ export function normalizeApiRecord(raw: unknown): MrcRecord | null {
   const tableIdRaw = Number(source.tableId);
   const tableId = Number.isInteger(tableIdRaw) ? tableIdRaw : undefined;
 
+  const masterIdRaw = source.masterId;
+  const masterIdNum = Number(masterIdRaw);
+  const masterId =
+    Number.isInteger(masterIdNum) && masterIdNum > 0 ? masterIdNum : null;
+
+  const rawIsCustom = source.isCustom;
+  const isCustom =
+    rawIsCustom === true ||
+    rawIsCustom === 1 ||
+    rawIsCustom === "1" ||
+    rawIsCustom === "true";
+
   const normalized: MrcRecord = {
     id,
     record: recordName,
     artist,
     rating,
+    isCustom,
     tags,
     release,
     added,
@@ -75,6 +88,12 @@ export function normalizeApiRecord(raw: unknown): MrcRecord | null {
 
   if (cover) {
     normalized.cover = cover;
+  }
+
+  if (masterId) {
+    normalized.masterId = masterId;
+  } else if (masterIdRaw === null) {
+    normalized.masterId = null;
   }
 
   return normalized;

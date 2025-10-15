@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import apiUrl from "./api";
 import {
   ThemeProvider,
@@ -119,6 +119,41 @@ export default function Collection({ tableName, title }: CollectionProps) {
   const handleFilterChange = (newFilters: Partial<Filters>) => {
     setFilters((prev) => ({ ...prev, ...newFilters }));
   };
+  const handleViewMasterRecord = useCallback(() => {
+    if (!selectedRecord || !selectedRecord.masterId) {
+      return;
+    }
+
+    const albumPayload = {
+      id: `collection-${selectedRecord.id}`,
+      record: selectedRecord.record,
+      artist: selectedRecord.artist,
+      cover: selectedRecord.cover ?? "",
+    };
+
+    const originPath = `${location.pathname}${location.search}${location.hash}`;
+
+    navigate(`/record?q=${selectedRecord.masterId}`, {
+      state: {
+        album: albumPayload,
+        masterId: selectedRecord.masterId,
+        query: selectedRecord.record,
+        fromCollection: {
+          path: originPath,
+          title: title ?? tableName,
+          tableName,
+        },
+      },
+    });
+  }, [
+    navigate,
+    selectedRecord,
+    location.pathname,
+    location.search,
+    location.hash,
+    title,
+    tableName,
+  ]);
 
   const resetFilters = () => {
     setFilters(initialFilters);
@@ -308,6 +343,7 @@ export default function Collection({ tableName, title }: CollectionProps) {
       record: "",
       artist: "",
       rating: 0,
+      isCustom: true,
       tags: [],
       release: 2024,
       added: new Date().toISOString().slice(0, 10),
@@ -491,7 +527,9 @@ export default function Collection({ tableName, title }: CollectionProps) {
             onCreateRecord={handleCreateRecord}
             onDeleteRecord={handleDeleteRecord}
             onMoveRecord={handleMoveRecord}
+            onViewMaster={handleViewMasterRecord}
             editEnabled={!!selectedRecord}
+            viewMasterEnabled={Boolean(selectedRecord?.masterId)}
             collectionTitle={title ?? tableName}
           />
         </Box>

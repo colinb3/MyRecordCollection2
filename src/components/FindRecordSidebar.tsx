@@ -102,7 +102,7 @@ export default function FindRecordSidebar({
           variant="subtitle1"
           sx={{ display: "flex", alignItems: "center" }}
         >
-          Add Tags
+          Choose Tags
           {wikiLoading && <CircularProgress size={16} sx={{ ml: 1 }} />}
         </Typography>
         <Box
