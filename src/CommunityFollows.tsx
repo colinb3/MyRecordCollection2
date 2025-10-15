@@ -27,7 +27,11 @@ import {
 import { clearRecordTablePreferencesCache } from "./preferences";
 import { clearCollectionRecordsCache } from "./collectionRecords";
 import { clearProfileHighlightsCache } from "./profileHighlights";
-import { clearCommunityCaches, loadUserFollows } from "./communityUsers";
+import {
+  clearCommunityCaches,
+  loadUserFollows,
+  loadPublicUserProfile,
+} from "./communityUsers";
 import type { CommunityUserSummary } from "./types";
 import apiUrl from "./api";
 import { setUserId } from "./analytics";
@@ -47,6 +51,11 @@ export default function CommunityFollows() {
   );
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
     cachedUser?.profilePicUrl ?? null
+  );
+
+  const [targetDisplayName, setTargetDisplayName] = useState<string>("");
+  const [targetProfilePicUrl, setTargetProfilePicUrl] = useState<string | null>(
+    null
   );
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -93,6 +102,8 @@ export default function CommunityFollows() {
     if (!uname) {
       setFollowers([]);
       setFollowing([]);
+      setTargetDisplayName("");
+      setTargetProfilePicUrl(null);
       setStatus("error");
       setError("Username is required");
       return () => {
@@ -104,12 +115,16 @@ export default function CommunityFollows() {
     setError(null);
     setFollowers([]);
     setFollowing([]);
+    setTargetDisplayName("");
+    setTargetProfilePicUrl(null);
 
-    loadUserFollows(uname)
-      .then((data) => {
+    Promise.all([loadUserFollows(uname), loadPublicUserProfile(uname)])
+      .then(([followsData, profileData]) => {
         if (cancelled) return;
-        setFollowers(data.followers);
-        setFollowing(data.following);
+        setFollowers(followsData.followers);
+        setFollowing(followsData.following);
+        setTargetDisplayName(profileData.displayName || "");
+        setTargetProfilePicUrl(profileData.profilePicUrl || null);
         setStatus("ready");
       })
       .catch((err: unknown) => {
@@ -187,13 +202,23 @@ export default function CommunityFollows() {
         />
         <Box sx={{ flex: 1, overflowY: "auto", pb: 3, px: 1 }}>
           <Box maxWidth={720} mx="auto" sx={{ mt: 1 }}>
-            <Box display={"flex"} alignItems="baseline" gap={1} mb={1} ml={1}>
-              <Typography variant="h5" fontWeight={500}>
-                {displayName}
-              </Typography>
-              <Typography variant="subtitle1" color="text.secondary">
-                (@{username})
-              </Typography>
+            <Box display={"flex"} alignItems="center" gap={1.5} mb={1} ml={1}>
+              <Avatar
+                src={targetProfilePicUrl ?? undefined}
+                alt={targetDisplayName || targetUsername}
+                sx={{ width: 48, height: 48, bgcolor: "grey.700" }}
+              >
+                {!targetProfilePicUrl &&
+                  (targetDisplayName || targetUsername).charAt(0).toUpperCase()}
+              </Avatar>
+              <Box display={"flex"} alignItems="center" gap={1}>
+                <Typography variant="h5" fontWeight={500}>
+                  {targetDisplayName || targetUsername}
+                </Typography>
+                <Typography variant="subtitle1" color="text.secondary">
+                  (@{targetUsername})
+                </Typography>
+              </Box>
             </Box>
             <Paper
               variant="outlined"
