@@ -530,6 +530,7 @@ export default function CommunityProfile() {
                     <RecordPreviewGrid
                       records={highlights}
                       keyPrefix="highlight"
+                      fromTitle={`${targetDisplayName}'s Profile`}
                     />
                   )}
                 </SectionCard>
@@ -556,6 +557,7 @@ export default function CommunityProfile() {
                         records={recentRecords}
                         keyPrefix="recent"
                         showDateAdded
+                        fromTitle={`${targetDisplayName}'s Profile`}
                       />
                     )}
                     <Box>
@@ -587,6 +589,7 @@ export default function CommunityProfile() {
                       <RecordPreviewGrid
                         records={wishlistRecords}
                         keyPrefix="wishlist"
+                        fromTitle={`${targetDisplayName}'s Profile`}
                       />
                     )}
                     <Box>
