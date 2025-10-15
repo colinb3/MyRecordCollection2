@@ -1685,6 +1685,26 @@ app.post('/api/records/create', requireAuth, async (req, res) => {
     }
 
     if (hasMaster) {
+      const [existingRows] = await pool.execute(
+        `SELECT r.name AS record, t.name AS collectionName
+         FROM Record r
+         JOIN RecTable t ON r.tableId = t.id
+         WHERE r.userUuid = ? AND r.masterId = ?
+         LIMIT 1`,
+        [req.userUuid, masterId]
+      );
+      if (Array.isArray(existingRows) && existingRows.length > 0) {
+        const match = existingRows[0];
+        const conflictRecord = typeof match.record === 'string' ? match.record : 'that record';
+        const conflictCollection = typeof match.collectionName === 'string' && match.collectionName.trim()
+          ? match.collectionName.trim()
+          : 'one of your collections';
+        return res.status(409).json({
+          error: `You already have "${conflictRecord}" in ${conflictCollection}.`,
+          existingRecord: conflictRecord,
+          existingCollection: conflictCollection,
+        });
+      }
       const masterCoverValue = masterCover || cleanCover || null;
       await pool.execute(
         `INSERT INTO Master (id, artist, cover, name, release_year)

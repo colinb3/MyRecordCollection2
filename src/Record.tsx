@@ -16,6 +16,7 @@ import {
   Snackbar,
   Stack,
   CircularProgress,
+  Divider,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import apiUrl from "./api";
@@ -68,6 +69,14 @@ function RatingsHistogram({ counts }: { counts: number[] }) {
     return null;
   }
 
+  const [width, setWidth] = useState(window.innerWidth);
+
+  useEffect(() => {
+    const handleResize = () => setWidth(window.innerWidth);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   const maxValue = counts.reduce(
     (max, current) =>
       Number.isFinite(current) && current > max ? current : max,
@@ -98,7 +107,7 @@ function RatingsHistogram({ counts }: { counts: number[] }) {
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
-                width: 28,
+                width: { xs: (width - 130) / 10, md: 28 },
                 minWidth: 0,
               }}
             >
@@ -195,7 +204,6 @@ export default function Record() {
   const [rating, setRating] = useState(0);
   const [releaseYear, setReleaseYear] = useState(new Date().getFullYear());
   const [adding, setAdding] = useState(false);
-  const [addError, setAddError] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
@@ -299,7 +307,6 @@ export default function Record() {
     setSelectedTags([]);
     setRating(0);
     setReleaseYear(new Date().getFullYear());
-    setAddError(null);
     setWikiTags([]);
     setWikiLoading(true);
     setMasterError(null);
@@ -567,7 +574,6 @@ export default function Record() {
     async (tableName: string, successMessage: string) => {
       if (!album) return;
       setAdding(true);
-      setAddError(null);
       try {
         const normalizedCover =
           album.cover && album.cover.trim().length > 0 ? album.cover : null;
@@ -602,13 +608,11 @@ export default function Record() {
         } else {
           const problem = await res.json().catch(() => ({}));
           const msg = problem.error || `Failed to add record (${res.status})`;
-          setAddError(msg);
           setSnackbar({ open: true, message: msg, severity: "error" });
         }
       } catch (error) {
         console.error(error);
         const msg = "Network error adding record";
-        setAddError(msg);
         setSnackbar({ open: true, message: msg, severity: "error" });
       } finally {
         setAdding(false);
@@ -673,7 +677,14 @@ export default function Record() {
             Be the first to rate!
           </Typography>
         )}
-        {histogramCounts ? <RatingsHistogram counts={histogramCounts} /> : null}
+        {histogramCounts ? (
+          <Box display={"flex"} flexDirection={"column"} alignItems={"center"}>
+            <Box display={"inline-block"} mb={0.5}>
+              <RatingsHistogram counts={histogramCounts} />
+            </Box>
+            <Typography color="text.secondary">Ratings</Typography>
+          </Box>
+        ) : null}
       </Box>
     );
   } else if (masterInfo) {
@@ -730,18 +741,17 @@ export default function Record() {
                   p: { xs: 2, md: 3 },
                   display: "flex",
                   flexDirection: "column",
-                  gap: 1.25,
                 }}
               >
                 <Button
                   startIcon={<ArrowBackIcon />}
                   onClick={handleBack}
                   variant="text"
-                  sx={{ alignSelf: "flex-start" }}
+                  sx={{ alignSelf: "flex-start", mb: 1 }}
                 >
                   {backButtonLabel}
                 </Button>
-                <Stack direction={{ xs: "row", md: "column" }} spacing={2}>
+                <Stack direction={{ xs: "row", md: "column" }}>
                   <Box
                     component="img"
                     src={album.cover || placeholderCover}
@@ -752,10 +762,11 @@ export default function Record() {
                       objectFit: "cover",
                       borderRadius: 2,
                       bgcolor: "grey.900",
+                      mb: { xs: 0, md: 1.5 },
                     }}
                   />
-                  <Box sx={{}}>
-                    <Typography variant="h5" fontWeight={700} gutterBottom>
+                  <Box sx={{ ml: { xs: 2, md: 0 } }}>
+                    <Typography variant="h5" fontWeight={700}>
                       {album.record}
                     </Typography>
                     <Typography color="text.secondary" variant="h6">
@@ -763,10 +774,8 @@ export default function Record() {
                     </Typography>
                   </Box>
                 </Stack>
-                {masterRatingContent && (
-                  <Box sx={{ mt: 1 }}>{masterRatingContent}</Box>
-                )}
-                {addError && <Alert severity="error">{addError}</Alert>}
+                <Divider sx={{ my: 2 }} />
+                {masterRatingContent && <Box>{masterRatingContent}</Box>}
               </Box>
               <Box
                 sx={{

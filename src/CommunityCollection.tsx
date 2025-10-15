@@ -9,10 +9,18 @@ import {
   Drawer,
   IconButton,
   useMediaQuery,
+  Button,
+  Tooltip,
 } from "@mui/material";
 import Grid from "@mui/material/Grid";
 import FilterListAltIcon from "@mui/icons-material/FilterListAlt";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import LaunchIcon from "@mui/icons-material/Launch";
+import {
+  useNavigate,
+  useParams,
+  useSearchParams,
+  useLocation,
+} from "react-router-dom";
 import TopBar from "./components/TopBar";
 import { darkTheme } from "./theme";
 import {
@@ -45,6 +53,7 @@ const WISHLIST_COLLECTION_NAME = "Wishlist";
 
 export default function CommunityCollection() {
   const navigate = useNavigate();
+  const location = useLocation();
   const params = useParams<{ username: string }>();
   const [searchParams] = useSearchParams();
   const cachedUser = getCachedUserInfo();
@@ -80,6 +89,7 @@ export default function CommunityCollection() {
   const [filters, setFilters] = useState<Filters>(() => createInitialFilters());
   const [allTags, setAllTags] = useState<string[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [selectedRecord, setSelectedRecord] = useState<MrcRecord | null>(null);
   const isLargeScreen = useMediaQuery("(min-width:1200px)");
 
   useEffect(() => {
@@ -127,6 +137,7 @@ export default function CommunityCollection() {
     setSearchTerm("");
     setFilters(createInitialFilters());
     setAllTags([]);
+    setSelectedRecord(null);
 
     Promise.all([
       loadPublicUserProfile(targetUsername),
@@ -227,6 +238,15 @@ export default function CommunityCollection() {
     return next;
   }, [records, searchTerm, filters]);
 
+  useEffect(() => {
+    if (!selectedRecord) {
+      return;
+    }
+    if (!filteredRecords.some((record) => record.id === selectedRecord.id)) {
+      setSelectedRecord(null);
+    }
+  }, [filteredRecords, selectedRecord]);
+
   const targetDisplayName = profile?.displayName || targetUsername;
   const targetAvatarInitial = (profile?.displayName || targetUsername)
     .charAt(0)
@@ -241,6 +261,53 @@ export default function CommunityCollection() {
   const emptyCollectionMessage = isWishlistView
     ? "No wishlist records to display."
     : "No records to display.";
+  const viewMasterEnabled = Boolean(selectedRecord?.masterId);
+  const viewMasterTooltip = selectedRecord
+    ? "This record does not have an associated master"
+    : "Select a record to view its master";
+
+  const handleSelectRecord = useCallback((record: MrcRecord | null) => {
+    setSelectedRecord(record);
+  }, []);
+
+  const handleViewMaster = useCallback(() => {
+    if (!selectedRecord?.masterId) {
+      return;
+    }
+
+    const albumPayload = {
+      id: `community-${selectedRecord.id}`,
+      record: selectedRecord.record,
+      artist: selectedRecord.artist,
+      cover: selectedRecord.cover ?? "",
+    };
+
+    const originPath = `${location.pathname}${location.search}${location.hash}`;
+
+    navigate(`/record?q=${selectedRecord.masterId}`, {
+      state: {
+        album: albumPayload,
+        masterId: selectedRecord.masterId,
+        query: selectedRecord.record,
+        fromCollection: {
+          path: originPath,
+          title: isWishlistView
+            ? `${targetDisplayName}'s Wishlist`
+            : `${targetDisplayName}'s Collection`,
+          tableName: activeTableName,
+        },
+      },
+    });
+  }, [
+    navigate,
+    selectedRecord,
+    location.pathname,
+    location.search,
+    location.hash,
+    isWishlistView,
+    targetDisplayName,
+    activeTableName,
+  ]);
 
   return (
     <ThemeProvider theme={darkTheme}>
@@ -333,9 +400,11 @@ export default function CommunityCollection() {
               <Box
                 sx={{
                   display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
+                  alignItems: { xs: "stretch" },
+                  justifyContent: { xs: "flex-start" },
+                  gap: 1,
                   pt: 1.1,
+                  flexWrap: { xs: "nowrap", sm: "nowrap" },
                 }}
               >
                 <TextField
@@ -349,6 +418,38 @@ export default function CommunityCollection() {
                     width: { xs: "100%", sm: 320 },
                   }}
                 />
+                {viewMasterEnabled ? (
+                  <Button
+                    variant="outlined"
+                    color="primary"
+                    onClick={handleViewMaster}
+                    startIcon={<LaunchIcon />}
+                    sx={{
+                      height: 40,
+                      alignSelf: { xs: "stretch", sm: "center" },
+                    }}
+                  >
+                    View
+                  </Button>
+                ) : (
+                  <Tooltip title={viewMasterTooltip} placement="top">
+                    <span style={{ display: "inline-flex" }}>
+                      <Button
+                        variant="outlined"
+                        color="primary"
+                        onClick={handleViewMaster}
+                        disabled
+                        startIcon={<LaunchIcon />}
+                        sx={{
+                          height: 40,
+                          alignSelf: { xs: "stretch", sm: "center" },
+                        }}
+                      >
+                        View
+                      </Button>
+                    </span>
+                  </Tooltip>
+                )}
               </Box>
               <Box sx={{ flex: 1, minHeight: 0 }}>
                 {error ? (
@@ -382,7 +483,12 @@ export default function CommunityCollection() {
                     </Typography>
                   </Box>
                 ) : (
-                  <RecordTable records={filteredRecords} loading={loading} />
+                  <RecordTable
+                    records={filteredRecords}
+                    loading={loading}
+                    onSelect={handleSelectRecord}
+                    selectedId={selectedRecord?.id}
+                  />
                 )}
               </Box>
             </Grid>
