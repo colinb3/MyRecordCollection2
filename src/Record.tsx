@@ -650,7 +650,7 @@ export default function Record() {
     );
   } else if (masterError) {
     masterRatingContent = <Typography color="error">{masterError}</Typography>;
-  } else if (masterInfo) {
+  } else if (masterInfo?.masterId) {
     const histogramCounts =
       Array.isArray(masterInfo.ratingCounts) &&
       masterInfo.ratingCounts.length === 10

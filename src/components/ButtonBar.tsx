@@ -160,7 +160,13 @@ export default function ButtonBar({
             View
           </Button>
         ) : (
-          <Tooltip title="This record does not have an associated master">
+          <Tooltip
+            title={
+              editEnabled
+                ? "This record does not have an associated master"
+                : "Select a record to view its master"
+            }
+          >
             <span style={{ display: "inline-flex" }}>
               <Button
                 variant="outlined"
