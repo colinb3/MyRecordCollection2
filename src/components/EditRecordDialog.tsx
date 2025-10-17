@@ -384,7 +384,7 @@ export default function EditRecordDialog({
               )}
             />
 
-            <Box sx={{ mt: 2 }}>
+            <Box sx={{ mt: 1 }}>
               <Typography
                 variant="caption"
                 color="text.secondary"
@@ -401,7 +401,7 @@ export default function EditRecordDialog({
                 <Typography
                   variant="caption"
                   color="text.secondary"
-                  sx={{ display: "block", mt: 0.75 }}
+                  sx={{ display: "block", mt: 0.5 }}
                 >
                   Fetching suggestions...
                 </Typography>
@@ -410,7 +410,7 @@ export default function EditRecordDialog({
                 <Typography
                   variant="caption"
                   color="text.secondary"
-                  sx={{ display: "block", mt: 0.75 }}
+                  sx={{ display: "block", mt: 0.5 }}
                 >
                   We’ll suggest tags automatically once both title and artist
                   are filled.
@@ -422,7 +422,7 @@ export default function EditRecordDialog({
                   spacing={1}
                   useFlexGap
                   flexWrap="wrap"
-                  sx={{ mt: 1 }}
+                  sx={{ mt: 0.5 }}
                 >
                   {recommendedTags.map((tag) => {
                     const normalizedTag = tag.trim();
@@ -465,7 +465,7 @@ export default function EditRecordDialog({
               inputProps={{ maxLength: 4000 }}
               onChange={handleChange}
               sx={{
-                mt: 3,
+                mt: 2,
                 "& .MuiOutlinedInput-root": {
                   backgroundColor: "background.paper",
                 },
