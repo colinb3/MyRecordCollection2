@@ -67,6 +67,7 @@ import {
 
 const DEFAULT_COLLECTION = "My Collection";
 const WISHLIST_COLLECTION = "Wishlist";
+const LISTENED_COLLECTION = "Listened";
 const MIN_RELEASE_YEAR = 1877;
 const MAX_RELEASE_YEAR = 2100;
 
@@ -190,6 +191,7 @@ export default function CollectionSettings() {
   const [isCollectionPrivate, setIsCollectionPrivate] =
     useState<boolean>(false);
   const [isWishlistPrivate, setIsWishlistPrivate] = useState<boolean>(true);
+  const [isListenedPrivate, setIsListenedPrivate] = useState<boolean>(false);
   const [collectionPrivacyLoading, setCollectionPrivacyLoading] =
     useState<boolean>(true);
   const [collectionPrivacySaving, setCollectionPrivacySaving] =
@@ -197,6 +199,10 @@ export default function CollectionSettings() {
   const [wishlistPrivacyLoading, setWishlistPrivacyLoading] =
     useState<boolean>(true);
   const [wishlistPrivacySaving, setWishlistPrivacySaving] =
+    useState<boolean>(false);
+  const [listenedPrivacyLoading, setListenedPrivacyLoading] =
+    useState<boolean>(true);
+  const [listenedPrivacySaving, setListenedPrivacySaving] =
     useState<boolean>(false);
   const [clearingCollection, setClearingCollection] = useState(false);
   const [clearingTags, setClearingTags] = useState(false);
@@ -260,12 +266,14 @@ export default function CollectionSettings() {
 
     setCollectionPrivacyLoading(true);
     setWishlistPrivacyLoading(true);
+    setListenedPrivacyLoading(true);
 
     loadCollectionPrivacy()
       .then((privacy: CollectionPrivacyState) => {
         if (!active) return;
         setIsCollectionPrivate(Boolean(privacy.collection.isPrivate));
         setIsWishlistPrivate(Boolean(privacy.wishlist.isPrivate));
+        setIsListenedPrivate(Boolean(privacy.listened.isPrivate));
       })
       .catch((err: unknown) => {
         if (!active) return;
@@ -275,6 +283,7 @@ export default function CollectionSettings() {
             : "Failed to load collection privacy";
         setIsCollectionPrivate(false);
         setIsWishlistPrivate(true);
+        setIsListenedPrivate(false);
         setSnackbar({
           open: true,
           message,
@@ -287,6 +296,7 @@ export default function CollectionSettings() {
         }
         setCollectionPrivacyLoading(false);
         setWishlistPrivacyLoading(false);
+        setListenedPrivacyLoading(false);
       });
 
     return () => {
@@ -391,6 +401,25 @@ export default function CollectionSettings() {
       );
     },
     [isWishlistPrivate, updatePrivacy, wishlistPrivacySaving]
+  );
+
+  const handleToggleListenedPrivacy = useCallback(
+    async (_event: ChangeEvent<HTMLInputElement>, checked: boolean) => {
+      const previous = isListenedPrivate;
+      await updatePrivacy(
+        LISTENED_COLLECTION,
+        checked,
+        previous,
+        setIsListenedPrivate,
+        setListenedPrivacySaving,
+        listenedPrivacySaving,
+        {
+          private: "Your listened collection is now private.",
+          public: "Your listened collection is now public.",
+        }
+      );
+    },
+    [isListenedPrivate, listenedPrivacySaving, updatePrivacy]
   );
 
   const handleToggleColumn =
@@ -680,9 +709,10 @@ export default function CollectionSettings() {
           highlights remain visible even when these collections are private.
         </Typography>
         <Stack
-          direction={{ xs: "column", sm: "row" }}
-          spacing={1.5}
-          alignItems={{ xs: "flex-start", sm: "center" }}
+          direction={"row"}
+          spacing={0}
+          alignItems={"center"}
+          sx={{ flexWrap: "wrap" }}
         >
           <Box
             sx={{
@@ -702,7 +732,27 @@ export default function CollectionSettings() {
                 />
               }
               label="Private Collection"
-              sx={{ m: 0 }}
+              sx={{ pr: 1 }}
+            />
+          </Box>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+              flexWrap: "wrap",
+            }}
+          >
+            <FormControlLabel
+              control={
+                <Switch
+                  color="primary"
+                  checked={isListenedPrivate}
+                  onChange={handleToggleListenedPrivacy}
+                  disabled={listenedPrivacyLoading || listenedPrivacySaving}
+                />
+              }
+              label="Private Listened"
             />
           </Box>
           <Box
@@ -723,15 +773,17 @@ export default function CollectionSettings() {
                 />
               }
               label="Private Wishlist"
-              sx={{ m: 0 }}
+              sx={{ pr: 1 }}
             />
-            {(collectionPrivacyLoading ||
-              collectionPrivacySaving ||
-              wishlistPrivacyLoading ||
-              wishlistPrivacySaving) && (
-              <CircularProgress size={22} sx={{ ml: { sm: 1 } }} />
-            )}
           </Box>
+          {(collectionPrivacyLoading ||
+            collectionPrivacySaving ||
+            wishlistPrivacyLoading ||
+            wishlistPrivacySaving ||
+            listenedPrivacyLoading ||
+            listenedPrivacySaving) && (
+            <CircularProgress size={22} sx={{ ml: { sm: 1 } }} />
+          )}
         </Stack>
       </Stack>
 

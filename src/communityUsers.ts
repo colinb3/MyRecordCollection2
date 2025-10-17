@@ -308,6 +308,7 @@ export async function loadPublicUserProfile(
         highlights: normalizeRecords(data.highlights),
         recentRecords: normalizeRecords(data.recentRecords),
         wishlistRecords: normalizeRecords(data.wishlistRecords),
+        listenedRecords: normalizeRecords(data.listenedRecords),
         followersCount: normalizeCount(data.followersCount),
         followingCount: normalizeCount(data.followingCount),
         isFollowing:
@@ -317,12 +318,14 @@ export async function loadPublicUserProfile(
         joinedDate: normalizeDateString(data.joinedDate),
         collectionPrivate: Boolean(data.collectionPrivate),
         wishlistPrivate: Boolean(data.wishlistPrivate ?? true),
+        listenedPrivate: Boolean(data.listenedPrivate ?? false),
       };
       profileCache.set(key, {
         ...normalizedProfile,
         highlights: cloneRecords(normalizedProfile.highlights),
         recentRecords: cloneRecords(normalizedProfile.recentRecords),
         wishlistRecords: cloneRecords(normalizedProfile.wishlistRecords),
+        listenedRecords: cloneRecords(normalizedProfile.listenedRecords),
       });
       return normalizedProfile;
     } finally {

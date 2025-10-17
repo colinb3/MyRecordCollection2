@@ -41,10 +41,12 @@ const HOST = process.env.HOST || '0.0.0.0';
 const JWT_SECRET = process.env.JWT_SECRET;
 const DEFAULT_COLLECTION_NAME = "My Collection";
 const WISHLIST_COLLECTION_NAME = "Wishlist";
+const LISTENED_COLLECTION_NAME = "Listened";
 const MAX_PROFILE_HIGHLIGHTS = 3;
 const PROFILE_RECENT_DEFAULT_LIMIT = 3;
 const PROFILE_RECENT_MAX_LIMIT = 20;
 const PROFILE_WISHLIST_PREVIEW_LIMIT = 3;
+const PROFILE_LISTENED_PREVIEW_LIMIT = 6;
 const DISCOGS_API_URL = "https://api.discogs.com/database/search";
 const DISCOGS_USER_AGENT = process.env.DISCOGS_USER_AGENT || "MyRecordCollection/1.0 (+https://myrecordcollection.app)";
 const DISCOGS_API_KEY = process.env.DISCOGS_API_KEY || "";
@@ -247,7 +249,7 @@ async function fetchRecordsWithTagsByIds(pool, userUuid, recordIds) {
   const placeholders = recordIds.map(() => "?").join(", ");
   const params = [userUuid, ...recordIds];
     const [rows] = await pool.query(
-  `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId, r.isCustom as isCustom, r.masterId as masterId, t.name as collectionName
+    `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId, r.isCustom as isCustom, r.masterId as masterId, r.review as review, t.name as collectionName
        FROM Record r
        LEFT JOIN RecTable t ON r.tableId = t.id
        WHERE r.userUuid = ? AND r.id IN (${placeholders})`,
@@ -615,7 +617,7 @@ app.get("/api/records", requireAuth, async (req, res) => {
     }
 
    const [rows] = await pool.query(
-   `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId, r.isCustom as isCustom, r.masterId as masterId
+   `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId, r.isCustom as isCustom, r.masterId as masterId, r.review as review
      FROM Record r WHERE r.userUuid = ? AND r.tableId = ?`,
       [req.userUuid, tableId]
     );
@@ -773,7 +775,7 @@ app.get("/api/profile/recent", requireAuth, async (req, res) => {
     const pool = await getPool();
     // Only include records that are in the user's default collection (RecTable.name = DEFAULT_COLLECTION_NAME)
     const [rows] = await pool.query(
-  `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId, r.isCustom as isCustom, r.masterId as masterId
+  `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId, r.isCustom as isCustom, r.masterId as masterId, r.review as review
        FROM Record r
        JOIN RecTable t ON r.tableId = t.id
        WHERE r.userUuid = ? AND t.name = ?
@@ -877,6 +879,11 @@ app.get("/api/community/users/:username", requireAuth, async (req, res) => {
       userRow.uuid,
       WISHLIST_COLLECTION_NAME
     );
+    const listenedRow = await getUserTableRow(
+      pool,
+      userRow.uuid,
+      LISTENED_COLLECTION_NAME
+    );
     const isOwner = userRow.uuid === req.userUuid;
     const collectionPrivate = defaultCollectionRow
       ? Number(defaultCollectionRow.isPrivate) === 1
@@ -884,6 +891,9 @@ app.get("/api/community/users/:username", requireAuth, async (req, res) => {
     const wishlistPrivate = wishlistRow
       ? Number(wishlistRow.isPrivate) === 1
       : true;
+    const listenedPrivate = listenedRow
+      ? Number(listenedRow.isPrivate) === 1
+      : false;
 
     let highlights = [];
     if (highlightIds.length > 0) {
@@ -898,7 +908,7 @@ app.get("/api/community/users/:username", requireAuth, async (req, res) => {
     let recentRecords = [];
     if (!collectionPrivate || isOwner) {
     const [recentRows] = await pool.query(
-  `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId, r.isCustom as isCustom, r.masterId as masterId
+  `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId, r.isCustom as isCustom, r.masterId as masterId, r.review as review
        FROM Record r
        JOIN RecTable t ON r.tableId = t.id
        WHERE r.userUuid = ? AND t.name = ?
@@ -918,7 +928,7 @@ app.get("/api/community/users/:username", requireAuth, async (req, res) => {
     let wishlistRecords = [];
     if (wishlistRow && (!wishlistPrivate || isOwner)) {
       const [wishlistRows] = await pool.query(
-  `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId, r.isCustom as isCustom, r.masterId as masterId
+  `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId, r.isCustom as isCustom, r.masterId as masterId, r.review as review
        FROM Record r
        JOIN RecTable t ON r.tableId = t.id
        WHERE r.userUuid = ? AND t.name = ?
@@ -935,6 +945,26 @@ app.get("/api/community/users/:username", requireAuth, async (req, res) => {
       }));
     }
 
+    let listenedRecords = [];
+    if (listenedRow && (!listenedPrivate || isOwner)) {
+      const [listenedRows] = await pool.query(
+        `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId, r.isCustom as isCustom, r.masterId as masterId, r.review as review
+         FROM Record r
+         JOIN RecTable t ON r.tableId = t.id
+         WHERE r.userUuid = ? AND t.name = ?
+         ORDER BY r.added DESC
+         LIMIT ?`,
+        [userRow.uuid, LISTENED_COLLECTION_NAME, PROFILE_LISTENED_PREVIEW_LIMIT]
+      );
+
+      const listenedIds = listenedRows.map((row) => row.id);
+      const listenedTags = await fetchTagsByRecordIds(pool, listenedIds);
+      listenedRecords = listenedRows.map((row) => ({
+        ...row,
+        tags: listenedTags[row.id] || [],
+      }));
+    }
+
     res.json({
       ...publicUser,
       highlights,
@@ -943,6 +973,8 @@ app.get("/api/community/users/:username", requireAuth, async (req, res) => {
       collectionPrivate,
       wishlistRecords,
       wishlistPrivate,
+      listenedRecords,
+      listenedPrivate,
     });
   } catch (error) {
     console.error("Failed to load public profile", error);
@@ -980,7 +1012,7 @@ app.get(
       }
 
       const [rows] = await pool.query(
-        `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId, r.isCustom as isCustom, r.masterId as masterId
+        `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId, r.isCustom as isCustom, r.masterId as masterId, r.review as review
          FROM Record r WHERE r.userUuid = ? AND r.tableId = ?`,
         [userRow.uuid, tableRow.id]
       );
@@ -1035,13 +1067,13 @@ app.get("/api/community/feed", requireAuth, async (req, res) => {
     const pool = await getPool();
       const [rows] = await pool.query(
     `SELECT r.id, r.name as record, r.artist, r.cover, r.rating,
-      r.release_year as 'release', r.added as added, r.tableId, r.isCustom as isCustom, r.masterId as masterId,
+      r.release_year as 'release', r.added as added, r.tableId, r.isCustom as isCustom, r.masterId as masterId, r.review as review,
               u.username, u.displayName, u.profilePic
        FROM Record r
        JOIN Follows f ON f.followsUuid = r.userUuid
        JOIN User u ON u.uuid = r.userUuid
   JOIN RecTable t ON r.tableId = t.id
-  WHERE f.userUuid = ? AND t.name = ? AND t.isPrivate = 0
+  WHERE f.userUuid = ? AND t.name = ? AND t.isPrivate = 0 
        ORDER BY r.added DESC, r.id DESC
        LIMIT 20`,
       [req.userUuid, DEFAULT_COLLECTION_NAME]
@@ -1072,17 +1104,22 @@ app.get("/api/community/feed", requireAuth, async (req, res) => {
       const cover =
         typeof row.cover === "string" && row.cover ? row.cover : undefined;
       const tags = tagsByRecord[row.id] || [];
+      const review =
+        typeof row.review === "string" && row.review.trim()
+          ? row.review.trim()
+          : null;
 
       const record = {
-  id: row.id,
-  record: row.record,
-  artist: row.artist,
-  rating,
-  isCustom: Boolean(row.isCustom),
-  release,
-  added,
-  tags,
-  tableId: row.tableId,
+        id: row.id,
+        record: row.record,
+        artist: row.artist,
+        review,
+        rating,
+        isCustom: Boolean(row.isCustom),
+        release,
+        added,
+        tags,
+        tableId: row.tableId,
       };
 
       if (cover) {
@@ -1244,8 +1281,18 @@ app.post('/api/register', async (req, res) => {
       [userUuid, username.toLowerCase(), displayName, hashedPassword, null, null]
     );
     await pool.execute(
-      `INSERT INTO RecTable (name, userUuid, isPrivate) VALUES (?, ?, ?), (?, ?, ?)`,
-      ["My Collection", userUuid, false, "Wishlist", userUuid, true]
+      `INSERT INTO RecTable (name, userUuid, isPrivate) VALUES (?, ?, ?), (?, ?, ?), (?, ?, ?)`,
+      [
+        DEFAULT_COLLECTION_NAME,
+        userUuid,
+        false,
+        WISHLIST_COLLECTION_NAME,
+        userUuid,
+        false,
+        LISTENED_COLLECTION_NAME,
+        userUuid,
+        false,
+      ]
     );
     const token = issueToken(userUuid);
   res.cookie('token', token, { httpOnly: true, sameSite: process.env.CROSS_SITE_COOKIES === 'true' ? 'none' : 'lax', secure: process.env.NODE_ENV === 'production', maxAge: 7*24*60*60*1000 });
@@ -1564,6 +1611,11 @@ if (process.env.NODE_ENV === 'production') {
 app.post('/api/records/update', requireAuth, async (req, res) => {
   console.log("Updating record...");
   const { id, record, artist, cover, rating, tags, release } = req.body;
+  const hasReviewField = Object.prototype.hasOwnProperty.call(
+    req.body ?? {},
+    "review"
+  );
+  const rawReview = req.body?.review;
   if (!id || !record) return res.status(400).json({ error: 'Missing id or record name' });
 
   const releaseNum = Number(release);
@@ -1579,7 +1631,7 @@ app.post('/api/records/update', requireAuth, async (req, res) => {
   try {
     const pool = await getPool();
     const [existingRows] = await pool.execute(
-      `SELECT name, artist, isCustom FROM Record WHERE id = ? AND userUuid = ? LIMIT 1`,
+      `SELECT name, artist, isCustom, review FROM Record WHERE id = ? AND userUuid = ? LIMIT 1`,
       [id, req.userUuid]
     );
 
@@ -1600,10 +1652,19 @@ app.post('/api/records/update', requireAuth, async (req, res) => {
 
     const nextName = isCustom ? record : existing.name;
     const nextArtist = isCustom ? artist : existing.artist;
+    let normalizedReview = existing.review ?? null;
+    if (hasReviewField) {
+      if (typeof rawReview === "string") {
+        const trimmed = rawReview.trim();
+        normalizedReview = trimmed.length > 0 ? trimmed.slice(0, 4000) : null;
+      } else if (rawReview === null) {
+        normalizedReview = null;
+      }
+    }
 
     const [updateResult] = await pool.execute(
-      `UPDATE Record SET name = ?, artist = ?, cover = ?, rating = ?, release_year = ? WHERE id = ? AND userUuid = ?`,
-      [nextName, nextArtist, cover, ratingNum, releaseNum, id, req.userUuid]
+      `UPDATE Record SET name = ?, artist = ?, cover = ?, rating = ?, release_year = ?, review = ? WHERE id = ? AND userUuid = ?`,
+      [nextName, nextArtist, cover, ratingNum, releaseNum, normalizedReview, id, req.userUuid]
     );
 
     if (!updateResult || updateResult.affectedRows === 0) {
@@ -1625,11 +1686,12 @@ app.post('/api/records/update', requireAuth, async (req, res) => {
     }
 
     const [rows] = await pool.execute(
-      `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId, r.isCustom as isCustom, r.masterId as masterId FROM Record r WHERE r.id = ? AND r.userUuid = ?`,
+      `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId, r.isCustom as isCustom, r.masterId as masterId, r.review as review FROM Record r WHERE r.id = ? AND r.userUuid = ?`,
       [id, req.userUuid]
     );
 
     const updated = rows[0];
+    updated.review = normalizedReview;
 
     const [tagRows] = await pool.execute(
       `SELECT t.name FROM Tag t JOIN Tagged tg ON t.id = tg.tagId WHERE tg.recordId = ?`,
@@ -1660,6 +1722,14 @@ app.post('/api/records/create', requireAuth, async (req, res) => {
   const ratingNum = Number(rating);
   if (!Number.isInteger(ratingNum) || ratingNum < 0 || ratingNum > 10) {
     return res.status(400).json({ error: 'invalid rating' });
+  }
+
+  let reviewText = null;
+  if (typeof req.body?.review === "string") {
+    const trimmed = req.body.review.trim();
+    reviewText = trimmed.length > 0 ? trimmed.slice(0, 4000) : null;
+  } else if (req.body?.review === null) {
+    reviewText = null;
   }
 
   const rawIsCustom = req.body ? req.body.isCustom : undefined;
@@ -1724,9 +1794,20 @@ app.post('/api/records/create', requireAuth, async (req, res) => {
     }
 
     const [result] = await pool.execute(
-      `INSERT INTO Record (name, artist, cover, rating, release_year, tableId, userUuid, added, isCustom, masterId)
-       VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?)`,
-      [recordName, artistName, cleanCover, ratingNum, releaseNum, tableId, req.userUuid, isCustom, hasMaster ? masterId : null]
+      `INSERT INTO Record (name, artist, cover, rating, release_year, tableId, userUuid, added, isCustom, masterId, review)
+       VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?)`,
+      [
+        recordName,
+        artistName,
+        cleanCover,
+        ratingNum,
+        releaseNum,
+        tableId,
+        req.userUuid,
+        isCustom,
+        hasMaster ? masterId : null,
+        reviewText,
+      ]
     );
     const newId = result.insertId;
     // Add tags (create if missing)
@@ -1743,10 +1824,11 @@ app.post('/api/records/create', requireAuth, async (req, res) => {
     }
     // Return new record
     const [rows] = await pool.execute(
-      `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId, r.isCustom as isCustom, r.masterId as masterId FROM Record r WHERE r.id = ? AND r.userUuid = ?`,
+      `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId, r.isCustom as isCustom, r.masterId as masterId, r.review as review FROM Record r WHERE r.id = ? AND r.userUuid = ?`,
       [newId, req.userUuid]
     );
     const created = rows[0];
+    created.review = reviewText;
     // Get tags
     const [tagRows] = await pool.execute(
       `SELECT t.name FROM Tag t JOIN Tagged tg ON t.id = tg.tagId WHERE tg.recordId = ?`,
@@ -2158,9 +2240,10 @@ app.get('/api/collections/privacy', requireAuth, async (req, res) => {
   console.log('Fetching collection privacy state...');
   try {
     const pool = await getPool();
-    const [collectionRow, wishlistRow] = await Promise.all([
+    const [collectionRow, wishlistRow, listenedRow] = await Promise.all([
       getUserTableRow(pool, req.userUuid, DEFAULT_COLLECTION_NAME),
       getUserTableRow(pool, req.userUuid, WISHLIST_COLLECTION_NAME),
+      getUserTableRow(pool, req.userUuid, LISTENED_COLLECTION_NAME),
     ]);
 
     if (!collectionRow) {
@@ -2182,9 +2265,20 @@ app.get('/api/collections/privacy', requireAuth, async (req, res) => {
           isPrivate: true,
         };
 
+    const listenedPrivacy = listenedRow
+      ? {
+          tableName: listenedRow.name,
+          isPrivate: Number(listenedRow.isPrivate) === 1,
+        }
+      : {
+          tableName: LISTENED_COLLECTION_NAME,
+          isPrivate: false,
+        };
+
     res.json({
       collection: collectionPrivacy,
       wishlist: wishlistPrivacy,
+      listened: listenedPrivacy,
     });
   } catch (err) {
     console.error('Failed to fetch collection privacy state', err);

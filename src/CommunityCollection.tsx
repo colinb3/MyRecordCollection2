@@ -50,6 +50,7 @@ const createInitialFilters = (): Filters => ({
 
 const DEFAULT_COLLECTION_NAME = "My Collection";
 const WISHLIST_COLLECTION_NAME = "Wishlist";
+const LISTENED_COLLECTION_NAME = "Listened";
 
 export default function CommunityCollection() {
   const navigate = useNavigate();
@@ -77,6 +78,9 @@ export default function CommunityCollection() {
     }
     if (normalized === WISHLIST_COLLECTION_NAME.toLowerCase()) {
       return WISHLIST_COLLECTION_NAME;
+    }
+    if (normalized === LISTENED_COLLECTION_NAME.toLowerCase()) {
+      return LISTENED_COLLECTION_NAME;
     }
     return rawTableParam;
   }, [rawTableParam]);
@@ -252,14 +256,21 @@ export default function CommunityCollection() {
     .charAt(0)
     .toUpperCase();
   const isWishlistView = activeTableName === WISHLIST_COLLECTION_NAME;
+  const isListenedView = activeTableName === LISTENED_COLLECTION_NAME;
   const searchPlaceholder = isWishlistView
     ? "Search Wishlist"
+    : isListenedView
+    ? "Search Listened"
     : "Search Collection";
   const noMatchMessage = isWishlistView
     ? "No wishlist records match these filters."
+    : isListenedView
+    ? "No listened records match these filters."
     : "No records match these filters.";
   const emptyCollectionMessage = isWishlistView
     ? "No wishlist records to display."
+    : isListenedView
+    ? "No listened records to display."
     : "No records to display.";
   const viewMasterEnabled = Boolean(selectedRecord?.masterId);
   const viewMasterTooltip = selectedRecord
@@ -293,6 +304,8 @@ export default function CommunityCollection() {
           path: originPath,
           title: isWishlistView
             ? `${targetDisplayName}'s Wishlist`
+            : isListenedView
+            ? `${targetDisplayName}'s Listened`
             : `${targetDisplayName}'s Collection`,
           tableName: activeTableName,
         },
@@ -305,6 +318,7 @@ export default function CommunityCollection() {
     location.search,
     location.hash,
     isWishlistView,
+    isListenedView,
     targetDisplayName,
     activeTableName,
   ]);
@@ -371,6 +385,8 @@ export default function CommunityCollection() {
                   <Typography variant="h5" sx={{ lineHeight: 1.2 }}>
                     {isWishlistView
                       ? `${targetDisplayName}'s Wishlist`
+                      : isListenedView
+                      ? `${targetDisplayName}'s Listened`
                       : `${targetDisplayName}'s Collection`}
                   </Typography>
                   <Typography variant="subtitle2" color="text.secondary">

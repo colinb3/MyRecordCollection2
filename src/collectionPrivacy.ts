@@ -2,6 +2,7 @@ import apiUrl from "./api";
 
 const DEFAULT_COLLECTION_NAME = "My Collection";
 const WISHLIST_COLLECTION_NAME = "Wishlist";
+const LISTENED_COLLECTION_NAME = "Listened";
 
 export interface CollectionPrivacyEntry {
   tableName: string;
@@ -11,6 +12,7 @@ export interface CollectionPrivacyEntry {
 export interface CollectionPrivacyState {
   collection: CollectionPrivacyEntry;
   wishlist: CollectionPrivacyEntry;
+  listened: CollectionPrivacyEntry;
 }
 
 const DEFAULT_PRIVACY_STATE: CollectionPrivacyState = {
@@ -21,6 +23,10 @@ const DEFAULT_PRIVACY_STATE: CollectionPrivacyState = {
   wishlist: {
     tableName: WISHLIST_COLLECTION_NAME,
     isPrivate: true,
+  },
+  listened: {
+    tableName: LISTENED_COLLECTION_NAME,
+    isPrivate: false,
   },
 };
 
@@ -64,6 +70,7 @@ function normalizePrivacy(raw: unknown): CollectionPrivacyState {
     return {
       collection: { ...DEFAULT_PRIVACY_STATE.collection },
       wishlist: { ...DEFAULT_PRIVACY_STATE.wishlist },
+      listened: { ...DEFAULT_PRIVACY_STATE.listened },
     };
   }
 
@@ -73,9 +80,11 @@ function normalizePrivacy(raw: unknown): CollectionPrivacyState {
   if (typeof obj.tableName === "string" && "isPrivate" in obj) {
     const entry = normalizeEntry(obj, DEFAULT_PRIVACY_STATE.collection);
     const wishlistEntry = { ...DEFAULT_PRIVACY_STATE.wishlist };
+    const listenedEntry = { ...DEFAULT_PRIVACY_STATE.listened };
     return {
       collection: entry,
       wishlist: wishlistEntry,
+      listened: listenedEntry,
     };
   }
 
@@ -87,10 +96,15 @@ function normalizePrivacy(raw: unknown): CollectionPrivacyState {
     obj.wishlist,
     DEFAULT_PRIVACY_STATE.wishlist
   );
+  const listenedEntry = normalizeEntry(
+    obj.listened,
+    DEFAULT_PRIVACY_STATE.listened
+  );
 
   return {
     collection: collectionEntry,
     wishlist: wishlistEntry,
+    listened: listenedEntry,
   };
 }
 
@@ -98,6 +112,7 @@ function clonePrivacy(state: CollectionPrivacyState): CollectionPrivacyState {
   return {
     collection: { ...state.collection },
     wishlist: { ...state.wishlist },
+    listened: { ...state.listened },
   };
 }
 
@@ -139,6 +154,7 @@ export async function loadCollectionPrivacy(
         error?: unknown;
         collection?: unknown;
         wishlist?: unknown;
+        listened?: unknown;
         tableName?: unknown;
         isPrivate?: unknown;
       };
@@ -178,6 +194,10 @@ export function updateCollectionPrivacyCache(
     base.collection.isPrivate = isPrivate;
   } else if (base.wishlist.tableName.trim().toLowerCase() === normalizedName) {
     base.wishlist.isPrivate = isPrivate;
+  } else if (
+    base.listened.tableName.trim().toLowerCase() === normalizedName
+  ) {
+    base.listened.isPrivate = isPrivate;
   }
 
   cachedPrivacy = normalizePrivacy(base);

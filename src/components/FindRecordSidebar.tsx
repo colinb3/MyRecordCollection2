@@ -13,9 +13,11 @@ import {
   Button,
   Slider,
   CircularProgress,
+  Stack,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import FavoriteIcon from "@mui/icons-material/Favorite";
+import HeadphonesIcon from "@mui/icons-material/Headphones";
 
 export interface AlbumListItem {
   id: string;
@@ -37,9 +39,12 @@ interface FindRecordSidebarProps {
   onRatingChange: (value: number) => void;
   releaseYear: number;
   onReleaseYearChange: (value: number) => void;
+  review: string;
+  onReviewChange: (value: string) => void;
   canAdd: boolean;
   onAddRecord: () => void;
   onWishlistRecord: () => void;
+  onListenedRecord: () => void;
 }
 
 export default function FindRecordSidebar({
@@ -53,9 +58,12 @@ export default function FindRecordSidebar({
   onRatingChange,
   releaseYear,
   onReleaseYearChange,
+  review,
+  onReviewChange,
   canAdd,
   onAddRecord,
   onWishlistRecord,
+  onListenedRecord,
 }: FindRecordSidebarProps) {
   const handleSlider = (_: Event, val: number | number[]) => {
     onRatingChange(val as number);
@@ -236,18 +244,41 @@ export default function FindRecordSidebar({
           sx={{ mb: 1, width: "50%" }}
           slotProps={{ input: { inputProps: { min: 1877, max: 2100 } } }}
         />
+        <Typography variant="subtitle1">Review (optional)</Typography>
+        <TextField
+          placeholder="Write a brief review..."
+          fullWidth
+          multiline
+          maxRows={1}
+          value={review}
+          onChange={(event) => onReviewChange(event.target.value)}
+          inputProps={{ maxLength: 4000 }}
+          sx={{
+            mb: 0,
+          }}
+        />
       </Box>
       <Box sx={{ mx: { xs: 1.3, sm: 1.5, md: 2 }, mb: 1 }}>
-        <Button
-          disabled={!canAdd}
-          variant="outlined"
-          fullWidth
-          onClick={onWishlistRecord}
-          sx={{ fontWeight: 700 }}
-          endIcon={<FavoriteIcon />}
-        >
-          Add to Wishlist
-        </Button>
+        <Stack direction={"row"} spacing={1}>
+          <Button
+            disabled={!canAdd}
+            variant="outlined"
+            onClick={onWishlistRecord}
+            sx={{ fontWeight: 700, flex: 1 }}
+            endIcon={<FavoriteIcon />}
+          >
+            Wishlist
+          </Button>
+          <Button
+            disabled={!canAdd}
+            variant="outlined"
+            onClick={onListenedRecord}
+            sx={{ fontWeight: 700, flex: 1 }}
+            endIcon={<HeadphonesIcon />}
+          >
+            Listened
+          </Button>
+        </Stack>
       </Box>
       <Box sx={{ mx: { xs: 1.3, sm: 1.5, md: 2 }, mb: 2 }}>
         <Button

@@ -411,8 +411,8 @@ export default function Community() {
                                 src={coverSrc}
                                 alt={`${entry.record.record} cover`}
                                 sx={{
-                                  maxWidth: { xs: 125, sm: 160, md: 200 },
-                                  maxHeight: { xs: 125, sm: 160, md: 200 },
+                                  maxWidth: { xs: 100, sm: 150, md: 200 },
+                                  maxHeight: { xs: 100, sm: 150, md: 200 },
                                   objectFit: "cover",
                                   borderRadius: 1,
                                   flexShrink: 0,
@@ -425,7 +425,7 @@ export default function Community() {
                                   flex: 1,
                                   display: "flex",
                                   flexDirection: "column",
-                                  gap: 1,
+                                  gap: 0.6,
                                   minWidth: 0,
                                 }}
                               >
@@ -467,7 +467,14 @@ export default function Community() {
                                     Tags: {tagsLabel}
                                   </Typography>
                                 )}
-                                {/*review text*/}
+                                {entry.record.review && (
+                                  <>
+                                    <Divider sx={{ my: 0.5 }} />
+                                    <Typography variant="body1">
+                                      {entry.record.review}
+                                    </Typography>
+                                  </>
+                                )}
                               </Box>
                             </Grid>
                           </ListItemButton>

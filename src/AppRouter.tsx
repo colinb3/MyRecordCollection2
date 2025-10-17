@@ -66,6 +66,14 @@ export default function AppRouter() {
           }
         />
         <Route
+          path="/listened"
+          element={
+            <RequireAuth>
+              <Collection tableName="Listened" title="Listened" />
+            </RequireAuth>
+          }
+        />
+        <Route
           path="/search"
           element={
             <RequireAuth>

@@ -6,6 +6,7 @@ import Typography from "@mui/material/Typography";
 import placeholderCover from "../assets/missingImg.jpg";
 import type { Record } from "../types";
 import { useNavigate, useLocation } from "react-router-dom";
+import { Divider } from "@mui/material";
 
 interface RecordPreviewGridProps {
   records: Record[];
@@ -68,6 +69,12 @@ export default function RecordPreviewGrid({
           showDateAdded && record.added
             ? dateFormatter.format(new Date(record.added))
             : null;
+        const hasReview =
+          typeof record.review === "string" && record.review.trim();
+        const reviewSnippet = hasReview
+          ? record.review!.trim().replace(/\s+/g, " ")
+          : null;
+        const hasRating = record.rating > 0;
         const isClickable = Boolean(record.masterId);
         return (
           <Grid size={4} key={key}>
@@ -114,18 +121,44 @@ export default function RecordPreviewGrid({
                 <Typography variant="subtitle1" noWrap>
                   {record.record}
                 </Typography>
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  noWrap
-                  pb={1}
-                >
+                <Typography variant="body2" color="text.secondary" noWrap>
                   {record.artist}
                 </Typography>
+                {hasRating && (
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    noWrap
+                    pt={0.5}
+                  >
+                    {record.rating}/10
+                  </Typography>
+                )}
                 {addedDateText && (
-                  <Typography variant="body2" color="text.secondary" noWrap>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    noWrap
+                    pt={0.5}
+                  >
                     {addedDateText}
                   </Typography>
+                )}
+                {reviewSnippet && (
+                  <>
+                    <Divider sx={{ my: 1 }} />
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        display: "-webkit-box",
+                        WebkitLineClamp: 3,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden",
+                      }}
+                    >
+                      “{reviewSnippet}”
+                    </Typography>
+                  </>
                 )}
               </Box>
             </Paper>

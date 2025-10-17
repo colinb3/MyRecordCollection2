@@ -63,6 +63,7 @@ interface MasterInfo {
 
 const DEFAULT_COLLECTION_NAME = "My Collection";
 const WISHLIST_COLLECTION_NAME = "Wishlist";
+const LISTENED_COLLECTION_NAME = "Listened";
 
 function RatingsHistogram({ counts }: { counts: number[] }) {
   if (!Array.isArray(counts) || counts.length === 0) {
@@ -203,6 +204,7 @@ export default function Record() {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [rating, setRating] = useState(0);
   const [releaseYear, setReleaseYear] = useState(new Date().getFullYear());
+  const [reviewText, setReviewText] = useState("");
   const [adding, setAdding] = useState(false);
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
@@ -227,6 +229,10 @@ export default function Record() {
   useEffect(() => {
     releaseYearTouchedRef.current = releaseYearTouched;
   }, [releaseYearTouched]);
+
+  useEffect(() => {
+    setReviewText("");
+  }, [album?.id]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -382,6 +388,10 @@ export default function Record() {
       setReleaseYear(value);
     }
     setReleaseYearTouched(true);
+  }, []);
+
+  const handleReviewChange = useCallback((value: string) => {
+    setReviewText(value);
   }, []);
 
   const loadMasterInfo = useCallback(
@@ -578,6 +588,9 @@ export default function Record() {
         const normalizedCover =
           album.cover && album.cover.trim().length > 0 ? album.cover : null;
         const payloadMasterCover = normalizedCover ?? masterInfo?.cover ?? null;
+        const trimmedReview = reviewText.trim();
+        const reviewPayload =
+          trimmedReview.length > 0 ? trimmedReview.slice(0, 4000) : null;
         const payload = {
           id: -1,
           cover: normalizedCover,
@@ -592,6 +605,7 @@ export default function Record() {
           masterId: masterInfo?.masterId ?? masterIdOverride ?? null,
           masterReleaseYear: masterInfo?.releaseYear ?? null,
           masterCover: payloadMasterCover,
+          review: reviewPayload,
         };
         const res = await fetch(apiUrl("/api/records/create"), {
           method: "POST",
@@ -618,7 +632,15 @@ export default function Record() {
         setAdding(false);
       }
     },
-    [album, rating, releaseYear, selectedTags, masterInfo, masterIdOverride]
+    [
+      album,
+      rating,
+      releaseYear,
+      reviewText,
+      selectedTags,
+      masterInfo,
+      masterIdOverride,
+    ]
   );
 
   const handleAddRecord = useCallback(() => {
@@ -627,6 +649,10 @@ export default function Record() {
 
   const handleAddWishlistRecord = useCallback(() => {
     void submitRecord(WISHLIST_COLLECTION_NAME, "Record added to wishlist");
+  }, [submitRecord]);
+
+  const handleAddListenedRecord = useCallback(() => {
+    void submitRecord(LISTENED_COLLECTION_NAME, "Record added to listened");
   }, [submitRecord]);
 
   const handleBack = useCallback(() => {
@@ -821,9 +847,12 @@ export default function Record() {
                   onRatingChange={setRating}
                   releaseYear={releaseYear}
                   onReleaseYearChange={handleReleaseYearChange}
+                  review={reviewText}
+                  onReviewChange={handleReviewChange}
                   canAdd={!adding}
                   onAddRecord={handleAddRecord}
                   onWishlistRecord={handleAddWishlistRecord}
+                  onListenedRecord={handleAddListenedRecord}
                 />
               </Box>
             </Paper>

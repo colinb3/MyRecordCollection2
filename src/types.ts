@@ -11,6 +11,7 @@ export interface Record {
   tableId?: number;
   collectionName?: string | null;
   masterId?: number | null;
+  review?: string | null;
 }
 
 export interface Filters {
@@ -129,12 +130,14 @@ export interface PublicUserProfile {
   highlights: Record[];
   recentRecords: Record[];
   wishlistRecords: Record[];
+  listenedRecords: Record[];
   followersCount: number;
   followingCount: number;
   isFollowing: boolean | null;
   joinedDate: string | null;
   collectionPrivate: boolean;
   wishlistPrivate: boolean;
+  listenedPrivate: boolean;
 }
 
 export interface UserFollowLists {

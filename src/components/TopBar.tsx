@@ -16,6 +16,7 @@ import AccountCircle from "@mui/icons-material/AccountCircle";
 import LogoutIcon from "@mui/icons-material/Logout";
 import FavoriteIcon from "@mui/icons-material/Favorite";
 import LibraryMusicIcon from "@mui/icons-material/LibraryMusic";
+import HeadphonesIcon from "@mui/icons-material/Headphones";
 import SettingsIcon from "@mui/icons-material/Settings";
 import PeopleAltIcon from "@mui/icons-material/PeopleAlt";
 import { useNavigate } from "react-router-dom";
@@ -212,6 +213,12 @@ export default function TopBar({
                   <LibraryMusicIcon />
                 </ListItemIcon>
                 <ListItemText>My Collection</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => navigate("/listened")}>
+                <ListItemIcon>
+                  <HeadphonesIcon />
+                </ListItemIcon>
+                <ListItemText>Listened</ListItemText>
               </MenuItem>
               <MenuItem onClick={() => navigate("/wishlist")}>
                 <ListItemIcon>

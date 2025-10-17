@@ -62,7 +62,9 @@ export default function EditRecordDialog({
   }, [record, open]);
 
   // Generic handler for simple text field changes
-  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (
+    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
     const { name, value } = event.target;
     if (editedRecord) {
       setEditedRecord({
@@ -173,7 +175,16 @@ export default function EditRecordDialog({
 
   const handleSaveChanges = () => {
     if (editedRecord) {
-      onSave(editedRecord);
+      let normalizedReview: string | null | undefined = editedRecord.review;
+      if (typeof normalizedReview === "string") {
+        const trimmed = normalizedReview.trim();
+        normalizedReview = trimmed.length > 0 ? trimmed.slice(0, 4000) : null;
+      }
+      const payload: Record = {
+        ...editedRecord,
+        review: normalizedReview ?? null,
+      };
+      onSave(payload);
     }
   };
 
@@ -441,6 +452,25 @@ export default function EditRecordDialog({
                 </Stack>
               )}
             </Box>
+
+            <TextField
+              name="review"
+              label="Review"
+              placeholder="Write a brief review..."
+              fullWidth
+              multiline
+              size="small"
+              maxRows={1}
+              value={editedRecord.review ?? ""}
+              inputProps={{ maxLength: 4000 }}
+              onChange={handleChange}
+              sx={{
+                mt: 3,
+                "& .MuiOutlinedInput-root": {
+                  backgroundColor: "background.paper",
+                },
+              }}
+            />
           </Grid>
         </Grid>
       </DialogContent>

@@ -42,6 +42,7 @@ import SettingsIcon from "@mui/icons-material/Settings";
 
 const OWN_PREVIEW_LIMIT = 3;
 const WISHLIST_COLLECTION_NAME = "Wishlist";
+const LISTENED_COLLECTION_NAME = "Listened";
 
 interface SectionCardProps {
   title: string;
@@ -184,6 +185,11 @@ export default function CommunityProfile() {
     return isViewingOwnProfile ? records.slice(0, OWN_PREVIEW_LIMIT) : records;
   }, [profile, isViewingOwnProfile]);
 
+  const listenedRecords = useMemo(() => {
+    const records = profile?.listenedRecords ?? [];
+    return isViewingOwnProfile ? records.slice(0, OWN_PREVIEW_LIMIT) : records;
+  }, [profile, isViewingOwnProfile]);
+
   const profileUsername = profile?.username ?? (targetUsername || username);
   const targetDisplayName =
     profile?.displayName || profileUsername || username || "";
@@ -272,6 +278,18 @@ export default function CommunityProfile() {
     navigate(`${base}?${params.toString()}`);
   }, [isViewingOwnProfile, navigate, profileUsername]);
 
+  const handleSeeListened = useCallback(() => {
+    if (isViewingOwnProfile) {
+      navigate("/listened");
+      return;
+    }
+    const target = profileUsername || username;
+    if (!target) return;
+    const base = `/community/${encodeURIComponent(target)}/collection`;
+    const params = new URLSearchParams({ table: LISTENED_COLLECTION_NAME });
+    navigate(`${base}?${params.toString()}`);
+  }, [isViewingOwnProfile, navigate, profileUsername, username]);
+
   const handleViewFollows = useCallback(
     (tab: "followers" | "following") => {
       if (!profileUsername) return;
@@ -350,6 +368,17 @@ export default function CommunityProfile() {
   const seeWishlistLabel = isViewingOwnProfile
     ? "Go to Wishlist"
     : "View Wishlist";
+
+  const showListenedSection = isViewingOwnProfile || !profile?.listenedPrivate;
+  const listenedTitle = isViewingOwnProfile
+    ? "Recently Listened"
+    : `${targetDisplayName}'s Recently Listened`;
+  const listenedEmptyCopy = isViewingOwnProfile
+    ? "No listened records yet. Add albums you have played."
+    : `${targetDisplayName} hasn’t shared any listened records yet.`;
+  const seeListenedLabel = isViewingOwnProfile
+    ? "View My Listened"
+    : "View Listened";
 
   return (
     <ThemeProvider theme={darkTheme}>
@@ -538,7 +567,7 @@ export default function CommunityProfile() {
 
               {showRecentSection && (
                 <Grid size={{ xs: 12 }}>
-                  <SectionCard title="Recently Added">
+                  <SectionCard title="Recently Collected">
                     {loading ? (
                       <Box
                         sx={{ display: "flex", alignItems: "center", gap: 2 }}
@@ -560,11 +589,53 @@ export default function CommunityProfile() {
                         fromTitle={`${targetDisplayName}'s Profile`}
                       />
                     )}
-                    <Box>
-                      <Button variant="contained" onClick={handleSeeCollection}>
-                        {seeCollectionLabel}
-                      </Button>
-                    </Box>
+                    {(!loading && recentRecords.length > 0) ||
+                    isViewingOwnProfile ? (
+                      <Box>
+                        <Button
+                          variant="contained"
+                          onClick={handleSeeCollection}
+                        >
+                          {seeCollectionLabel}
+                        </Button>
+                      </Box>
+                    ) : null}
+                  </SectionCard>
+                </Grid>
+              )}
+
+              {showListenedSection && (
+                <Grid size={{ xs: 12 }}>
+                  <SectionCard title={listenedTitle}>
+                    {loading ? (
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 2 }}
+                      >
+                        <CircularProgress size={20} />
+                        <Typography color="text.secondary">
+                          Loading listened records…
+                        </Typography>
+                      </Box>
+                    ) : listenedRecords.length === 0 ? (
+                      <Typography color="text.secondary">
+                        {listenedEmptyCopy}
+                      </Typography>
+                    ) : (
+                      <RecordPreviewGrid
+                        records={listenedRecords}
+                        keyPrefix="listened"
+                        showDateAdded={true}
+                        fromTitle={`${targetDisplayName}'s Profile`}
+                      />
+                    )}
+                    {(!loading && listenedRecords.length > 0) ||
+                    isViewingOwnProfile ? (
+                      <Box>
+                        <Button variant="contained" onClick={handleSeeListened}>
+                          {seeListenedLabel}
+                        </Button>
+                      </Box>
+                    ) : null}
                   </SectionCard>
                 </Grid>
               )}
@@ -592,11 +663,15 @@ export default function CommunityProfile() {
                         fromTitle={`${targetDisplayName}'s Profile`}
                       />
                     )}
-                    <Box>
-                      <Button variant="contained" onClick={handleSeeWishlist}>
-                        {seeWishlistLabel}
-                      </Button>
-                    </Box>
+
+                    {(!loading && wishlistRecords.length > 0) ||
+                    isViewingOwnProfile ? (
+                      <Box>
+                        <Button variant="contained" onClick={handleSeeWishlist}>
+                          {seeWishlistLabel}
+                        </Button>
+                      </Box>
+                    ) : null}
                   </SectionCard>
                 </Grid>
               )}
