@@ -13,6 +13,10 @@ interface RecordPreviewGridProps {
   keyPrefix?: string;
   showDateAdded?: boolean;
   fromTitle?: string;
+  ownerUsername: string;
+  ownerDisplayName?: string | null;
+  ownerProfilePicUrl?: string | null;
+  isOwnerViewing?: boolean;
 }
 
 export default function RecordPreviewGrid({
@@ -20,6 +24,10 @@ export default function RecordPreviewGrid({
   keyPrefix,
   showDateAdded = false,
   fromTitle,
+  ownerUsername,
+  ownerDisplayName,
+  ownerProfilePicUrl,
+  isOwnerViewing = false,
 }: RecordPreviewGridProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -33,29 +41,32 @@ export default function RecordPreviewGrid({
   }, []);
 
   const handleRecordClick = (record: Record) => {
-    if (!record.masterId) {
+    if (!record || record.id <= 0) {
       return;
     }
 
-    const albumPayload = {
-      id: `preview-${record.id}`,
-      record: record.record,
-      artist: record.artist,
-      cover: record.cover ?? "",
-    };
-
     const originPath = `${location.pathname}${location.search}${location.hash}`;
+    const ownerDisplay = (ownerDisplayName ?? "").trim() || ownerUsername;
+    const ownerState = isOwnerViewing
+      ? null
+      : {
+          username: ownerUsername,
+          displayName: ownerDisplayName ?? null,
+          profilePicUrl: ownerProfilePicUrl ?? null,
+        };
 
-    navigate(`/record?q=${record.masterId}`, {
+    const targetPath = isOwnerViewing
+      ? `/record/${record.id}`
+      : `/community/${encodeURIComponent(ownerUsername)}/record/${record.id}`;
+
+    navigate(targetPath, {
       state: {
-        album: albumPayload,
-        masterId: record.masterId,
-        query: record.record,
-        fromCollection: {
+        from: {
           path: originPath,
-          title: fromTitle || "Profile",
-          tableName: undefined,
+          label: fromTitle || `${ownerDisplay}'s Profile`,
         },
+        record,
+        owner: ownerState,
       },
     });
   };
@@ -75,7 +86,7 @@ export default function RecordPreviewGrid({
           ? record.review!.trim().replace(/\s+/g, " ")
           : null;
         const hasRating = record.rating > 0;
-        const isClickable = Boolean(record.masterId);
+        const isClickable = record.id > 0;
         return (
           <Grid size={4} key={key}>
             <Paper
@@ -146,7 +157,7 @@ export default function RecordPreviewGrid({
                 )}
                 {reviewSnippet && (
                   <>
-                    <Divider sx={{ my: 1 }} />
+                    <Divider sx={{ my: 1.2 }} />
                     <Typography
                       variant="body2"
                       sx={{
@@ -154,6 +165,7 @@ export default function RecordPreviewGrid({
                         WebkitLineClamp: 3,
                         WebkitBoxOrient: "vertical",
                         overflow: "hidden",
+                        pb: 0,
                       }}
                     >
                       “{reviewSnippet}”

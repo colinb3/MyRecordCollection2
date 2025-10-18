@@ -258,7 +258,7 @@ export default function FindRecordSidebar({
           }}
         />
       </Box>
-      <Box sx={{ mx: { xs: 1.3, sm: 1.5, md: 2 }, mb: 1 }}>
+      <Box sx={{ mx: { xs: 1.3, sm: 1.5, md: 2 }, my: 1 }}>
         <Stack direction={"row"} spacing={1}>
           <Button
             disabled={!canAdd}

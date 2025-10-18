@@ -1068,15 +1068,15 @@ app.get("/api/community/feed", requireAuth, async (req, res) => {
       const [rows] = await pool.query(
     `SELECT r.id, r.name as record, r.artist, r.cover, r.rating,
       r.release_year as 'release', r.added as added, r.tableId, r.isCustom as isCustom, r.masterId as masterId, r.review as review,
-              u.username, u.displayName, u.profilePic
+              u.username, u.displayName, u.profilePic, t.name as tableName
        FROM Record r
        JOIN Follows f ON f.followsUuid = r.userUuid
        JOIN User u ON u.uuid = r.userUuid
   JOIN RecTable t ON r.tableId = t.id
-  WHERE f.userUuid = ? AND t.name = ? AND t.isPrivate = 0 
+  WHERE f.userUuid = ? AND t.isPrivate = 0 
        ORDER BY r.added DESC, r.id DESC
        LIMIT 20`,
-      [req.userUuid, DEFAULT_COLLECTION_NAME]
+      [req.userUuid]
     );
 
     if (!Array.isArray(rows) || rows.length === 0) {
@@ -1108,6 +1108,12 @@ app.get("/api/community/feed", requireAuth, async (req, res) => {
         typeof row.review === "string" && row.review.trim()
           ? row.review.trim()
           : null;
+      const tableName =
+        typeof row.tableName === "string" && row.tableName.trim()
+          ? row.tableName.trim()
+          : row.tableName === null
+          ? null
+          : undefined;
 
       const record = {
         id: row.id,
@@ -1127,6 +1133,10 @@ app.get("/api/community/feed", requireAuth, async (req, res) => {
       }
 
       record.masterId = masterId;
+
+      if (tableName !== undefined) {
+        record.tableName = tableName;
+      }
 
       return {
         owner: {

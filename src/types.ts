@@ -9,9 +9,21 @@ export interface Record {
   release: number;
   added: string;
   tableId?: number;
+  tableName?: string | null;
   collectionName?: string | null;
   masterId?: number | null;
   review?: string | null;
+}
+
+export interface RecordOwnerInfo {
+  username: string;
+  displayName: string | null;
+  profilePicUrl: string | null;
+}
+
+export interface RecordDetailResponse {
+  record: Record;
+  owner?: RecordOwnerInfo | null;
 }
 
 export interface Filters {

@@ -465,7 +465,7 @@ export default function EditRecordDialog({
               inputProps={{ maxLength: 4000 }}
               onChange={handleChange}
               sx={{
-                mt: 2,
+                mt: 2.2,
                 "& .MuiOutlinedInput-root": {
                   backgroundColor: "background.paper",
                 },

@@ -1,195 +1,104 @@
-import {
-  useState,
-  useEffect,
-  useCallback,
-  useRef,
-  type ReactNode,
-} from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ThemeProvider,
   CssBaseline,
   Box,
-  Paper,
   Typography,
+  Chip,
   Button,
+  Avatar,
+  Stack,
+  Paper,
+  Divider,
+  CircularProgress,
   Alert,
   Snackbar,
-  Stack,
-  CircularProgress,
-  Divider,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  DialogContentText,
+  ButtonBase,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import apiUrl from "./api";
+import LaunchIcon from "@mui/icons-material/Launch";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import DriveFileMoveOutlinedIcon from "@mui/icons-material/DriveFileMoveOutlined";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import TopBar from "./components/TopBar";
 import { darkTheme } from "./theme";
-import { setUserId } from "./analytics";
 import placeholderCover from "./assets/missingImg.jpg";
-import FindRecordSidebar from "./components/FindRecordSidebar";
+import apiUrl from "./api";
 import {
   clearUserInfoCache,
   getCachedUserInfo,
   loadUserInfo,
 } from "./userInfo";
+import { setUserId } from "./analytics";
 import { clearRecordTablePreferencesCache } from "./preferences";
-import { clearCommunityCaches } from "./communityUsers";
-import { wikiGenres } from "./wiki";
-import { useLocation, useNavigate } from "react-router-dom";
-
-interface RecordListItem {
-  id: string;
-  record: string;
-  artist: string;
-  cover: string;
-}
-
-interface LocationState {
-  album?: RecordListItem;
-  query?: string;
-  masterId?: number;
-  fromCollection?: {
-    path: string;
-    title?: string;
-    tableName?: string;
-  };
-}
-
-interface MasterInfo {
-  masterId: number | null;
-  ratingAverage: number | null;
-  releaseYear: number | null;
-  cover: string | null;
-  ratingCounts: number[] | null;
-}
+import {
+  clearCollectionRecordsCache,
+  loadAllCollectionRecords,
+  loadCollectionRecords,
+} from "./collectionRecords";
+import {
+  clearCommunityCaches,
+  loadPublicUserCollection,
+  loadPublicUserProfile,
+} from "./communityUsers";
+import { clearProfileHighlightsCache } from "./profileHighlights";
+import type { Record as MrcRecord, RecordOwnerInfo } from "./types";
+import EditRecordDialog from "./components/EditRecordDialog";
+import MoveRecordDialog from "./components/MoveRecordDialog";
 
 const DEFAULT_COLLECTION_NAME = "My Collection";
 const WISHLIST_COLLECTION_NAME = "Wishlist";
 const LISTENED_COLLECTION_NAME = "Listened";
 
-function RatingsHistogram({ counts }: { counts: number[] }) {
-  if (!Array.isArray(counts) || counts.length === 0) {
-    return null;
-  }
+type FromState = {
+  path?: string;
+  label?: string;
+};
 
-  const [width, setWidth] = useState(window.innerWidth);
+type LocationState = {
+  record?: MrcRecord;
+  from?: FromState;
+  owner?: RecordOwnerInfo | null;
+};
 
-  useEffect(() => {
-    const handleResize = () => setWidth(window.innerWidth);
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  const maxValue = counts.reduce(
-    (max, current) =>
-      Number.isFinite(current) && current > max ? current : max,
-    0
-  );
-  const safeMax = maxValue > 0 ? maxValue : 1;
-
-  return (
-    <Box sx={{ alignSelf: { xs: "flex-start", md: "flex" } }}>
-      <Box
-        sx={{
-          width: "100%",
-          display: "grid",
-          gridTemplateColumns: "repeat(10, minmax(0, 1fr))",
-          columnGap: 0.75,
-          alignItems: "end",
-          minHeight: 96,
-        }}
-      >
-        {counts.map((count, index) => {
-          const safeCount = Number.isFinite(count) && count > 0 ? count : 0;
-          const ratio = safeCount / safeMax;
-          const barHeight = Math.max(Math.round(ratio * 80), 4);
-          return (
-            <Box
-              key={index}
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                width: { xs: (width - 130) / 10, md: 28 },
-                minWidth: 0,
-              }}
-            >
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{ whiteSpace: "nowrap" }}
-              >
-                {safeCount}
-              </Typography>
-              <Box
-                sx={{
-                  width: "100%",
-                  height: `${barHeight}px`,
-                  bgcolor: "primary.main",
-                  borderRadius: 1,
-                  transition: "height 0.2s ease",
-                  mt: 0.5,
-                }}
-              />
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{ mt: 0.5, whiteSpace: "nowrap" }}
-              >
-                {index + 1}
-              </Typography>
-            </Box>
-          );
-        })}
-      </Box>
-    </Box>
-  );
+function inferCollectionFromLabel(label?: string | null): string | null {
+  if (!label) return null;
+  const lower = label.toLowerCase();
+  if (lower.includes("wishlist")) return WISHLIST_COLLECTION_NAME;
+  if (lower.includes("listened")) return LISTENED_COLLECTION_NAME;
+  if (lower.includes("collection")) return DEFAULT_COLLECTION_NAME;
+  return null;
 }
 
-export default function Record() {
+function formatDate(
+  value: string | null | undefined,
+  formatter: Intl.DateTimeFormat
+): string {
+  if (!value) return "Unknown";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "Unknown";
+  return formatter.format(parsed);
+}
+
+export default function RecordDetails() {
   const navigate = useNavigate();
   const location = useLocation();
-  const locationState = (location.state as LocationState | undefined) ?? {};
-  const initialAlbum = locationState.album ?? null;
-  const fromCollection = locationState.fromCollection;
-  const fromCollectionPath =
-    typeof fromCollection?.path === "string"
-      ? fromCollection.path.trim() || null
-      : null;
-  const fromCollectionTitle = (() => {
-    if (typeof fromCollection?.title === "string") {
-      const trimmed = fromCollection.title.trim();
-      if (trimmed.length > 0) return trimmed;
-    }
-    if (typeof fromCollection?.tableName === "string") {
-      const trimmed = fromCollection.tableName.trim();
-      if (trimmed.length > 0) return trimmed;
-    }
-    return null;
-  })();
-  const searchQuery =
-    typeof locationState.query === "string" ? locationState.query.trim() : "";
-  const backButtonLabel = fromCollectionTitle
-    ? `Back to ${fromCollectionTitle}`
-    : "Back to Search";
+  const locationState =
+    (location.state as LocationState | undefined) ?? undefined;
+  const params = useParams<{ recordId: string; username?: string }>();
+  const ownerUsername = params.username ?? null;
+  const recordIdParam = params.recordId ?? "";
+  const recordIdNumber = Number(recordIdParam);
+  const isValidRecordId =
+    Number.isInteger(recordIdNumber) && recordIdNumber > 0;
+
   const cachedUser = getCachedUserInfo();
-
-  const parseMasterId = (value: string | null | undefined): number | null => {
-    if (!value) return null;
-    const numeric = Number(value);
-    return Number.isInteger(numeric) && numeric > 0 ? numeric : null;
-  };
-
-  const masterIdFromQuery = parseMasterId(
-    new URLSearchParams(location.search).get("q")
-  );
-  const initialMasterId =
-    typeof locationState.masterId === "number" && locationState.masterId > 0
-      ? locationState.masterId
-      : masterIdFromQuery;
-
-  const [album, setAlbum] = useState<RecordListItem | null>(initialAlbum);
-  const [masterIdOverride, setMasterIdOverride] = useState<number | null>(
-    initialMasterId ?? null
-  );
   const [username, setUsername] = useState<string>(cachedUser?.username ?? "");
   const [displayName, setDisplayName] = useState<string>(
     cachedUser?.displayName ?? ""
@@ -198,97 +107,57 @@ export default function Record() {
     cachedUser?.profilePicUrl ?? null
   );
 
-  const [availableTags, setAvailableTags] = useState<string[]>([]);
-  const [wikiTags, setWikiTags] = useState<string[]>([]);
-  const [wikiLoading, setWikiLoading] = useState(false);
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [rating, setRating] = useState(0);
-  const [releaseYear, setReleaseYear] = useState(new Date().getFullYear());
-  const [reviewText, setReviewText] = useState("");
-  const [adding, setAdding] = useState(false);
+  const [record, setRecord] = useState<MrcRecord | null>(
+    locationState?.record ?? null
+  );
+  const [fromInfo, setFromInfo] = useState<FromState | null>(
+    locationState?.from ?? null
+  );
+  const [owner, setOwner] = useState<RecordOwnerInfo | null>(() => {
+    if (locationState?.owner) return locationState.owner;
+    if (!ownerUsername) return null;
+    return {
+      username: ownerUsername,
+      displayName: null,
+      profilePicUrl: null,
+    };
+  });
+  const [loadingRecord, setLoadingRecord] = useState<boolean>(
+    () => !locationState?.record
+  );
+  const [error, setError] = useState<string | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [moveDialogOpen, setMoveDialogOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
     severity: "success" | "error";
   }>({ open: false, message: "", severity: "success" });
-  const [masterInfo, setMasterInfo] = useState<MasterInfo | null>(null);
-  const [masterLoading, setMasterLoading] = useState(false);
-  const [masterError, setMasterError] = useState<string | null>(null);
-  const [releaseYearTouched, setReleaseYearTouched] = useState(false);
-  const isMountedRef = useRef(true);
-  const releaseYearTouchedRef = useRef(false);
-  const skipNextMasterFetchRef = useRef<number | null>(null);
 
   useEffect(() => {
-    isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    releaseYearTouchedRef.current = releaseYearTouched;
-  }, [releaseYearTouched]);
-
-  useEffect(() => {
-    setReviewText("");
-  }, [album?.id]);
-
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const queryMasterId = parseMasterId(params.get("q"));
-    const stateMasterId =
-      typeof locationState.masterId === "number" && locationState.masterId > 0
-        ? locationState.masterId
-        : null;
-    const nextMasterId = stateMasterId ?? queryMasterId ?? null;
-    setMasterIdOverride((prev) =>
-      prev === nextMasterId ? prev : nextMasterId
-    );
-  }, [location.search, locationState.masterId]);
-
-  useEffect(() => {
-    if (!locationState.album) {
-      const params = new URLSearchParams(location.search);
-      const hasMasterQuery = parseMasterId(params.get("q"));
-      if (!hasMasterQuery) {
-        navigate("/search", { replace: true });
-      }
+    if (locationState?.record) {
+      setRecord((prev) => prev ?? locationState.record ?? null);
+      setLoadingRecord(false);
     }
-  }, [locationState.album, navigate, location.search]);
-
-  useEffect(() => {
-    if (locationState.album) {
-      setAlbum(locationState.album);
+    if (locationState?.from) {
+      setFromInfo((prev) => prev ?? locationState.from ?? null);
     }
-  }, [locationState.album]);
+    if (locationState?.owner) {
+      setOwner((prev) => prev ?? locationState.owner ?? null);
+    }
+  }, [locationState]);
 
   useEffect(() => {
     let cancelled = false;
-
     (async () => {
-      const [info, tags] = await Promise.all([
-        loadUserInfo(),
-        (async () => {
-          try {
-            const res = await fetch(apiUrl("/api/tags"), {
-              credentials: "include",
-            });
-            if (!res.ok) return null;
-            return (await res.json()) as string[];
-          } catch {
-            return null;
-          }
-        })(),
-      ]);
-
+      const info = await loadUserInfo();
       if (cancelled) return;
-
       if (!info) {
         navigate("/login");
         return;
       }
-
       setUsername(info.username);
       setDisplayName(info.displayName ?? "");
       setProfilePicUrl(info.profilePicUrl ?? null);
@@ -297,64 +166,149 @@ export default function Record() {
       } catch {
         /* ignore analytics errors */
       }
-      if (Array.isArray(tags)) {
-        setAvailableTags(tags);
-      }
     })();
-
     return () => {
       cancelled = true;
     };
   }, [navigate]);
 
   useEffect(() => {
-    if (!album) return;
-
-    setSelectedTags([]);
-    setRating(0);
-    setReleaseYear(new Date().getFullYear());
-    setWikiTags([]);
-    setWikiLoading(true);
-    setMasterError(null);
-    setReleaseYearTouched(false);
-    releaseYearTouchedRef.current = false;
+    if (!ownerUsername) return;
     let cancelled = false;
-
     (async () => {
       try {
-        const genres = await wikiGenres(album.record, album.artist, true);
+        const profile = await loadPublicUserProfile(ownerUsername);
         if (cancelled) return;
-        if (genres && genres.length > 0) {
-          const first = genres[0];
-          const yearNum = first && /^\d{4}$/.test(first) ? Number(first) : null;
-          const withinRange =
-            yearNum && yearNum >= 1800 && yearNum <= 2100 ? yearNum : null;
-          if (withinRange && !releaseYearTouchedRef.current) {
-            setReleaseYear(withinRange);
-          }
-          const tagsOnly = withinRange
-            ? genres.slice(1).filter((tag) => !!tag)
-            : genres.filter((tag) => !!tag);
-          setWikiTags(tagsOnly);
-        } else {
-          setWikiTags([]);
-        }
-      } catch (error) {
-        console.error(error);
-        if (!cancelled) {
-          setWikiTags([]);
-        }
-      } finally {
-        if (!cancelled) {
-          setWikiLoading(false);
-        }
+        setOwner({
+          username: profile.username,
+          displayName: profile.displayName,
+          profilePicUrl: profile.profilePicUrl,
+        });
+      } catch {
+        if (cancelled) return;
+        setOwner(
+          (prev) =>
+            prev ?? {
+              username: ownerUsername,
+              displayName: null,
+              profilePicUrl: null,
+            }
+        );
       }
     })();
+    return () => {
+      cancelled = true;
+    };
+  }, [ownerUsername]);
+
+  useEffect(() => {
+    if (!isValidRecordId) {
+      setError("Invalid record id.");
+      setLoadingRecord(false);
+      return;
+    }
+    if (record) {
+      setLoadingRecord(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingRecord(true);
+    setError(null);
+
+    const fetchRecord = async () => {
+      try {
+        if (ownerUsername) {
+          const inferred = inferCollectionFromLabel(fromInfo?.label);
+          const tableOrder = Array.from(
+            new Set(
+              [
+                inferred,
+                DEFAULT_COLLECTION_NAME,
+                WISHLIST_COLLECTION_NAME,
+                LISTENED_COLLECTION_NAME,
+              ].filter((value): value is string => Boolean(value))
+            )
+          );
+
+          let found: MrcRecord | null = null;
+          let sawPrivate = false;
+          let lastError: unknown = null;
+
+          for (const tableName of tableOrder) {
+            try {
+              const records = await loadPublicUserCollection(
+                ownerUsername,
+                tableName
+              );
+              if (cancelled) return;
+              const match = records.find((item) => item.id === recordIdNumber);
+              if (match) {
+                found = { ...match, collectionName: tableName };
+                break;
+              }
+            } catch (err: unknown) {
+              lastError = err;
+              if ((err as any)?.status === 403) {
+                sawPrivate = true;
+              }
+            }
+          }
+
+          if (cancelled) return;
+
+          if (found) {
+            setRecord(found);
+          } else if (sawPrivate) {
+            setError("This record is private or unavailable.");
+          } else if (lastError instanceof Error) {
+            setError(lastError.message || "Failed to load record.");
+          } else {
+            setError("Record not found.");
+          }
+        } else {
+          const inferred = inferCollectionFromLabel(fromInfo?.label);
+          if (inferred) {
+            try {
+              const records = await loadCollectionRecords(inferred);
+              if (cancelled) return;
+              const match = records.find((item) => item.id === recordIdNumber);
+              if (match) {
+                setRecord({ ...match, collectionName: inferred });
+                return;
+              }
+            } catch {
+              /* ignore and fall back */
+            }
+          }
+
+          const records = await loadAllCollectionRecords();
+          if (cancelled) return;
+          const match = records.find((item) => item.id === recordIdNumber);
+          if (match) {
+            setRecord(match);
+          } else {
+            setError("Record not found.");
+          }
+        }
+      } catch (err: unknown) {
+        if (cancelled) return;
+        const message =
+          err instanceof Error ? err.message : "Failed to load record.";
+        setError(message);
+      } finally {
+        if (!cancelled) {
+          setLoadingRecord(false);
+        }
+      }
+    };
+
+    void fetchRecord();
 
     return () => {
       cancelled = true;
     };
-  }, [album]);
+  }, [record, isValidRecordId, recordIdNumber, ownerUsername, fromInfo?.label]);
 
   const handleLogout = useCallback(async () => {
     await fetch(apiUrl("/api/logout"), {
@@ -362,8 +316,10 @@ export default function Record() {
       credentials: "include",
     });
     clearRecordTablePreferencesCache();
-    clearUserInfoCache();
+    clearCollectionRecordsCache();
+    clearProfileHighlightsCache();
     clearCommunityCaches();
+    clearUserInfoCache();
     try {
       setUserId(undefined);
     } catch {
@@ -372,354 +328,269 @@ export default function Record() {
     navigate("/login");
   }, [navigate]);
 
-  const handleToggleTag = useCallback((tag: string) => {
-    setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
-    );
-  }, []);
-
-  const handleAddNewTag = useCallback((tag: string) => {
-    setAvailableTags((prev) => (prev.includes(tag) ? prev : [...prev, tag]));
-    setSelectedTags((prev) => (prev.includes(tag) ? prev : [...prev, tag]));
-  }, []);
-
-  const handleReleaseYearChange = useCallback((value: number) => {
-    if (Number.isFinite(value)) {
-      setReleaseYear(value);
-    }
-    setReleaseYearTouched(true);
-  }, []);
-
-  const handleReviewChange = useCallback((value: string) => {
-    setReviewText(value);
-  }, []);
-
-  const loadMasterInfo = useCallback(
-    async (options?: { preserveReleaseYear?: boolean }) => {
-      const masterIdToUse = masterIdOverride;
-      const preserveReleaseYear =
-        options?.preserveReleaseYear ?? releaseYearTouchedRef.current;
-      const targetAlbumId =
-        album?.id ?? (masterIdToUse ? `master-${masterIdToUse}` : null);
-
-      if (!album && !masterIdToUse) {
-        return;
-      }
-
-      let endpoint: string | null = null;
-      if (masterIdToUse) {
-        endpoint = apiUrl(`/api/records/master-info?masterId=${masterIdToUse}`);
-      } else if (album) {
-        const params = new URLSearchParams({
-          artist: album.artist,
-          record: album.record,
-        });
-        endpoint = apiUrl(`/api/records/master-info?${params.toString()}`);
-      }
-
-      if (!endpoint) {
-        return;
-      }
-
-      setMasterLoading(true);
-      setMasterError(null);
-      setMasterInfo(null);
-
-      try {
-        const response = await fetch(endpoint, { credentials: "include" });
-
-        if (!response.ok) {
-          let message = "Failed to load community rating";
-          try {
-            const problem = await response.json();
-            if (problem?.error) {
-              message = problem.error;
-            }
-          } catch {
-            /* ignore json errors */
-          }
-          throw new Error(message);
-        }
-
-        const data = await response.json();
-
-        if (!isMountedRef.current) {
-          return;
-        }
-
-        const masterIdValue = Number(data?.masterId);
-        const ratingAverageValue =
-          data?.ratingAverage !== null && data?.ratingAverage !== undefined
-            ? Number(data.ratingAverage)
-            : null;
-        const releaseYearValue =
-          data?.releaseYear !== null && data?.releaseYear !== undefined
-            ? Number(data.releaseYear)
-            : null;
-        const coverValue =
-          typeof data?.cover === "string" && data.cover.trim()
-            ? data.cover.trim()
-            : null;
-        const ratingCountsValue = Array.isArray(data?.ratingCounts)
-          ? data.ratingCounts.slice(0, 10).map((value: unknown) => {
-              const num = Number(value);
-              return Number.isFinite(num) && num >= 0 ? num : 0;
-            })
-          : null;
-
-        const normalized: MasterInfo = {
-          masterId:
-            Number.isInteger(masterIdValue) && masterIdValue > 0
-              ? masterIdValue
-              : null,
-          ratingAverage:
-            ratingAverageValue !== null && Number.isFinite(ratingAverageValue)
-              ? Math.round(ratingAverageValue * 10) / 10
-              : null,
-          releaseYear:
-            releaseYearValue !== null && Number.isInteger(releaseYearValue)
-              ? releaseYearValue
-              : null,
-          cover: coverValue,
-          ratingCounts:
-            ratingCountsValue && ratingCountsValue.length === 10
-              ? ratingCountsValue
-              : null,
-        };
-
-        if (!album) {
-          const nameFromResponse =
-            typeof data?.record === "string" && data.record.trim()
-              ? data.record.trim()
-              : null;
-          const artistFromResponse =
-            typeof data?.artist === "string" && data.artist.trim()
-              ? data.artist.trim()
-              : null;
-
-          if (nameFromResponse || artistFromResponse) {
-            setAlbum({
-              id:
-                targetAlbumId ?? `master-${normalized.masterId ?? Date.now()}`,
-              record: nameFromResponse ?? "Unknown Record",
-              artist: artistFromResponse ?? "Unknown Artist",
-              cover: coverValue ?? "",
-            });
-          }
-        }
-
-        if (normalized.masterId && normalized.masterId !== masterIdOverride) {
-          skipNextMasterFetchRef.current = normalized.masterId;
-          setMasterIdOverride(normalized.masterId);
-        }
-
-        if (album && coverValue && (!album.cover || album.cover.length === 0)) {
-          setAlbum((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  cover: coverValue,
-                }
-              : prev
-          );
-        }
-
-        const currentAlbumId = album?.id ?? targetAlbumId;
-        if (
-          targetAlbumId &&
-          currentAlbumId &&
-          targetAlbumId !== currentAlbumId
-        ) {
-          setMasterLoading(false);
-          return;
-        }
-
-        setMasterInfo(normalized);
-        setMasterLoading(false);
-
-        if (
-          !preserveReleaseYear &&
-          normalized.releaseYear &&
-          normalized.releaseYear >= 1800 &&
-          normalized.releaseYear <= 2100
-        ) {
-          setReleaseYear(normalized.releaseYear);
-          setReleaseYearTouched(true);
-          releaseYearTouchedRef.current = true;
-        }
-      } catch (error) {
-        if (!isMountedRef.current) {
-          return;
-        }
-        console.warn("Failed to load master info", error);
-        setMasterInfo(null);
-        setMasterError(
-          error instanceof Error
-            ? error.message
-            : "Failed to load community rating"
-        );
-        setMasterLoading(false);
-      }
-    },
-    [album, masterIdOverride]
-  );
-
-  useEffect(() => {
-    if (!album && !masterIdOverride) {
-      setMasterInfo(null);
-      setMasterError(null);
-      return;
-    }
-    if (
-      skipNextMasterFetchRef.current !== null &&
-      masterIdOverride === skipNextMasterFetchRef.current
-    ) {
-      skipNextMasterFetchRef.current = null;
-      return;
-    }
-    void loadMasterInfo({ preserveReleaseYear: false });
-  }, [album, masterIdOverride, loadMasterInfo]);
-
-  const submitRecord = useCallback(
-    async (tableName: string, successMessage: string) => {
-      if (!album) return;
-      setAdding(true);
-      try {
-        const normalizedCover =
-          album.cover && album.cover.trim().length > 0 ? album.cover : null;
-        const payloadMasterCover = normalizedCover ?? masterInfo?.cover ?? null;
-        const trimmedReview = reviewText.trim();
-        const reviewPayload =
-          trimmedReview.length > 0 ? trimmedReview.slice(0, 4000) : null;
-        const payload = {
-          id: -1,
-          cover: normalizedCover,
-          record: album.record,
-          artist: album.artist,
-          rating,
-          isCustom: false,
-          tags: selectedTags,
-          release: releaseYear,
-          added: new Date().toISOString().slice(0, 10),
-          tableName,
-          masterId: masterInfo?.masterId ?? masterIdOverride ?? null,
-          masterReleaseYear: masterInfo?.releaseYear ?? null,
-          masterCover: payloadMasterCover,
-          review: reviewPayload,
-        };
-        const res = await fetch(apiUrl("/api/records/create"), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify(payload),
-        });
-        if (res.ok) {
-          setSnackbar({
-            open: true,
-            message: successMessage,
-            severity: "success",
-          });
-        } else {
-          const problem = await res.json().catch(() => ({}));
-          const msg = problem.error || `Failed to add record (${res.status})`;
-          setSnackbar({ open: true, message: msg, severity: "error" });
-        }
-      } catch (error) {
-        console.error(error);
-        const msg = "Network error adding record";
-        setSnackbar({ open: true, message: msg, severity: "error" });
-      } finally {
-        setAdding(false);
-      }
-    },
-    [
-      album,
-      rating,
-      releaseYear,
-      reviewText,
-      selectedTags,
-      masterInfo,
-      masterIdOverride,
-    ]
-  );
-
-  const handleAddRecord = useCallback(() => {
-    void submitRecord(DEFAULT_COLLECTION_NAME, "Record added to collection");
-  }, [submitRecord]);
-
-  const handleAddWishlistRecord = useCallback(() => {
-    void submitRecord(WISHLIST_COLLECTION_NAME, "Record added to wishlist");
-  }, [submitRecord]);
-
-  const handleAddListenedRecord = useCallback(() => {
-    void submitRecord(LISTENED_COLLECTION_NAME, "Record added to listened");
-  }, [submitRecord]);
-
   const handleBack = useCallback(() => {
-    if (fromCollectionPath) {
-      navigate(fromCollectionPath);
+    if (fromInfo?.path) {
+      navigate(fromInfo.path);
       return;
     }
-    if (searchQuery) {
-      navigate(`/search?tab=records&q=${encodeURIComponent(searchQuery)}`);
-    } else {
-      navigate("/search");
+    if (ownerUsername) {
+      navigate(`/community/${encodeURIComponent(ownerUsername)}/collection`);
+      return;
     }
-  }, [navigate, fromCollectionPath, searchQuery]);
+    navigate("/mycollection");
+  }, [fromInfo, navigate, ownerUsername]);
 
-  if (!album) {
-    return null;
-  }
+  const handleOpenMasterRecord = useCallback(() => {
+    if (!record) return;
+    const masterId = record.masterId ?? null;
+    const originPath = `${location.pathname}${location.search}${location.hash}`;
+    const ownerDisplay = owner?.displayName?.trim()
+      ? owner.displayName
+      : ownerUsername
+      ? `@${ownerUsername}`
+      : null;
+    const fromTitle = fromInfo?.label
+      ? fromInfo.label
+      : ownerDisplay
+      ? `${ownerDisplay}'s Collection`
+      : DEFAULT_COLLECTION_NAME;
 
-  let masterRatingContent: ReactNode = null;
-  if (masterLoading) {
-    masterRatingContent = (
-      <Typography color="text.secondary">
-        Loading community rating… <CircularProgress size={20} />
-      </Typography>
+    const albumPayload = {
+      id: `record-${record.id}`,
+      record: record.record,
+      artist: record.artist,
+      cover: record.cover ?? "",
+    };
+
+    if (masterId) {
+      navigate(`/search/record/${masterId}`, {
+        state: {
+          album: albumPayload,
+          masterId,
+          query: record.record,
+          fromCollection: {
+            path: originPath,
+            title: fromTitle,
+            tableName: record.collectionName ?? record.tableName,
+          },
+        },
+      });
+    } else {
+      navigate("/search", {
+        state: {
+          album: albumPayload,
+          query: `${record.artist} ${record.record}`.trim(),
+          fromCollection: {
+            path: originPath,
+            title: fromTitle,
+            tableName: record.collectionName ?? record.tableName,
+          },
+        },
+      });
+    }
+  }, [location, navigate, owner, ownerUsername, record, fromInfo]);
+
+  const handleOpenOwnerProfile = useCallback(() => {
+    if (!ownerUsername) return;
+    navigate(`/community/${encodeURIComponent(ownerUsername)}`);
+  }, [navigate, ownerUsername]);
+
+  const isOwnerView = ownerUsername ? ownerUsername === username : true;
+  const ownerDisplayName = owner?.displayName?.trim() || null;
+  const ownerHandle = ownerUsername ? `@${ownerUsername}` : null;
+  const ownerInitial = useMemo(() => {
+    if (ownerDisplayName) return ownerDisplayName.charAt(0).toUpperCase();
+    if (ownerUsername) return ownerUsername.charAt(0).toUpperCase();
+    return "?";
+  }, [ownerDisplayName, ownerUsername]);
+  const ownerProfileAlt = ownerDisplayName ?? ownerHandle ?? "Record owner";
+  const currentCollectionName =
+    record?.collectionName ??
+    record?.tableName ??
+    inferCollectionFromLabel(fromInfo?.label) ??
+    null;
+
+  const handleOpenEditDialog = () => {
+    if (!record) return;
+    setEditDialogOpen(true);
+  };
+
+  const handleSaveRecordChanges = async (updatedRecord: MrcRecord) => {
+    if (!record) return;
+    try {
+      const res = await fetch(apiUrl("/api/records/update"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(updatedRecord),
+      });
+
+      if (!res.ok) {
+        const problem = await res.json().catch(() => ({}));
+        setSnackbar({
+          open: true,
+          message: problem.error || "Failed to save record",
+          severity: "error",
+        });
+        return;
+      }
+
+      const saved = (await res.json().catch(() => updatedRecord)) as MrcRecord;
+      setRecord((prev) =>
+        prev
+          ? {
+              ...prev,
+              ...saved,
+            }
+          : saved
+      );
+      const updatedCollection = saved.collectionName ?? saved.tableName ?? null;
+      if (updatedCollection) {
+        setFromInfo((prev) =>
+          prev ? { ...prev, label: updatedCollection } : prev
+        );
+      }
+
+      setEditDialogOpen(false);
+      setSnackbar({
+        open: true,
+        message: "Record saved",
+        severity: "success",
+      });
+      clearCollectionRecordsCache();
+      clearProfileHighlightsCache();
+      clearCommunityCaches();
+    } catch {
+      setSnackbar({
+        open: true,
+        message: "Failed to save record",
+        severity: "error",
+      });
+    }
+  };
+
+  const handleRequestDelete = () => {
+    if (!record) return;
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirmed = async () => {
+    if (!record) return;
+    setDeleteLoading(true);
+    const successMessage = "Record deleted";
+    let navigateTo: string | null = null;
+
+    try {
+      const res = await fetch(apiUrl("/api/records/delete"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ id: record.id }),
+      });
+
+      if (!res.ok) {
+        const problem = await res.json().catch(() => ({}));
+        setSnackbar({
+          open: true,
+          message: problem.error || "Failed to delete record",
+          severity: "error",
+        });
+        return;
+      }
+
+      clearCollectionRecordsCache();
+      clearProfileHighlightsCache();
+      clearCommunityCaches();
+      navigateTo =
+        fromInfo?.path ??
+        (ownerUsername
+          ? `/community/${encodeURIComponent(ownerUsername)}/collection`
+          : "/mycollection");
+    } catch {
+      setSnackbar({
+        open: true,
+        message: "Network error deleting record",
+        severity: "error",
+      });
+    } finally {
+      setDeleteLoading(false);
+      setDeleteDialogOpen(false);
+      if (navigateTo) {
+        navigate(navigateTo, {
+          state: { message: successMessage },
+        });
+      }
+    }
+  };
+
+  const handleOpenMoveDialog = () => {
+    if (!record) return;
+    setMoveDialogOpen(true);
+  };
+
+  const handleRecordMoved = (
+    targetCollection: string,
+    serverMessage?: string
+  ) => {
+    setRecord((prev) =>
+      prev
+        ? {
+            ...prev,
+            collectionName: targetCollection,
+            tableName: targetCollection,
+          }
+        : prev
     );
-  } else if (masterError) {
-    masterRatingContent = <Typography color="error">{masterError}</Typography>;
-  } else if (masterInfo?.masterId) {
-    const histogramCounts =
-      Array.isArray(masterInfo.ratingCounts) &&
-      masterInfo.ratingCounts.length === 10
-        ? masterInfo.ratingCounts
-        : null;
-    masterRatingContent = (
-      <Box sx={{ display: "flex", flexDirection: "column" }}>
-        {masterInfo.ratingAverage !== null ? (
-          <Typography
-            color="text.secondary"
-            sx={{ mb: histogramCounts ? 0.7 : 0 }}
-          >
-            Average rating: {masterInfo.ratingAverage.toFixed(1)}
-          </Typography>
-        ) : (
-          <Typography
-            color="text.secondary"
-            sx={{ mb: histogramCounts ? 0.7 : 0 }}
-          >
-            Be the first to rate!
-          </Typography>
-        )}
-        {histogramCounts ? (
-          <Box display={"flex"} flexDirection={"column"} alignItems={"center"}>
-            <Box display={"inline-block"} mb={0.5}>
-              <RatingsHistogram counts={histogramCounts} />
-            </Box>
-            <Typography color="text.secondary">Ratings</Typography>
-          </Box>
-        ) : null}
-      </Box>
-    );
-  } else if (masterInfo) {
-    masterRatingContent = (
-      <Typography color="text.secondary">
-        No master for this release. Ratings unavailable.
-      </Typography>
-    );
-  }
+    setFromInfo((prev) => (prev ? { ...prev, label: targetCollection } : prev));
+    setMoveDialogOpen(false);
+    setSnackbar({
+      open: true,
+      message: serverMessage || `Record moved to ${targetCollection}`,
+      severity: "success",
+    });
+    clearCollectionRecordsCache();
+    clearProfileHighlightsCache();
+    clearCommunityCaches();
+  };
+
+  const handleSnackbarClose = (_: unknown, reason?: string) => {
+    if (reason === "clickaway") return;
+    setSnackbar((prev) => ({ ...prev, open: false }));
+  };
+
+  const dateFormatter = useMemo(() => {
+    return new Intl.DateTimeFormat(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  }, []);
+
+  const collectionLabel = useMemo(() => {
+    if (fromInfo?.label) return fromInfo.label;
+    if (record?.collectionName) return record.collectionName;
+    if (record?.tableName) return record.tableName;
+    if (ownerUsername) {
+      const ownerDisplay = owner?.displayName?.trim()
+        ? owner.displayName
+        : `@${ownerUsername}`;
+      return `${ownerDisplay}'s Collection`;
+    }
+    return DEFAULT_COLLECTION_NAME;
+  }, [fromInfo, record, ownerUsername, owner]);
+
+  const ratingText =
+    record && record.rating > 0 ? `${record.rating}/10` : "Not rated";
+  const releaseText =
+    record && record.release > 0 ? `${record.release}` : "Unknown";
+  const addedText = record
+    ? formatDate(record.added, dateFormatter)
+    : "Unknown";
+  const showMasterButton = Boolean(record?.masterId);
+  const showOwnerActions = isOwnerView && Boolean(record);
+  const showActionRow = showMasterButton || showOwnerActions;
+  const hasReview = Boolean(record?.review && record.review.trim());
+  const tags = record?.tags ?? [];
 
   return (
     <ThemeProvider theme={darkTheme}>
@@ -730,18 +601,21 @@ export default function Record() {
           height: "100vh",
           display: "flex",
           flexDirection: "column",
+          overflow: "hidden",
         }}
       >
         <TopBar
-          title="Search"
-          onLogout={handleLogout}
+          title="Record Details"
           username={username}
           displayName={displayName}
           profilePicUrl={profilePicUrl ?? undefined}
+          onLogout={handleLogout}
         />
         <Box
+          component="main"
           sx={{
             flex: 1,
+            minHeight: 0,
             overflowY: { xs: "auto", md: "auto" },
             mt: 1,
             pb: 2,
@@ -749,133 +623,416 @@ export default function Record() {
           }}
         >
           <Box maxWidth={800} mx="auto" sx={{ height: { md: "100%" } }}>
-            <Paper
-              variant="outlined"
-              sx={{
-                borderRadius: 2,
-                display: "flex",
-                flexDirection: { xs: "column", md: "row" },
-                minHeight: { xs: 420, md: 560 },
-                height: { md: "100%" },
-                overflow: "hidden",
-              }}
-            >
-              <Box
-                sx={{
-                  flexBasis: { md: "45%" },
-                  flexGrow: 1,
-                  p: { xs: 2, md: 3 },
-                  display: "flex",
-                  flexDirection: "column",
-                }}
-              >
-                <Button
-                  startIcon={<ArrowBackIcon />}
-                  onClick={handleBack}
-                  variant="text"
-                  sx={{ alignSelf: "flex-start", mb: 1 }}
+            <Stack spacing={3}>
+              {loadingRecord ? (
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    minHeight: 240,
+                  }}
                 >
-                  {backButtonLabel}
-                </Button>
-                <Stack direction={{ xs: "row", md: "column" }}>
-                  {fromCollection && (masterLoading || !masterInfo) ? (
+                  <CircularProgress />
+                </Box>
+              ) : error ? (
+                <Alert severity="error">{error}</Alert>
+              ) : record ? (
+                <Stack spacing={3}>
+                  <Paper
+                    variant="outlined"
+                    sx={{
+                      borderRadius: 2,
+                      display: "flex",
+                      flexDirection: { xs: "column", md: "row" },
+                      height: { md: "100%" },
+                      overflow: "hidden",
+                    }}
+                  >
                     <Box
                       sx={{
-                        width: 180,
-                        height: 180,
-                        borderRadius: 2,
-                        bgcolor: "grey.900",
-                        mb: { xs: 0, md: 1.5 },
+                        flexBasis: { md: "45%" },
+                        flexGrow: 1,
+                        p: { xs: 2, md: 3 },
                         display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
+                        flexDirection: "column",
                       }}
                     >
-                      <CircularProgress />
+                      <Stack
+                        direction="row"
+                        justifyContent="space-between"
+                        alignItems="center"
+                        sx={{ width: "100%" }}
+                      >
+                        <Button
+                          variant="outlined"
+                          startIcon={<ArrowBackIcon />}
+                          onClick={handleBack}
+                          sx={{ alignSelf: "flex-start", mb: 1.5, px: 1.9 }}
+                        >
+                          Back
+                        </Button>
+                        {ownerUsername && ownerHandle && (
+                          <Box sx={{ ml: 2, minWidth: 0, mb: 1.5 }}>
+                            <ButtonBase
+                              onClick={handleOpenOwnerProfile}
+                              sx={{
+                                borderRadius: 1,
+                                px: 1,
+                                py: 0.5,
+                                textAlign: "right",
+                                "&:hover": {
+                                  bgcolor: "action.hover",
+                                },
+                                minWidth: 0,
+                                maxWidth: "100%",
+                              }}
+                              aria-label={`View ${
+                                ownerDisplayName ?? ownerHandle
+                              }'s profile`}
+                            >
+                              <Stack
+                                direction="row"
+                                spacing={1.5}
+                                alignItems="center"
+                                sx={{ minWidth: 0 }}
+                              >
+                                <Stack spacing={0.25} sx={{ minWidth: 0 }}>
+                                  <Typography
+                                    variant="subtitle2"
+                                    sx={{
+                                      whiteSpace: "nowrap",
+                                      overflow: "hidden",
+                                      textOverflow: "ellipsis",
+                                      minWidth: 0,
+                                    }}
+                                  >
+                                    {ownerDisplayName ?? ownerHandle}
+                                  </Typography>
+                                  {ownerDisplayName && (
+                                    <Typography
+                                      variant="body2"
+                                      color="text.secondary"
+                                      sx={{
+                                        whiteSpace: "nowrap",
+                                        overflow: "hidden",
+                                        textOverflow: "ellipsis",
+                                        minWidth: 0,
+                                      }}
+                                    >
+                                      {ownerHandle}
+                                    </Typography>
+                                  )}
+                                </Stack>
+                                <Avatar
+                                  src={owner?.profilePicUrl ?? undefined}
+                                  alt={ownerProfileAlt}
+                                  sx={{ width: 40, height: 40, flexShrink: 0 }}
+                                >
+                                  {ownerInitial}
+                                </Avatar>
+                              </Stack>
+                            </ButtonBase>
+                          </Box>
+                        )}
+                      </Stack>
+                      <Stack
+                        spacing={{ xs: 2, md: 3 }}
+                        direction={{ xs: "column", md: "row" }}
+                        alignItems={{ xs: "stretch", md: "flex-start" }}
+                      >
+                        <Box
+                          sx={{
+                            flexShrink: 0,
+                            width: { xs: "100%", sm: 260 },
+                            maxWidth: 260,
+                            alignSelf: "flex-start",
+                          }}
+                        >
+                          <Box
+                            component="img"
+                            src={record.cover || placeholderCover}
+                            alt={record.record}
+                            sx={{
+                              width: "100%",
+                              borderRadius: 2,
+                              objectFit: "cover",
+                              aspectRatio: "1 / 1",
+                            }}
+                          />
+                        </Box>
+                        <Stack spacing={2} sx={{ flex: 1 }}>
+                          <Stack spacing={0.5}>
+                            <Typography variant="h4" component="h1">
+                              {record.record}
+                            </Typography>
+                            <Typography variant="h6" color="text.secondary">
+                              {record.artist}
+                            </Typography>
+                          </Stack>
+
+                          <Divider flexItem />
+
+                          <Stack pb={record.masterId ? 1 : 0}>
+                            <Stack direction="row" flexWrap="wrap" useFlexGap>
+                              <Box mr={2.5} mb={1.5}>
+                                <Typography
+                                  variant="overline"
+                                  color="text.secondary"
+                                  sx={{ letterSpacing: 0.6 }}
+                                >
+                                  Collection
+                                </Typography>
+                                <Typography variant="body1">
+                                  {collectionLabel}
+                                </Typography>
+                              </Box>
+                              <Box mr={2.5} mb={1.5}>
+                                <Typography
+                                  variant="overline"
+                                  color="text.secondary"
+                                  sx={{ letterSpacing: 0.6 }}
+                                >
+                                  Rating
+                                </Typography>
+                                <Typography variant="body1">
+                                  {ratingText}
+                                </Typography>
+                              </Box>
+                              <Box mr={2.5} mb={1.5}>
+                                <Typography
+                                  variant="overline"
+                                  color="text.secondary"
+                                  sx={{ letterSpacing: 0.6 }}
+                                >
+                                  Release Year
+                                </Typography>
+                                <Typography variant="body1">
+                                  {releaseText}
+                                </Typography>
+                              </Box>
+                              <Box mr={2.5} mb={1.5}>
+                                <Typography
+                                  variant="overline"
+                                  color="text.secondary"
+                                  sx={{ letterSpacing: 0.6 }}
+                                >
+                                  Added
+                                </Typography>
+                                <Typography variant="body1">
+                                  {addedText}
+                                </Typography>
+                              </Box>
+                              {record.isCustom ? (
+                                <Box mr={2.5} mb={1.5}>
+                                  <Typography
+                                    variant="overline"
+                                    color="text.secondary"
+                                    sx={{ letterSpacing: 0.6 }}
+                                  >
+                                    Entry Type
+                                  </Typography>
+                                  <Typography variant="body1">
+                                    Custom
+                                  </Typography>
+                                </Box>
+                              ) : null}
+                            </Stack>
+
+                            <Box mb={2}>
+                              <Typography
+                                variant="overline"
+                                color="text.secondary"
+                                sx={{ letterSpacing: 0.6 }}
+                              >
+                                Tags
+                              </Typography>
+                              {tags.length > 0 ? (
+                                <Stack
+                                  direction="row"
+                                  spacing={1}
+                                  flexWrap="wrap"
+                                  useFlexGap
+                                >
+                                  {tags.map((tag) => (
+                                    <Chip
+                                      key={tag}
+                                      label={tag}
+                                      sx={{ fontSize: "0.9rem" }}
+                                    />
+                                  ))}
+                                </Stack>
+                              ) : (
+                                <Typography
+                                  variant="body2"
+                                  color="text.secondary"
+                                >
+                                  No tags added yet.
+                                </Typography>
+                              )}
+                            </Box>
+
+                            <Box>
+                              <Typography
+                                variant="overline"
+                                color="text.secondary"
+                                sx={{ letterSpacing: 0.6 }}
+                              >
+                                Review
+                              </Typography>
+                              {hasReview ? (
+                                <Typography
+                                  variant="body1"
+                                  sx={{ whiteSpace: "pre-line" }}
+                                >
+                                  {record.review}
+                                </Typography>
+                              ) : (
+                                <Typography
+                                  variant="body2"
+                                  color="text.secondary"
+                                >
+                                  No review saved for this record.
+                                </Typography>
+                              )}
+                            </Box>
+                          </Stack>
+
+                          {showActionRow && (
+                            <Stack
+                              direction={{ xs: "column", sm: "row" }}
+                              spacing={1.5}
+                              useFlexGap
+                              flexWrap="wrap"
+                              alignItems={{
+                                xs: "stretch",
+                                sm: "flex-start",
+                              }}
+                            >
+                              <Stack
+                                direction={{ xs: "row", sm: "row" }}
+                                spacing={1.5}
+                                useFlexGap
+                                flexWrap="wrap"
+                                alignItems={{
+                                  xs: "stretch",
+                                  sm: "flex-start",
+                                }}
+                              >
+                                {showMasterButton && (
+                                  <Button
+                                    variant="contained"
+                                    color="primary"
+                                    startIcon={<LaunchIcon />}
+                                    onClick={handleOpenMasterRecord}
+                                  >
+                                    Master
+                                  </Button>
+                                )}
+                                {showOwnerActions && (
+                                  <>
+                                    <Button
+                                      variant="outlined"
+                                      startIcon={<EditOutlinedIcon />}
+                                      onClick={handleOpenEditDialog}
+                                    >
+                                      Edit
+                                    </Button>
+                                    <Button
+                                      variant="outlined"
+                                      startIcon={<DriveFileMoveOutlinedIcon />}
+                                      onClick={handleOpenMoveDialog}
+                                    >
+                                      Move
+                                    </Button>
+                                    <Button
+                                      variant="outlined"
+                                      color="error"
+                                      startIcon={<DeleteOutlineIcon />}
+                                      onClick={handleRequestDelete}
+                                    >
+                                      Delete
+                                    </Button>
+                                  </>
+                                )}
+                              </Stack>
+                            </Stack>
+                          )}
+                        </Stack>
+                      </Stack>
                     </Box>
-                  ) : (
-                    <Box
-                      component="img"
-                      src={
-                        !fromCollection
-                          ? album.cover || placeholderCover
-                          : masterInfo?.cover || placeholderCover
-                      }
-                      alt={album.record}
-                      sx={{
-                        width: 180,
-                        height: 180,
-                        objectFit: "cover",
-                        borderRadius: 2,
-                        bgcolor: "grey.900",
-                        mb: { xs: 0, md: 1.5 },
-                      }}
-                    />
-                  )}
-                  <Box sx={{ ml: { xs: 2, md: 0 } }}>
-                    <Typography variant="h5" fontWeight={700}>
-                      {album.record}
-                    </Typography>
-                    <Typography color="text.secondary" variant="h6">
-                      {album.artist}
-                    </Typography>
-                  </Box>
+                  </Paper>
                 </Stack>
-                <Divider sx={{ my: 2 }} />
-                {masterRatingContent && <Box>{masterRatingContent}</Box>}
-              </Box>
-              <Box
-                sx={{
-                  flexBasis: { md: "55%" },
-                  flexGrow: 1,
-                  p: { xs: 2, md: 3 },
-                  mt: { xs: -1, md: 0 },
-                  mb: { xs: 2, md: 0 },
-                  maxHeight: { xs: 700, md: "none" },
-                  display: "flex",
-                  flexDirection: "column",
-                }}
-              >
-                <FindRecordSidebar
-                  availableTags={availableTags}
-                  selectedTags={selectedTags}
-                  onToggleTag={handleToggleTag}
-                  onAddNewTag={handleAddNewTag}
-                  wikiTags={wikiTags}
-                  wikiLoading={wikiLoading}
-                  rating={rating}
-                  onRatingChange={setRating}
-                  releaseYear={releaseYear}
-                  onReleaseYearChange={handleReleaseYearChange}
-                  review={reviewText}
-                  onReviewChange={handleReviewChange}
-                  canAdd={!adding}
-                  onAddRecord={handleAddRecord}
-                  onWishlistRecord={handleAddWishlistRecord}
-                  onListenedRecord={handleAddListenedRecord}
-                />
-              </Box>
-            </Paper>
+              ) : (
+                <Alert severity="info">Record not available.</Alert>
+              )}
+            </Stack>
           </Box>
         </Box>
-        <Snackbar
-          open={snackbar.open}
-          autoHideDuration={4000}
-          onClose={(_, reason) => {
-            if (reason !== "clickaway")
-              setSnackbar((prev) => ({ ...prev, open: false }));
-          }}
-          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-        >
-          <Alert
-            severity={snackbar.severity}
-            variant="filled"
-            onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
-          >
-            {snackbar.message}
-          </Alert>
-        </Snackbar>
       </Box>
+      <EditRecordDialog
+        open={editDialogOpen}
+        onClose={() => setEditDialogOpen(false)}
+        onSave={handleSaveRecordChanges}
+        record={record}
+        tagOptions={record?.tags ?? []}
+      />
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => !deleteLoading && setDeleteDialogOpen(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle sx={{ bgcolor: "background.paper" }}>
+          Delete Record
+        </DialogTitle>
+        <DialogContent sx={{ bgcolor: "background.paper" }}>
+          <DialogContentText>
+            {`Are you sure you want to permanently delete "${
+              record?.record || "this record"
+            }"? This action cannot be undone.`}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ bgcolor: "background.paper" }}>
+          <Button
+            onClick={() => setDeleteDialogOpen(false)}
+            disabled={deleteLoading}
+            sx={{ fontWeight: 700 }}
+          >
+            Cancel
+          </Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={handleDeleteConfirmed}
+            disabled={deleteLoading}
+            sx={{ fontWeight: 700 }}
+          >
+            {deleteLoading ? "Deleting..." : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+      <MoveRecordDialog
+        open={moveDialogOpen}
+        recordId={record?.id ?? null}
+        currentCollection={currentCollectionName}
+        onClose={() => setMoveDialogOpen(false)}
+        onMoved={handleRecordMoved}
+      />
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={handleSnackbarClose}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          severity={snackbar.severity}
+          variant="filled"
+          onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </ThemeProvider>
   );
 }

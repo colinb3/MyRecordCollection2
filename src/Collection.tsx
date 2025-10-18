@@ -7,12 +7,7 @@ import {
   IconButton,
   Drawer,
   useMediaQuery,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogContentText,
-  DialogActions,
-  Button,
+  TextField,
   Snackbar,
   Alert,
 } from "@mui/material";
@@ -46,9 +41,6 @@ import { setUserId } from "./analytics";
 import TopBar from "./components/TopBar";
 import RecordTable from "./components/RecordTable";
 import FilterSidebar from "./components/FilterSidebar";
-import ButtonBar from "./components/ButtonBar";
-import MoveRecordDialog from "./components/MoveRecordDialog";
-import EditRecordDialog from "./components/EditRecordDialog";
 import ManageTagsDialog from "./components/ManageTagsDialog";
 
 interface CollectionProps {
@@ -88,15 +80,7 @@ export default function Collection({ tableName, title }: CollectionProps) {
   );
 
   const [selectedRecord, setSelectedRecord] = useState<Record | null>(null);
-  // Track the last actual (persisted) selected record so we can restore after cancelling a create
-  const [lastRealSelectedRecord, setLastRealSelectedRecord] =
-    useState<Record | null>(null);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [editMode, setEditMode] = useState<"edit" | "create">("edit");
-  // Deletion dialog & snackbar
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [moveDialogOpen, setMoveDialogOpen] = useState(false);
-  const [deleteLoading, setDeleteLoading] = useState(false);
+  // Snackbar for high level notifications
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
@@ -119,41 +103,30 @@ export default function Collection({ tableName, title }: CollectionProps) {
   const handleFilterChange = (newFilters: Partial<Filters>) => {
     setFilters((prev) => ({ ...prev, ...newFilters }));
   };
-  const handleViewMasterRecord = useCallback(() => {
-    if (!selectedRecord || !selectedRecord.masterId) {
-      return;
-    }
 
-    const albumPayload = {
-      id: `collection-${selectedRecord.id}`,
-      record: selectedRecord.record,
-      artist: selectedRecord.artist,
-      cover: selectedRecord.cover ?? "",
-    };
+  const navigateToRecordDetails = useCallback(
+    (record: Record) => {
+      const originPath = `${location.pathname}${location.search}${location.hash}`;
 
-    const originPath = `${location.pathname}${location.search}${location.hash}`;
-
-    navigate(`/record?q=${selectedRecord.masterId}`, {
-      state: {
-        album: albumPayload,
-        masterId: selectedRecord.masterId,
-        query: selectedRecord.record,
-        fromCollection: {
-          path: originPath,
-          title: title ?? tableName,
-          tableName,
+      navigate(`/record/${record.id}`, {
+        state: {
+          from: {
+            path: originPath,
+            label: title ?? tableName,
+          },
+          record,
         },
-      },
-    });
-  }, [
-    navigate,
-    selectedRecord,
-    location.pathname,
-    location.search,
-    location.hash,
-    title,
-    tableName,
-  ]);
+      });
+    },
+    [
+      navigate,
+      location.pathname,
+      location.search,
+      location.hash,
+      title,
+      tableName,
+    ]
+  );
 
   const resetFilters = () => {
     setFilters(initialFilters);
@@ -236,7 +209,6 @@ export default function Collection({ tableName, title }: CollectionProps) {
           setRecords(recordData);
           setFilteredRecords(recordData);
           setSelectedRecord(null);
-          setLastRealSelectedRecord(null);
         }
 
         if (tagData) {
@@ -322,183 +294,9 @@ export default function Collection({ tableName, title }: CollectionProps) {
   const handleSelectRecord = (rec: Record | null) => {
     setSelectedRecord(rec);
     if (rec && rec.id !== -1) {
-      setLastRealSelectedRecord(rec);
+      navigateToRecordDetails(rec);
     }
   };
-
-  // Open dialog for editing selected record
-  const handleEditRecord = () => {
-    if (selectedRecord) {
-      setEditMode("edit");
-      setEditDialogOpen(true);
-    }
-  };
-
-  // Open dialog for creating a new record
-  const handleCreateRecord = () => {
-    setEditMode("create");
-    setSelectedRecord({
-      id: -1,
-      cover: "",
-      record: "",
-      artist: "",
-      rating: 0,
-      isCustom: true,
-      tags: [],
-      release: 2024,
-      added: new Date().toISOString().slice(0, 10),
-    });
-    setEditDialogOpen(true);
-  };
-
-  const handleDeleteRecord = () => {
-    if (!selectedRecord || selectedRecord.id === -1) return;
-    setDeleteDialogOpen(true);
-  };
-
-  const performDelete = async () => {
-    if (!selectedRecord) return;
-    setDeleteLoading(true);
-    try {
-      const res = await fetch(apiUrl("/api/records/delete"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ id: selectedRecord.id }),
-      });
-      if (res.ok) {
-        setRecords((prev) => prev.filter((r) => r.id !== selectedRecord.id));
-        setSelectedRecord(null);
-        setLastRealSelectedRecord(null);
-        setSnackbar({
-          open: true,
-          message: "Record deleted",
-          severity: "success",
-        });
-      } else {
-        const problem = await res.json().catch(() => ({}));
-        setSnackbar({
-          open: true,
-          message: problem.error || "Failed to delete record",
-          severity: "error",
-        });
-      }
-    } catch {
-      setSnackbar({
-        open: true,
-        message: "Network error deleting record",
-        severity: "error",
-      });
-    } finally {
-      setDeleteLoading(false);
-      setDeleteDialogOpen(false);
-    }
-  };
-
-  const handleMoveRecord = () => {
-    if (!selectedRecord) return;
-    setMoveDialogOpen(true);
-  };
-
-  const handleRecordMoved = (
-    targetCollection: string,
-    serverMessage?: string
-  ) => {
-    // Remove from current list (since it's moving out of the current table)
-    if (selectedRecord) {
-      setRecords((prev) => prev.filter((r) => r.id !== selectedRecord.id));
-      setFilteredRecords((prev) =>
-        prev.filter((r) => r.id !== selectedRecord.id)
-      );
-      setSelectedRecord(null);
-      setLastRealSelectedRecord(null);
-    }
-    setSnackbar({
-      open: true,
-      message: serverMessage || `Record moved to ${targetCollection}`,
-      severity: "success",
-    });
-    setMoveDialogOpen(false);
-  };
-
-  // Save handler for dialog
-  const handleSaveRecord = async (rec: Record) => {
-    try {
-      let updated: Record | null = null;
-      if (editMode === "edit" && rec.id !== -1) {
-        const res = await fetch(apiUrl("/api/records/update"), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify(rec),
-        });
-        if (res.ok) {
-          updated = await res.json();
-          setRecords((prev) =>
-            prev.map((r) => (r.id === updated!.id ? updated! : r))
-          );
-          // Keep the selectedRecord in sync with the saved changes
-          setSelectedRecord(updated);
-        } else {
-          const problem = await res.json().catch(() => ({}));
-          setSnackbar({
-            open: true,
-            message: problem.error || `Failed to save record (${res.status})`,
-            severity: "error",
-          });
-          return;
-        }
-      } else if (editMode === "create") {
-        const createPayload = { ...rec, tableName };
-        const res = await fetch(apiUrl("/api/records/create"), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify(createPayload),
-        });
-        if (res.ok) {
-          updated = await res.json();
-          setRecords((prev) => [...prev, updated!]);
-          // Select the newly created record so editing it shows the latest data
-          setSelectedRecord(updated);
-          setLastRealSelectedRecord(updated);
-        } else {
-          const problem = await res.json().catch(() => ({}));
-          setSnackbar({
-            open: true,
-            message: problem.error || `Failed to create record (${res.status})`,
-            severity: "error",
-          });
-          return;
-        }
-      }
-
-      // If the saved record returned tags, merge any new tags into allTags
-      if (updated && Array.isArray(updated.tags)) {
-        setAllTags((prev) => {
-          const set = new Set(prev);
-          for (const t of updated!.tags) set.add(t);
-          return Array.from(set);
-        });
-      }
-
-      setEditDialogOpen(false);
-      if (updated) {
-        setSnackbar({
-          open: true,
-          message: editMode === "create" ? "Record added" : "Record saved",
-          severity: "success",
-        });
-      }
-    } catch (err) {
-      setSnackbar({
-        open: true,
-        message: "Failed to save record",
-        severity: "error",
-      });
-    }
-  };
-
   return (
     <ThemeProvider theme={darkTheme}>
       <CssBaseline />
@@ -520,17 +318,23 @@ export default function Collection({ tableName, title }: CollectionProps) {
           />
         </Box>
 
-        <Box sx={{ flex: "0 0 auto", mb: 1 }}>
-          <ButtonBar
-            onSearchChange={setSearchTerm}
-            onEditRecord={handleEditRecord}
-            onCreateRecord={handleCreateRecord}
-            onDeleteRecord={handleDeleteRecord}
-            onMoveRecord={handleMoveRecord}
-            onViewMaster={handleViewMasterRecord}
-            editEnabled={!!selectedRecord}
-            viewMasterEnabled={Boolean(selectedRecord?.masterId)}
-            collectionTitle={title ?? tableName}
+        <Box
+          sx={{
+            flex: "0 0 auto",
+            mb: 1,
+            display: "flex",
+            justifyContent: "flex-start",
+          }}
+        >
+          <TextField
+            variant="outlined"
+            type="search"
+            placeholder={`Search ${title ?? tableName}`}
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            sx={{
+              width: { xs: "100%", sm: 350 },
+            }}
           />
         </Box>
         <Grid
@@ -576,53 +380,6 @@ export default function Collection({ tableName, title }: CollectionProps) {
             </Grid>
           )}
         </Grid>
-        <EditRecordDialog
-          open={editDialogOpen}
-          onClose={() => {
-            // If creating and user cancels, restore previous real selection
-            if (editMode === "create" && selectedRecord?.id === -1) {
-              setSelectedRecord(lastRealSelectedRecord);
-              setEditMode("edit");
-            }
-            setEditDialogOpen(false);
-          }}
-          onSave={handleSaveRecord}
-          record={selectedRecord}
-          tagOptions={allTags}
-        />
-        <Dialog
-          open={deleteDialogOpen}
-          onClose={() => !deleteLoading && setDeleteDialogOpen(false)}
-        >
-          <DialogTitle sx={{ bgcolor: "background.paper" }}>
-            Delete Record
-          </DialogTitle>
-          <DialogContent sx={{ bgcolor: "background.paper" }}>
-            <DialogContentText>
-              {`Are you sure you want to permanently delete "${
-                selectedRecord?.record || ""
-              }"? This action cannot be undone.`}
-            </DialogContentText>
-          </DialogContent>
-          <DialogActions sx={{ bgcolor: "background.paper" }}>
-            <Button
-              onClick={() => setDeleteDialogOpen(false)}
-              disabled={deleteLoading}
-              sx={{ fontWeight: 700 }}
-            >
-              Cancel
-            </Button>
-            <Button
-              color="error"
-              variant="contained"
-              onClick={performDelete}
-              disabled={deleteLoading}
-              sx={{ fontWeight: 700 }}
-            >
-              {deleteLoading ? "Deleting..." : "Delete"}
-            </Button>
-          </DialogActions>
-        </Dialog>
         <Snackbar
           open={snackbar.open}
           autoHideDuration={4000}
@@ -738,22 +495,7 @@ export default function Collection({ tableName, title }: CollectionProps) {
                   }
                 : prev
             );
-            setLastRealSelectedRecord((prev) =>
-              prev && prev.tags.includes(oldName)
-                ? {
-                    ...prev,
-                    tags: prev.tags.map((t) => (t === oldName ? newName : t)),
-                  }
-                : prev
-            );
           }}
-        />
-        <MoveRecordDialog
-          open={moveDialogOpen}
-          recordId={selectedRecord?.id ?? null}
-          currentCollection={tableName}
-          onClose={() => setMoveDialogOpen(false)}
-          onMoved={handleRecordMoved}
         />
       </Box>
     </ThemeProvider>

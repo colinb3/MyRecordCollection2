@@ -19,6 +19,8 @@ import {
   Tab,
   Divider,
   Button,
+  ButtonBase,
+  Stack,
 } from "@mui/material";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import TopBar from "./components/TopBar";
@@ -195,32 +197,59 @@ export default function Community() {
 
   const handleRecordNavigate = useCallback(
     (entry: CommunityFeedEntry) => {
-      const masterId = Number(entry.record.masterId);
-      if (!Number.isInteger(masterId) || masterId <= 0) {
+      if (!entry.record || entry.record.id <= 0) {
         return;
       }
 
-      const albumPayload = {
-        id: `community-${entry.record.id}`,
-        record: entry.record.record,
-        artist: entry.record.artist,
-        cover: entry.record.cover || "",
-      };
+      const ownerUsername = entry.owner.username;
+      const normalizedOwner = ownerUsername.toLowerCase();
+      const normalizedViewer = (username ?? "").toLowerCase();
+      const isOwnRecord =
+        normalizedOwner.length > 0 && normalizedOwner === normalizedViewer;
 
       const originPath = `${location.pathname}${location.search}${location.hash}`;
+      const ownerDisplay =
+        (entry.owner.displayName ?? "").trim() || ownerUsername;
+      const rawCollectionName = (
+        entry.record.collectionName ||
+        entry.record.tableName ||
+        ""
+      ).trim();
+      const collectionLabel = (() => {
+        if (!rawCollectionName) return "Collection";
+        const normalized = rawCollectionName.toLowerCase();
+        if (normalized === "my collection") return "Collection";
+        if (normalized === "wishlist") return "Wishlist";
+        if (normalized === "listened") return "Listened";
+        return rawCollectionName;
+      })();
 
-      navigate(`/record?q=${masterId}`, {
+      const fromLabel = `${ownerDisplay}'s ${collectionLabel}`;
+
+      const targetPath = isOwnRecord
+        ? `/record/${entry.record.id}`
+        : `/community/${encodeURIComponent(ownerUsername)}/record/${
+            entry.record.id
+          }`;
+
+      navigate(targetPath, {
         state: {
-          album: albumPayload,
-          masterId,
-          fromCollection: {
+          from: {
             path: originPath,
-            title: "Community Feed",
+            label: fromLabel,
           },
+          record: entry.record,
+          owner: isOwnRecord
+            ? null
+            : {
+                username: ownerUsername,
+                displayName: entry.owner.displayName ?? null,
+                profilePicUrl: entry.owner.profilePicUrl ?? null,
+              },
         },
       });
     },
-    [location.hash, location.pathname, location.search, navigate]
+    [location.hash, location.pathname, location.search, navigate, username]
   );
 
   return (
@@ -325,9 +354,27 @@ export default function Community() {
                         const coverSrc = entry.record.cover
                           ? entry.record.cover
                           : placeholderCover;
+                        const tableName = (() => {
+                          const raw =
+                            typeof entry.record.tableName === "string"
+                              ? entry.record.tableName.trim()
+                              : "";
+                          if (!raw) return "their collection";
+                          const normalized = raw.toLowerCase();
+                          if (normalized === "my collection") {
+                            return "collected";
+                          }
+                          if (normalized === "wishlist") {
+                            return "wishlisted";
+                          }
+                          if (normalized === "listened") {
+                            return "listened to";
+                          }
+                          return raw;
+                        })();
                         const canNavigateToRecord =
-                          Number.isInteger(entry.record.masterId) &&
-                          Number(entry.record.masterId) > 0;
+                          Number.isInteger(entry.record.id) &&
+                          Number(entry.record.id) > 0;
 
                         return (
                           <ListItemButton
@@ -352,7 +399,7 @@ export default function Community() {
                               opacity: canNavigateToRecord ? 1 : 0.85,
                             }}
                           >
-                            <Grid container spacing={2} width={"100%"}>
+                            <Grid container spacing={1} width={"100%"}>
                               <Grid
                                 size={12}
                                 sx={{
@@ -361,20 +408,7 @@ export default function Community() {
                                   gap: 0.5,
                                 }}
                               >
-                                <Avatar
-                                  src={entry.owner.profilePicUrl ?? undefined}
-                                  alt={ownerDisplay}
-                                  sx={{
-                                    width: 40,
-                                    height: 40,
-                                    bgcolor: "grey.700",
-                                  }}
-                                >
-                                  {!entry.owner.profilePicUrl && avatarInitial}
-                                </Avatar>
-                                <Button
-                                  variant="text"
-                                  size="small"
+                                <ButtonBase
                                   onClick={(event) =>
                                     handleOwnerClick(
                                       event,
@@ -382,25 +416,71 @@ export default function Community() {
                                     )
                                   }
                                   sx={{
-                                    textTransform: "none",
-                                    fontWeight: 700,
-                                    fontSize: "1rem",
-                                    pl: 0.75,
-                                    minWidth: 0,
-                                    color: "text.primary",
-                                    ":hover": {
-                                      backgroundColor: "action.hover",
+                                    alignSelf: "flex-start",
+                                    borderRadius: 1,
+                                    px: 0.5,
+                                    py: 0.5,
+                                    textAlign: "left",
+                                    "&:hover": {
+                                      bgcolor: "action.hover",
                                     },
+                                    // ensure children can shrink for text truncation
+                                    minWidth: 0,
                                   }}
                                 >
-                                  {ownerDisplay}
-                                </Button>
+                                  <Stack
+                                    direction="row"
+                                    spacing={1.5}
+                                    alignItems="center"
+                                    sx={{ minWidth: 0 }}
+                                  >
+                                    <Avatar
+                                      src={
+                                        entry.owner.profilePicUrl ?? undefined
+                                      }
+                                      alt={ownerDisplay}
+                                      sx={{
+                                        width: 40,
+                                        height: 40,
+                                        bgcolor: "grey.700",
+                                        flex: "0 0 auto",
+                                      }}
+                                    >
+                                      {!entry.owner.profilePicUrl &&
+                                        avatarInitial}
+                                    </Avatar>
+
+                                    <Typography
+                                      fontWeight={700}
+                                      noWrap
+                                      sx={{
+                                        overflow: "hidden",
+                                        textOverflow: "ellipsis",
+                                        whiteSpace: "nowrap",
+                                        minWidth: 0,
+                                      }}
+                                    >
+                                      {ownerDisplay}
+                                    </Typography>
+                                  </Stack>
+                                </ButtonBase>
+                                <Typography
+                                  component="span"
+                                  sx={{ ml: -0.5 }}
+                                  noWrap
+                                  overflow={"visible"}
+                                >
+                                  {tableName}:
+                                </Typography>
                                 {addedDate && (
                                   <Typography
                                     variant="body2"
                                     color="text.secondary"
                                     ml={"auto"}
                                     textAlign={"right"}
+                                    noWrap
+                                    overflow={"visible"}
+                                    pl={1}
                                   >
                                     {addedDate}
                                   </Typography>
@@ -426,6 +506,7 @@ export default function Community() {
                                   display: "flex",
                                   flexDirection: "column",
                                   gap: 0.6,
+                                  pl: 1,
                                   minWidth: 0,
                                 }}
                               >

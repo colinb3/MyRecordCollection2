@@ -9,12 +9,9 @@ import {
   Drawer,
   IconButton,
   useMediaQuery,
-  Button,
-  Tooltip,
 } from "@mui/material";
 import Grid from "@mui/material/Grid";
 import FilterListAltIcon from "@mui/icons-material/FilterListAlt";
-import LaunchIcon from "@mui/icons-material/Launch";
 import {
   useNavigate,
   useParams,
@@ -67,6 +64,10 @@ export default function CommunityCollection() {
   );
 
   const targetUsername = params.username ?? "";
+  const normalizedViewer = (username ?? "").toLowerCase();
+  const normalizedTarget = targetUsername.trim().toLowerCase();
+  const viewingOwnCollection =
+    normalizedTarget.length > 0 && normalizedTarget === normalizedViewer;
   const rawTableParam = (searchParams.get("table") ?? "").trim();
   const activeTableName = useMemo(() => {
     if (!rawTableParam) {
@@ -93,7 +94,6 @@ export default function CommunityCollection() {
   const [filters, setFilters] = useState<Filters>(() => createInitialFilters());
   const [allTags, setAllTags] = useState<string[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [selectedRecord, setSelectedRecord] = useState<MrcRecord | null>(null);
   const isLargeScreen = useMediaQuery("(min-width:1200px)");
 
   useEffect(() => {
@@ -141,7 +141,6 @@ export default function CommunityCollection() {
     setSearchTerm("");
     setFilters(createInitialFilters());
     setAllTags([]);
-    setSelectedRecord(null);
 
     Promise.all([
       loadPublicUserProfile(targetUsername),
@@ -242,15 +241,6 @@ export default function CommunityCollection() {
     return next;
   }, [records, searchTerm, filters]);
 
-  useEffect(() => {
-    if (!selectedRecord) {
-      return;
-    }
-    if (!filteredRecords.some((record) => record.id === selectedRecord.id)) {
-      setSelectedRecord(null);
-    }
-  }, [filteredRecords, selectedRecord]);
-
   const targetDisplayName = profile?.displayName || targetUsername;
   const targetAvatarInitial = (profile?.displayName || targetUsername)
     .charAt(0)
@@ -272,56 +262,60 @@ export default function CommunityCollection() {
     : isListenedView
     ? "No listened records to display."
     : "No records to display.";
-  const viewMasterEnabled = Boolean(selectedRecord?.masterId);
-  const viewMasterTooltip = selectedRecord
-    ? "This record does not have an associated master"
-    : "Select a record to view its master";
+  const navigateToRecordDetails = useCallback(
+    (record: MrcRecord) => {
+      const originPath = `${location.pathname}${location.search}${location.hash}`;
 
-  const handleSelectRecord = useCallback((record: MrcRecord | null) => {
-    setSelectedRecord(record);
-  }, []);
+      const targetPath = viewingOwnCollection
+        ? `/record/${record.id}`
+        : `/community/${encodeURIComponent(targetUsername)}/record/${
+            record.id
+          }`;
 
-  const handleViewMaster = useCallback(() => {
-    if (!selectedRecord?.masterId) {
-      return;
-    }
-
-    const albumPayload = {
-      id: `community-${selectedRecord.id}`,
-      record: selectedRecord.record,
-      artist: selectedRecord.artist,
-      cover: selectedRecord.cover ?? "",
-    };
-
-    const originPath = `${location.pathname}${location.search}${location.hash}`;
-
-    navigate(`/record?q=${selectedRecord.masterId}`, {
-      state: {
-        album: albumPayload,
-        masterId: selectedRecord.masterId,
-        query: selectedRecord.record,
-        fromCollection: {
-          path: originPath,
-          title: isWishlistView
-            ? `${targetDisplayName}'s Wishlist`
-            : isListenedView
-            ? `${targetDisplayName}'s Listened`
-            : `${targetDisplayName}'s Collection`,
-          tableName: activeTableName,
+      navigate(targetPath, {
+        state: {
+          from: {
+            path: originPath,
+            label: isWishlistView
+              ? `${targetDisplayName}'s Wishlist`
+              : isListenedView
+              ? `${targetDisplayName}'s Listened`
+              : `${targetDisplayName}'s Collection`,
+          },
+          record,
+          owner: viewingOwnCollection
+            ? null
+            : {
+                username: targetUsername,
+                displayName: profile?.displayName ?? null,
+                profilePicUrl: profile?.profilePicUrl ?? null,
+              },
         },
-      },
-    });
-  }, [
-    navigate,
-    selectedRecord,
-    location.pathname,
-    location.search,
-    location.hash,
-    isWishlistView,
-    isListenedView,
-    targetDisplayName,
-    activeTableName,
-  ]);
+      });
+    },
+    [
+      navigate,
+      location.pathname,
+      location.search,
+      location.hash,
+      isWishlistView,
+      isListenedView,
+      targetDisplayName,
+      targetUsername,
+      profile?.displayName,
+      profile?.profilePicUrl,
+      viewingOwnCollection,
+    ]
+  );
+
+  const handleSelectRecord = useCallback(
+    (record: MrcRecord | null) => {
+      if (record && record.id > 0) {
+        navigateToRecordDetails(record);
+      }
+    },
+    [navigateToRecordDetails]
+  );
 
   return (
     <ThemeProvider theme={darkTheme}>
@@ -418,7 +412,6 @@ export default function CommunityCollection() {
                   display: "flex",
                   alignItems: { xs: "stretch" },
                   justifyContent: { xs: "flex-start" },
-                  gap: 1,
                   pt: 1.1,
                   flexWrap: { xs: "nowrap", sm: "nowrap" },
                 }}
@@ -434,38 +427,6 @@ export default function CommunityCollection() {
                     width: { xs: "100%", sm: 320 },
                   }}
                 />
-                {viewMasterEnabled ? (
-                  <Button
-                    variant="outlined"
-                    color="primary"
-                    onClick={handleViewMaster}
-                    startIcon={<LaunchIcon />}
-                    sx={{
-                      height: 40,
-                      alignSelf: { xs: "stretch", sm: "center" },
-                    }}
-                  >
-                    View
-                  </Button>
-                ) : (
-                  <Tooltip title={viewMasterTooltip} placement="top">
-                    <span style={{ display: "inline-flex" }}>
-                      <Button
-                        variant="outlined"
-                        color="primary"
-                        onClick={handleViewMaster}
-                        disabled
-                        startIcon={<LaunchIcon />}
-                        sx={{
-                          height: 40,
-                          alignSelf: { xs: "stretch", sm: "center" },
-                        }}
-                      >
-                        View
-                      </Button>
-                    </span>
-                  </Tooltip>
-                )}
               </Box>
               <Box sx={{ flex: 1, minHeight: 0 }}>
                 {error ? (
@@ -503,7 +464,6 @@ export default function CommunityCollection() {
                     records={filteredRecords}
                     loading={loading}
                     onSelect={handleSelectRecord}
-                    selectedId={selectedRecord?.id}
                   />
                 )}
               </Box>

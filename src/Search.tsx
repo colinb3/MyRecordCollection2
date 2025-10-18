@@ -205,7 +205,7 @@ export default function Search() {
       // Pass the submitted query (from URL param) so the record page can
       // restore it when navigating back to Search.
       const submitted = (searchParams.get("q") ?? "").trim();
-      navigate("/record", { state: { album: item, query: submitted } });
+      navigate("/search/record", { state: { album: item, query: submitted } });
     },
     [navigate, searchParams]
   );

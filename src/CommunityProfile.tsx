@@ -190,7 +190,13 @@ export default function CommunityProfile() {
     return isViewingOwnProfile ? records.slice(0, OWN_PREVIEW_LIMIT) : records;
   }, [profile, isViewingOwnProfile]);
 
-  const profileUsername = profile?.username ?? (targetUsername || username);
+  const profileUsername =
+    profile?.username ??
+    (targetUsername && targetUsername.length > 0
+      ? targetUsername
+      : undefined) ??
+    username ??
+    "";
   const targetDisplayName =
     profile?.displayName || profileUsername || username || "";
   const targetAvatarInitial = targetDisplayName
@@ -453,7 +459,11 @@ export default function CommunityProfile() {
                         {!profile.profilePicUrl && targetAvatarInitial}
                       </Avatar>
                       <Box>
-                        <Typography variant="h4" mt={{ xs: -2, sm: 0 }}>
+                        <Typography
+                          variant="h4"
+                          mt={{ xs: -2, sm: 0 }}
+                          flexWrap={"wrap"}
+                        >
                           {targetDisplayName}
                         </Typography>
                         <Typography
@@ -559,7 +569,13 @@ export default function CommunityProfile() {
                     <RecordPreviewGrid
                       records={highlights}
                       keyPrefix="highlight"
-                      fromTitle={`${targetDisplayName}'s Profile`}
+                      fromTitle={`${targetDisplayName}'s Highlights`}
+                      ownerUsername={profileUsername}
+                      ownerDisplayName={
+                        profile?.displayName ?? targetDisplayName
+                      }
+                      ownerProfilePicUrl={profile?.profilePicUrl ?? null}
+                      isOwnerViewing={isViewingOwnProfile}
                     />
                   )}
                 </SectionCard>
@@ -586,7 +602,13 @@ export default function CommunityProfile() {
                         records={recentRecords}
                         keyPrefix="recent"
                         showDateAdded
-                        fromTitle={`${targetDisplayName}'s Profile`}
+                        fromTitle={`${targetDisplayName}'s Collection`}
+                        ownerUsername={profileUsername}
+                        ownerDisplayName={
+                          profile?.displayName ?? targetDisplayName
+                        }
+                        ownerProfilePicUrl={profile?.profilePicUrl ?? null}
+                        isOwnerViewing={isViewingOwnProfile}
                       />
                     )}
                     {(!loading && recentRecords.length > 0) ||
@@ -625,7 +647,13 @@ export default function CommunityProfile() {
                         records={listenedRecords}
                         keyPrefix="listened"
                         showDateAdded={true}
-                        fromTitle={`${targetDisplayName}'s Profile`}
+                        fromTitle={`${targetDisplayName}'s Listened`}
+                        ownerUsername={profileUsername}
+                        ownerDisplayName={
+                          profile?.displayName ?? targetDisplayName
+                        }
+                        ownerProfilePicUrl={profile?.profilePicUrl ?? null}
+                        isOwnerViewing={isViewingOwnProfile}
                       />
                     )}
                     {(!loading && listenedRecords.length > 0) ||
@@ -660,7 +688,13 @@ export default function CommunityProfile() {
                       <RecordPreviewGrid
                         records={wishlistRecords}
                         keyPrefix="wishlist"
-                        fromTitle={`${targetDisplayName}'s Profile`}
+                        fromTitle={`${targetDisplayName}'s Wishlist`}
+                        ownerUsername={profileUsername}
+                        ownerDisplayName={
+                          profile?.displayName ?? targetDisplayName
+                        }
+                        ownerProfilePicUrl={profile?.profilePicUrl ?? null}
+                        isOwnerViewing={isViewingOwnProfile}
                       />
                     )}
 

@@ -62,6 +62,20 @@ export function normalizeApiRecord(raw: unknown): MrcRecord | null {
   const tableIdRaw = Number(source.tableId);
   const tableId = Number.isInteger(tableIdRaw) ? tableIdRaw : undefined;
 
+  const tableName =
+    typeof source.tableName === "string" && source.tableName.trim()
+      ? source.tableName.trim()
+      : source.tableName === null
+      ? null
+      : undefined;
+
+  const collectionName =
+    typeof source.collectionName === "string" && source.collectionName.trim()
+      ? source.collectionName.trim()
+      : source.collectionName === null
+      ? null
+      : undefined;
+
   const masterIdRaw = source.masterId;
   const masterIdNum = Number(masterIdRaw);
   const masterId =
@@ -90,6 +104,14 @@ export function normalizeApiRecord(raw: unknown): MrcRecord | null {
     added,
     tableId,
   };
+
+  if (tableName !== undefined) {
+    normalized.tableName = tableName;
+  }
+
+  if (collectionName !== undefined) {
+    normalized.collectionName = collectionName;
+  }
 
   if (cover) {
     normalized.cover = cover;
