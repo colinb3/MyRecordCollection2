@@ -61,15 +61,6 @@ interface MasterInfo {
   ratingCounts: number[] | null;
 }
 
-type MasterInfoCacheEntry = {
-  info: MasterInfo;
-  recordName: string | null;
-  artistName: string | null;
-  cover: string | null;
-};
-
-const masterInfoCache = new Map<string, MasterInfoCacheEntry>();
-
 const DEFAULT_COLLECTION_NAME = "My Collection";
 const WISHLIST_COLLECTION_NAME = "Wishlist";
 const LISTENED_COLLECTION_NAME = "Listened";
@@ -164,6 +155,17 @@ export default function MasterRecord() {
     typeof fromCollection?.path === "string"
       ? fromCollection.path.trim() || null
       : null;
+  const fromCollectionTitle = (() => {
+    if (typeof fromCollection?.title === "string") {
+      const trimmed = fromCollection.title.trim();
+      if (trimmed.length > 0) return trimmed;
+    }
+    if (typeof fromCollection?.tableName === "string") {
+      const trimmed = fromCollection.tableName.trim();
+      if (trimmed.length > 0) return trimmed;
+    }
+    return null;
+  })();
   const searchQuery =
     typeof locationState.query === "string" ? locationState.query.trim() : "";
   const cachedUser = getCachedUserInfo();
@@ -427,9 +429,7 @@ export default function MasterRecord() {
       const fetchKey = masterIdToUse
         ? `master:${masterIdToUse}`
         : album
-        ? `album:${album.id ?? ""}:${album.artist ?? ""}:${
-            album.record ?? ""
-          }`
+        ? `album:${album.id ?? ""}:${album.artist ?? ""}:${album.record ?? ""}`
         : null;
 
       let endpoint: string | null = null;
@@ -447,89 +447,10 @@ export default function MasterRecord() {
         return;
       }
 
-      const applyResult = (entry: MasterInfoCacheEntry) => {
-        const normalized = entry.info;
-        const coverValue = entry.cover;
-
-        if (!album) {
-          const recordName = entry.recordName ?? "Unknown Record";
-          const artistName = entry.artistName ?? "Unknown Artist";
-          setAlbum({
-            id:
-              targetAlbumId ?? `master-${normalized.masterId ?? Date.now()}`,
-            record: recordName,
-            artist: artistName,
-            cover: coverValue ?? "",
-          });
-        }
-
-        if (
-          normalized.masterId &&
-          normalized.masterId !== masterIdOverride
-        ) {
-          skipNextMasterFetchRef.current = normalized.masterId;
-          setMasterIdOverride(normalized.masterId);
-        }
-
-        if (
-          album &&
-          coverValue &&
-          (!album.cover || album.cover.length === 0)
-        ) {
-          setAlbum((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  cover: coverValue,
-                }
-              : prev
-          );
-        }
-
-        const currentAlbumId = album?.id ?? targetAlbumId;
-        if (
-          targetAlbumId &&
-          currentAlbumId &&
-          targetAlbumId !== currentAlbumId
-        ) {
-          setMasterLoading(false);
-          masterFetchKeyRef.current = fetchKey;
-          return;
-        }
-
-        setMasterInfo(normalized);
-        setMasterError(null);
-        setMasterLoading(false);
-        masterFetchKeyRef.current = fetchKey;
-
-        if (
-          !preserveReleaseYear &&
-          normalized.releaseYear &&
-          normalized.releaseYear >= 1800 &&
-          normalized.releaseYear <= 2100
-        ) {
-          setReleaseYear(normalized.releaseYear);
-          setReleaseYearTouched(true);
-          releaseYearTouchedRef.current = true;
-        }
-      };
-
-      if (fetchKey === masterFetchKeyRef.current) {
-        const cachedEntry = masterInfoCache.get(fetchKey);
-        if (cachedEntry) {
-          applyResult(cachedEntry);
-          return;
-        }
-        return;
-      }
-
-      if (fetchKey === masterFetchInFlightKeyRef.current) {
-        return;
-      }
-
-      const cachedEntry = masterInfoCache.get(fetchKey);
-      if (cachedEntry) {
-        applyResult(cachedEntry);
+      if (
+        fetchKey === masterFetchKeyRef.current ||
+        fetchKey === masterFetchInFlightKeyRef.current
+      ) {
         return;
       }
 
@@ -600,24 +521,68 @@ export default function MasterRecord() {
               ? ratingCountsValue
               : null,
         };
-        const nameFromResponse =
-          typeof data?.record === "string" && data.record.trim()
-            ? data.record.trim()
-            : null;
-        const artistFromResponse =
-          typeof data?.artist === "string" && data.artist.trim()
-            ? data.artist.trim()
-            : null;
 
-        const cacheEntry: MasterInfoCacheEntry = {
-          info: normalized,
-          recordName: nameFromResponse,
-          artistName: artistFromResponse,
-          cover: coverValue,
-        };
+        if (!album) {
+          const nameFromResponse =
+            typeof data?.record === "string" && data.record.trim()
+              ? data.record.trim()
+              : null;
+          const artistFromResponse =
+            typeof data?.artist === "string" && data.artist.trim()
+              ? data.artist.trim()
+              : null;
 
-        masterInfoCache.set(fetchKey, cacheEntry);
-        applyResult(cacheEntry);
+          if (nameFromResponse || artistFromResponse) {
+            setAlbum({
+              id:
+                targetAlbumId ?? `master-${normalized.masterId ?? Date.now()}`,
+              record: nameFromResponse ?? "Unknown Record",
+              artist: artistFromResponse ?? "Unknown Artist",
+              cover: coverValue ?? "",
+            });
+          }
+        }
+
+        if (normalized.masterId && normalized.masterId !== masterIdOverride) {
+          skipNextMasterFetchRef.current = normalized.masterId;
+          setMasterIdOverride(normalized.masterId);
+        }
+
+        if (album && coverValue && (!album.cover || album.cover.length === 0)) {
+          setAlbum((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  cover: coverValue,
+                }
+              : prev
+          );
+        }
+
+        const currentAlbumId = album?.id ?? targetAlbumId;
+        if (
+          targetAlbumId &&
+          currentAlbumId &&
+          targetAlbumId !== currentAlbumId
+        ) {
+          setMasterLoading(false);
+          return;
+        }
+
+        setMasterInfo(normalized);
+        setMasterLoading(false);
+        masterFetchKeyRef.current = fetchKey;
+
+        if (
+          !preserveReleaseYear &&
+          normalized.releaseYear &&
+          normalized.releaseYear >= 1800 &&
+          normalized.releaseYear <= 2100
+        ) {
+          setReleaseYear(normalized.releaseYear);
+          setReleaseYearTouched(true);
+          releaseYearTouchedRef.current = true;
+        }
       } catch (error) {
         if (!isMountedRef.current) {
           return;
@@ -821,11 +786,14 @@ export default function MasterRecord() {
             flex: 1,
             overflowY: { xs: "auto", md: "auto" },
             mt: 1,
-            pb: 2,
             px: 1,
           }}
         >
-          <Box maxWidth={800} mx="auto" sx={{ height: { md: "100%" } }}>
+          <Box
+            maxWidth={800}
+            mx="auto"
+            sx={{ height: { md: "100%" }, pb: { xs: 4, sm: 0 } }}
+          >
             <Paper
               variant="outlined"
               sx={{

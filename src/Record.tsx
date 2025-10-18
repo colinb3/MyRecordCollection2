@@ -622,7 +622,11 @@ export default function RecordDetails() {
             px: 1,
           }}
         >
-          <Box maxWidth={800} mx="auto" sx={{ height: { md: "100%" } }}>
+          <Box
+            maxWidth={800}
+            mx="auto"
+            sx={{ height: { md: "100%" }, pb: { xs: 4, sm: 0 } }}
+          >
             <Stack spacing={3}>
               {loadingRecord ? (
                 <Box
