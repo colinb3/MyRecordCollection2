@@ -155,17 +155,6 @@ export default function MasterRecord() {
     typeof fromCollection?.path === "string"
       ? fromCollection.path.trim() || null
       : null;
-  const fromCollectionTitle = (() => {
-    if (typeof fromCollection?.title === "string") {
-      const trimmed = fromCollection.title.trim();
-      if (trimmed.length > 0) return trimmed;
-    }
-    if (typeof fromCollection?.tableName === "string") {
-      const trimmed = fromCollection.tableName.trim();
-      if (trimmed.length > 0) return trimmed;
-    }
-    return null;
-  })();
   const searchQuery =
     typeof locationState.query === "string" ? locationState.query.trim() : "";
   const cachedUser = getCachedUserInfo();
