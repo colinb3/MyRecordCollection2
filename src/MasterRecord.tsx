@@ -871,8 +871,8 @@ export default function MasterRecord() {
                       }
                       alt={album.record}
                       sx={{
-                        width: { xs: 125, sm: 150, md: 175 },
-                        height: { xs: 125, sm: 150, md: 175 },
+                        width: { xs: 150, sm: 175, md: 200 },
+                        height: { xs: 150, sm: 175, md: 200 },
                         objectFit: "cover",
                         borderRadius: 2,
                         bgcolor: "grey.900",

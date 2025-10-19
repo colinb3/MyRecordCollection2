@@ -717,15 +717,13 @@ export default function RecordDetails() {
                         )}
                       </Stack>
                       <Stack
-                        spacing={{ xs: 2, md: 3 }}
+                        spacing={{ xs: 1, md: 2 }}
                         direction={{ xs: "column", md: "row" }}
                         alignItems={{ xs: "stretch", md: "flex-start" }}
                       >
                         <Box
                           sx={{
                             flexShrink: 0,
-                            width: { xs: "100%", sm: 260 },
-                            maxWidth: 260,
                             alignSelf: "flex-start",
                           }}
                         >
@@ -734,7 +732,8 @@ export default function RecordDetails() {
                             src={record.cover || placeholderCover}
                             alt={record.record}
                             sx={{
-                              width: "100%",
+                              width: { xs: 150, sm: 175, md: 200 },
+                              height: { xs: 150, sm: 175, md: 200 },
                               borderRadius: 2,
                               objectFit: "cover",
                               aspectRatio: "1 / 1",
