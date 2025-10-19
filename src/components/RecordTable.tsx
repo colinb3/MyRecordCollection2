@@ -6,6 +6,7 @@ import {
   type RecordTableSortPreference,
 } from "../types";
 import placeholderCover from "../assets/missingImg.jpg";
+import { formatLocalDate } from "../dateUtils";
 
 // Clean column definitions with wrapping via cellClassName
 const columns: GridColDef[] = [
@@ -104,7 +105,10 @@ const columns: GridColDef[] = [
     minWidth: 100,
     renderCell: (params) => {
       const val = params.value;
-      if (typeof val === "string") return val.slice(0, 10);
+      if (typeof val === "string") {
+        const formatted = formatLocalDate(val);
+        return formatted ?? val;
+      }
       return val;
     },
   },

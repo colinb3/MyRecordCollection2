@@ -47,6 +47,7 @@ const PROFILE_RECENT_DEFAULT_LIMIT = 3;
 const PROFILE_RECENT_MAX_LIMIT = 20;
 const PROFILE_WISHLIST_PREVIEW_LIMIT = 3;
 const PROFILE_LISTENED_PREVIEW_LIMIT = 6;
+const MASTER_REVIEW_LIMIT = 10;
 const DISCOGS_API_URL = "https://api.discogs.com/database/search";
 const DISCOGS_USER_AGENT = process.env.DISCOGS_USER_AGENT || "MyRecordCollection/1.0 (+https://myrecordcollection.app)";
 const DISCOGS_API_KEY = process.env.DISCOGS_API_KEY || "";
@@ -139,6 +140,19 @@ function normalizeDateOnly(value) {
   }
 
   return null;
+}
+
+function formatUtcDateTime(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  const pad = (num) => String(num).padStart(2, "0");
+  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(
+    date.getUTCDate()
+  )} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}:${pad(
+    date.getUTCSeconds()
+  )}`;
 }
 
 const RECORD_TABLE_COLUMN_KEYS = [
@@ -760,6 +774,127 @@ app.get("/api/records/master-info", requireAuth, async (req, res) => {
   } catch (error) {
     console.error("Failed to load master info", error);
     res.status(502).json({ error: "Failed to fetch master information" });
+  }
+});
+
+app.get("/api/records/master-reviews", requireAuth, async (req, res) => {
+  console.log("Fetching master reviews...");
+
+  const masterIdParam = Number(req.query.masterId);
+  const masterId = Number.isInteger(masterIdParam) && masterIdParam > 0 ? masterIdParam : null;
+  if (!masterId) {
+    return res.status(400).json({ error: "masterId is required" });
+  }
+
+  try {
+    const pool = await getPool();
+    const [rows] = await pool.query(
+      `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.added, r.review,
+              u.username, u.displayName, u.profilePic
+         FROM Record r
+         JOIN User u ON u.uuid = r.userUuid
+         LEFT JOIN RecTable t ON t.id = r.tableId
+        WHERE r.masterId = ?
+          AND r.review IS NOT NULL
+          AND TRIM(r.review) <> ''
+          AND (t.isPrivate = 0 OR t.isPrivate IS NULL)
+        ORDER BY r.added DESC, r.id DESC
+        LIMIT ?`,
+      [masterId, MASTER_REVIEW_LIMIT]
+    );
+
+    const reviews = Array.isArray(rows)
+      ? rows.map((row) => {
+          const ratingValue = Number(row.rating);
+          const rating =
+            Number.isFinite(ratingValue) && ratingValue > 0 ? ratingValue : null;
+          const addedValue =
+            formatUtcDateTime(row.added) ?? formatUtcDateTime(new Date());
+          const reviewText =
+            typeof row.review === "string" ? row.review.trim() : "";
+          const displayName =
+            typeof row.displayName === "string" && row.displayName.trim()
+              ? row.displayName.trim()
+              : null;
+          const coverValue =
+            typeof row.cover === "string" && row.cover.trim()
+              ? row.cover.trim()
+              : null;
+          const username =
+            typeof row.username === "string" && row.username.trim()
+              ? row.username.trim()
+              : "";
+
+          return {
+            recordId: row.id,
+            record:
+              typeof row.record === "string" && row.record.trim()
+                ? row.record.trim()
+                : "",
+            artist:
+              typeof row.artist === "string" && row.artist.trim()
+                ? row.artist.trim()
+                : "",
+            cover: coverValue,
+            rating,
+            review: reviewText,
+            added: addedValue,
+            owner: {
+              username,
+              displayName,
+              profilePicUrl: buildProfilePicPublicPath(row.profilePic),
+            },
+          };
+        })
+        : [];
+
+    // Also fetch master metadata (record/artist/cover) plus average rating
+    let ratingAverage = null;
+    let masterRecord = null;
+    let masterArtist = null;
+    let masterCover = null;
+    try {
+      const [masterRows] = await pool.query(
+        `SELECT name, artist, cover, ratingAve FROM Master WHERE id = ? LIMIT 1`,
+        [masterId]
+      );
+      if (Array.isArray(masterRows) && masterRows.length > 0) {
+        const masterRow = masterRows[0];
+        const ratingRaw = masterRow.ratingAve;
+        const ratingNum = ratingRaw != null ? Number(ratingRaw) : null;
+        ratingAverage = Number.isFinite(ratingNum) ? ratingNum : null;
+        masterRecord =
+          typeof masterRow.name === "string" && masterRow.name.trim()
+            ? masterRow.name.trim()
+            : null;
+        masterArtist =
+          typeof masterRow.artist === "string" && masterRow.artist.trim()
+            ? masterRow.artist.trim()
+            : null;
+        masterCover =
+          typeof masterRow.cover === "string" && masterRow.cover.trim()
+            ? masterRow.cover.trim()
+            : null;
+      }
+    } catch (err) {
+      console.warn("Failed to load master metadata", err);
+      ratingAverage = null;
+      masterRecord = null;
+      masterArtist = null;
+      masterCover = null;
+    }
+
+    res.json({
+      masterId,
+      ratingAverage,
+      record: masterRecord,
+      artist: masterArtist,
+      cover: masterCover,
+      reviews,
+    });
+  } catch (error) {
+    console.error("Failed to load master reviews", error);
+    res.status(500).json({ error: "Failed to load master reviews" });
   }
 });
 
@@ -1805,7 +1940,7 @@ app.post('/api/records/create', requireAuth, async (req, res) => {
 
     const [result] = await pool.execute(
       `INSERT INTO Record (name, artist, cover, rating, release_year, tableId, userUuid, added, isCustom, masterId, review)
-       VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), ?, ?, ?)`,
       [
         recordName,
         artistName,
@@ -2001,10 +2136,13 @@ app.post('/api/import/discogs', requireAuth, async (req, res) => {
         withoutCover += 1;
       }
 
-  const addedDate = dateAdded || new Date().toISOString().slice(0, 10);
+  const addedAtUtcRaw = dateAdded
+    ? formatUtcDateTime(`${dateAdded}T00:00:00Z`)
+    : formatUtcDateTime(new Date());
+  const addedAtUtc = addedAtUtcRaw ?? formatUtcDateTime(new Date());
       const [insertResult] = await pool.execute(
         `INSERT INTO Record (name, artist, cover, rating, release_year, tableId, userUuid, added) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [recordName, artist, cover || null, rating, release, tableId, req.userUuid, addedDate]
+        [recordName, artist, cover || null, rating, release, tableId, req.userUuid, addedAtUtc]
       );
       const newRecordId = insertResult.insertId;
       created += 1;

@@ -134,6 +134,17 @@ export interface CommunityFeedEntry {
   record: Record;
 }
 
+export interface MasterReviewEntry {
+  recordId: number;
+  record: string;
+  artist: string;
+  cover?: string | null;
+  rating: number | null;
+  review: string;
+  added: string;
+  owner: CommunityFeedOwner;
+}
+
 export interface PublicUserProfile {
   username: string;
   displayName: string | null;

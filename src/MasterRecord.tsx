@@ -266,7 +266,7 @@ export default function MasterRecord() {
     if (currentParamMasterId === masterIdOverride) {
       return;
     }
-    navigate(`/search/record/${masterIdOverride}`, {
+    navigate(`/master/${masterIdOverride}`, {
       replace: true,
       state: { ...locationState, masterId: masterIdOverride },
     });
@@ -686,6 +686,32 @@ export default function MasterRecord() {
     void submitRecord(LISTENED_COLLECTION_NAME, "Record added to listened");
   }, [submitRecord]);
 
+  const handleOpenMasterReviews = useCallback(() => {
+    const resolvedMasterId = masterInfo?.masterId ?? masterIdOverride;
+    if (!resolvedMasterId) {
+      return;
+    }
+    const originPath = `${location.pathname}${location.search}${location.hash}`;
+    navigate(`/master/${resolvedMasterId}/reviews`, {
+      state: {
+        album,
+        query: searchQuery,
+        fromCollection,
+        fromMaster: { path: originPath },
+      },
+    });
+  }, [
+    album,
+    fromCollection,
+    location.pathname,
+    location.search,
+    location.hash,
+    masterInfo,
+    masterIdOverride,
+    navigate,
+    searchQuery,
+  ]);
+
   const handleBack = useCallback(() => {
     if (fromCollectionPath) {
       navigate(fromCollectionPath);
@@ -742,6 +768,15 @@ export default function MasterRecord() {
             <Typography color="text.secondary">Ratings</Typography>
           </Box>
         ) : null}
+        <Box alignSelf={"center"}>
+          <Button
+            variant="outlined"
+            onClick={handleOpenMasterReviews}
+            sx={{ mt: 1.5, alignSelf: "flex-start", px: 3 }}
+          >
+            View community reviews
+          </Button>
+        </Box>
       </Box>
     );
   } else if (masterInfo) {
@@ -789,7 +824,6 @@ export default function MasterRecord() {
                 borderRadius: 2,
                 display: "flex",
                 flexDirection: { xs: "column", md: "row" },
-                minHeight: { xs: 420, md: 560 },
                 height: { md: "100%" },
                 overflow: "hidden",
               }}
@@ -837,8 +871,8 @@ export default function MasterRecord() {
                       }
                       alt={album.record}
                       sx={{
-                        width: 180,
-                        height: 180,
+                        width: { xs: 125, sm: 150, md: 175 },
+                        height: { xs: 125, sm: 150, md: 175 },
                         objectFit: "cover",
                         borderRadius: 2,
                         bgcolor: "grey.900",

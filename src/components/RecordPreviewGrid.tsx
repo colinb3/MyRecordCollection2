@@ -7,6 +7,7 @@ import placeholderCover from "../assets/missingImg.jpg";
 import type { Record } from "../types";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Divider } from "@mui/material";
+import { formatLocalDate } from "../dateUtils";
 
 interface RecordPreviewGridProps {
   records: Record[];
@@ -78,7 +79,7 @@ export default function RecordPreviewGrid({
         const key = keyPrefix ? `${keyPrefix}-${record.id}` : record.id;
         const addedDateText =
           showDateAdded && record.added
-            ? dateFormatter.format(new Date(record.added))
+            ? formatLocalDate(record.added, dateFormatter) ?? record.added
             : null;
         const hasReview =
           typeof record.review === "string" && record.review.trim();
@@ -162,7 +163,7 @@ export default function RecordPreviewGrid({
                       variant="body2"
                       sx={{
                         display: "-webkit-box",
-                        WebkitLineClamp: 3,
+                        WebkitLineClamp: 2,
                         WebkitBoxOrient: "vertical",
                         overflow: "hidden",
                         pb: 0,

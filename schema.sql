@@ -21,7 +21,7 @@ CREATE TABLE RecTable (
 
 CREATE TABLE Record (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    added DATE NOT NULL,
+    added DATETIME NOT NULL,
     artist VARCHAR(255),
     cover VARCHAR(255),
     name VARCHAR(255) NOT NULL,

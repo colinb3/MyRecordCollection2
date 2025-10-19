@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useState,
   type MouseEvent,
   type SyntheticEvent,
@@ -39,38 +40,9 @@ import { clearCommunityCaches, loadCommunityFeed } from "./communityUsers";
 import apiUrl from "./api";
 import placeholderCover from "./assets/missingImg.jpg";
 import { Grid } from "@mui/system";
+import { formatLocalDate } from "./dateUtils";
 
 type CommunityView = "feed" | "search";
-
-// Format an ISO date (YYYY-MM-DD) to a human friendly form like "Jan 2, 2025".
-function formatDateDisplay(isoDate: string): string {
-  if (!isoDate) return "";
-  const parts = isoDate.split("-").map((p) => Number(p));
-  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) {
-    // fallback to the original string if parsing fails
-    return isoDate;
-  }
-  const [year, month, day] = parts;
-  // Use UTC to avoid local timezone shifting when creating Date from YYYY-MM-DD
-  const d = new Date(Date.UTC(year, month - 1, day));
-  const monthNames = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-  ];
-  return `${
-    monthNames[d.getUTCMonth()]
-  } ${d.getUTCDate()}, ${d.getUTCFullYear()}`;
-}
 
 export default function Community() {
   const navigate = useNavigate();
@@ -80,6 +52,13 @@ export default function Community() {
   const [displayName, setDisplayName] = useState<string>(
     cachedUser?.displayName ?? ""
   );
+  const feedDateFormatter = useMemo(() => {
+    return new Intl.DateTimeFormat(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  }, []);
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
     cachedUser?.profilePicUrl ?? null
   );
@@ -345,8 +324,11 @@ export default function Community() {
                           .charAt(0)
                           .toUpperCase();
                         const addedDate = entry.record.added
-                          ? formatDateDisplay(entry.record.added.slice(0, 10))
-                          : "";
+                          ? formatLocalDate(
+                              entry.record.added,
+                              feedDateFormatter
+                            ) ?? entry.record.added
+                          : null;
                         const tagsLabel =
                           entry.record.tags && entry.record.tags.length > 0
                             ? entry.record.tags.join(", ")
@@ -491,8 +473,8 @@ export default function Community() {
                                 src={coverSrc}
                                 alt={`${entry.record.record} cover`}
                                 sx={{
-                                  maxWidth: { xs: 100, sm: 150, md: 200 },
-                                  maxHeight: { xs: 100, sm: 150, md: 200 },
+                                  maxWidth: { xs: 100, sm: 150, md: 175 },
+                                  maxHeight: { xs: 100, sm: 150, md: 175 },
                                   objectFit: "cover",
                                   borderRadius: 1,
                                   flexShrink: 0,

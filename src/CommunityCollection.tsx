@@ -9,6 +9,7 @@ import {
   Drawer,
   IconButton,
   useMediaQuery,
+  ButtonBase,
 } from "@mui/material";
 import Grid from "@mui/material/Grid";
 import FilterListAltIcon from "@mui/icons-material/FilterListAlt";
@@ -348,7 +349,7 @@ export default function CommunityCollection() {
           <Box
             sx={{
               flex: "0 0 auto",
-              pb: { xs: 1, md: 1.5 },
+              pb: 1,
               display: "flex",
               flexDirection: "column",
               gap: 1,
@@ -362,11 +363,28 @@ export default function CommunityCollection() {
                 gap: { xs: 1.5, md: 2 },
               }}
             >
-              <Box
+              <ButtonBase
+                onClick={() => {
+                  if (profile) {
+                    navigate(
+                      `/community/${encodeURIComponent(profile.username)}`
+                    );
+                  }
+                }}
                 sx={{
                   display: "flex",
                   alignItems: "center",
                   gap: 1.5,
+                  alignSelf: "flex-start",
+                  borderRadius: 1,
+                  px: 0.5,
+                  py: 0.5,
+                  textAlign: "left",
+                  "&:hover": {
+                    bgcolor: "action.hover",
+                  },
+                  // ensure children can shrink for text truncation
+                  minWidth: 0,
                 }}
               >
                 <Avatar
@@ -387,7 +405,7 @@ export default function CommunityCollection() {
                     @{profile?.username ?? targetUsername}
                   </Typography>
                 </Box>
-              </Box>
+              </ButtonBase>
             </Box>
           </Box>
 

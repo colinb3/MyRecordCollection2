@@ -51,6 +51,7 @@ import { clearProfileHighlightsCache } from "./profileHighlights";
 import type { Record as MrcRecord, RecordOwnerInfo } from "./types";
 import EditRecordDialog from "./components/EditRecordDialog";
 import MoveRecordDialog from "./components/MoveRecordDialog";
+import { formatLocalDate } from "./dateUtils";
 
 const DEFAULT_COLLECTION_NAME = "My Collection";
 const WISHLIST_COLLECTION_NAME = "Wishlist";
@@ -74,16 +75,6 @@ function inferCollectionFromLabel(label?: string | null): string | null {
   if (lower.includes("listened")) return LISTENED_COLLECTION_NAME;
   if (lower.includes("collection")) return DEFAULT_COLLECTION_NAME;
   return null;
-}
-
-function formatDate(
-  value: string | null | undefined,
-  formatter: Intl.DateTimeFormat
-): string {
-  if (!value) return "Unknown";
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "Unknown";
-  return formatter.format(parsed);
 }
 
 export default function RecordDetails() {
@@ -363,7 +354,7 @@ export default function RecordDetails() {
     };
 
     if (masterId) {
-      navigate(`/search/record/${masterId}`, {
+      navigate(`/master/${masterId}`, {
         state: {
           album: albumPayload,
           masterId,
@@ -584,7 +575,7 @@ export default function RecordDetails() {
   const releaseText =
     record && record.release > 0 ? `${record.release}` : "Unknown";
   const addedText = record
-    ? formatDate(record.added, dateFormatter)
+    ? formatLocalDate(record.added, dateFormatter) ?? "Unknown"
     : "Unknown";
   const showMasterButton = Boolean(record?.masterId);
   const showOwnerActions = isOwnerView && Boolean(record);
@@ -676,7 +667,7 @@ export default function RecordDetails() {
                         >
                           Back
                         </Button>
-                        {ownerUsername && ownerHandle && (
+                        {ownerUsername && (
                           <Box sx={{ ml: 2, minWidth: 0, mb: 1.5 }}>
                             <ButtonBase
                               onClick={handleOpenOwnerProfile}
@@ -691,9 +682,7 @@ export default function RecordDetails() {
                                 minWidth: 0,
                                 maxWidth: "100%",
                               }}
-                              aria-label={`View ${
-                                ownerDisplayName ?? ownerHandle
-                              }'s profile`}
+                              aria-label={`View ${ownerDisplayName}'s profile`}
                             >
                               <Stack
                                 direction="row"
@@ -703,7 +692,8 @@ export default function RecordDetails() {
                               >
                                 <Stack spacing={0.25} sx={{ minWidth: 0 }}>
                                   <Typography
-                                    variant="subtitle2"
+                                    variant="body1"
+                                    fontWeight={600}
                                     sx={{
                                       whiteSpace: "nowrap",
                                       overflow: "hidden",
@@ -713,20 +703,6 @@ export default function RecordDetails() {
                                   >
                                     {ownerDisplayName ?? ownerHandle}
                                   </Typography>
-                                  {ownerDisplayName && (
-                                    <Typography
-                                      variant="body2"
-                                      color="text.secondary"
-                                      sx={{
-                                        whiteSpace: "nowrap",
-                                        overflow: "hidden",
-                                        textOverflow: "ellipsis",
-                                        minWidth: 0,
-                                      }}
-                                    >
-                                      {ownerHandle}
-                                    </Typography>
-                                  )}
                                 </Stack>
                                 <Avatar
                                   src={owner?.profilePicUrl ?? undefined}
@@ -777,7 +753,7 @@ export default function RecordDetails() {
 
                           <Divider flexItem />
 
-                          <Stack pb={record.masterId ? 1 : 0}>
+                          <Stack>
                             <Stack direction="row" flexWrap="wrap" useFlexGap>
                               <Box mr={2.5} mb={1.5}>
                                 <Typography
@@ -876,30 +852,24 @@ export default function RecordDetails() {
                               )}
                             </Box>
 
-                            <Box>
-                              <Typography
-                                variant="overline"
-                                color="text.secondary"
-                                sx={{ letterSpacing: 0.6 }}
-                              >
-                                Review
-                              </Typography>
-                              {hasReview ? (
+                            {hasReview ? (
+                              <Box pb={1}>
+                                <Typography
+                                  variant="overline"
+                                  color="text.secondary"
+                                  sx={{ letterSpacing: 0.6 }}
+                                >
+                                  Review
+                                </Typography>
+
                                 <Typography
                                   variant="body1"
                                   sx={{ whiteSpace: "pre-line" }}
                                 >
                                   {record.review}
                                 </Typography>
-                              ) : (
-                                <Typography
-                                  variant="body2"
-                                  color="text.secondary"
-                                >
-                                  No review saved for this record.
-                                </Typography>
-                              )}
-                            </Box>
+                              </Box>
+                            ) : null}
                           </Stack>
 
                           {showActionRow && (

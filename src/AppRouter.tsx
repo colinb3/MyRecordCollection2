@@ -1,6 +1,13 @@
-import { BrowserRouter, HashRouter, Routes, Route } from "react-router-dom";
+import {
+  BrowserRouter,
+  HashRouter,
+  Routes,
+  Route,
+  Navigate,
+  useLocation,
+  useParams,
+} from "react-router-dom";
 import { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
 import LandingPage from "./LandingPage";
 import Collection from "./Collection";
 import Search from "./Search";
@@ -13,11 +20,11 @@ import Community from "./Community";
 import CommunityProfile from "./CommunityProfile";
 import CommunityCollection from "./CommunityCollection";
 import CommunityFollows from "./CommunityFollows";
-import { useLocation } from "react-router-dom";
 import { trackPage } from "./analytics";
 import { loadUserInfo } from "./userInfo";
 import MasterRecordPage from "./MasterRecord";
 import RecordDetails from "./Record";
+import MasterReviews from "./MasterReviews";
 
 // Component that prevents authenticated users from seeing auth pages
 function RedirectIfAuthed({ children }: { children: React.ReactNode }) {
@@ -84,7 +91,15 @@ export default function AppRouter() {
         />
         <Route path="/findrecord" element={<Navigate to="/search" replace />} />
         <Route
-          path="/search/record/:masterId?"
+          path="/master/:masterId/reviews"
+          element={
+            <RequireAuth>
+              <MasterReviews />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/master/:masterId?"
           element={
             <RequireAuth>
               <MasterRecordPage />
