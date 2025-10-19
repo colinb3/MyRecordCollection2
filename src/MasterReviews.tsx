@@ -93,6 +93,21 @@ export default function MasterReviews() {
   const [fetchStatus, setFetchStatus] = useState<FetchStatus>("loading");
   const [fetchError, setFetchError] = useState<string | null>(null);
 
+  const normalizeProfilePicUrl = useCallback((raw: unknown): string | null => {
+    if (typeof raw !== "string") {
+      return null;
+    }
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      return null;
+    }
+    if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+      return trimmed;
+    }
+    const normalizedPath = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+    return apiUrl(normalizedPath);
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -227,10 +242,9 @@ export default function MasterReviews() {
                       typeof ownerValue.displayName === "string"
                         ? ownerValue.displayName
                         : null,
-                    profilePicUrl:
-                      typeof ownerValue.profilePicUrl === "string"
-                        ? ownerValue.profilePicUrl
-                        : null,
+                    profilePicUrl: normalizeProfilePicUrl(
+                      ownerValue.profilePicUrl
+                    ),
                   },
                 };
                 return entry;
@@ -254,7 +268,7 @@ export default function MasterReviews() {
     return () => {
       cancelled = true;
     };
-  }, [safeMasterId]);
+  }, [safeMasterId, normalizeProfilePicUrl]);
 
   const dateTimeFormatter = useMemo(() => {
     return new Intl.DateTimeFormat(undefined, {
@@ -472,6 +486,7 @@ export default function MasterReviews() {
                               variant="body2"
                               color="text.secondary"
                               noWrap
+                              overflow={"visible"}
                             >
                               {addedText}
                             </Typography>
