@@ -155,8 +155,13 @@ function normalizeFeedEntry(raw: AnyObject): CommunityFeedEntry | null {
 const searchCache = new Map<string, CommunityUserSummary[]>();
 const searchInFlight = new Map<string, Promise<CommunityUserSummary[]>>();
 
-let feedCache: CommunityFeedEntry[] | null = null;
-let feedInFlight: Promise<CommunityFeedEntry[]> | null = null;
+type ActivityScope = "friends" | "you";
+
+const activityFeedCache = new Map<ActivityScope, CommunityFeedEntry[]>();
+const activityFeedInFlight = new Map<
+  ActivityScope,
+  Promise<CommunityFeedEntry[]>
+>();
 
 export async function searchCommunityUsers(
   query: string
@@ -204,25 +209,38 @@ export async function searchCommunityUsers(
   return fetchPromise;
 }
 
-export async function loadCommunityFeed(): Promise<CommunityFeedEntry[]> {
-  if (feedCache) {
-    return cloneFeedEntries(feedCache);
+export async function loadActivityFeed(
+  scope: ActivityScope = "friends"
+): Promise<CommunityFeedEntry[]> {
+  const normalizedScope: ActivityScope = scope === "you" ? "you" : "friends";
+
+  if (activityFeedCache.has(normalizedScope)) {
+    return cloneFeedEntries(activityFeedCache.get(normalizedScope)!);
   }
 
-  if (feedInFlight) {
-    return feedInFlight.then((entries) => cloneFeedEntries(entries));
+  if (activityFeedInFlight.has(normalizedScope)) {
+    return activityFeedInFlight
+      .get(normalizedScope)!
+      .then((entries) => cloneFeedEntries(entries));
   }
 
   const fetchPromise = (async () => {
+    const searchParams = new URLSearchParams();
+    searchParams.set("scope", normalizedScope);
+    const query = searchParams.toString();
+
     try {
-      const res = await fetch(apiUrl("/api/community/feed"), {
-        credentials: "include",
-      });
+      const res = await fetch(
+        apiUrl(`/api/activity${query ? `?${query}` : ""}`),
+        {
+          credentials: "include",
+        }
+      );
       if (!res.ok) {
         const message = await res
           .json()
           .catch(() => ({}))
-          .then((data: any) => data?.error || "Failed to load feed");
+          .then((data: any) => data?.error || "Failed to load activity");
         const error = new Error(message);
         (error as any).status = res.status;
         throw error;
@@ -234,17 +252,17 @@ export async function loadCommunityFeed(): Promise<CommunityFeedEntry[]> {
         .map((item) => normalizeFeedEntry(item))
         .filter((item): item is CommunityFeedEntry => item !== null);
 
-      feedCache = cloneFeedEntries(normalized);
+      activityFeedCache.set(
+        normalizedScope,
+        cloneFeedEntries(normalized)
+      );
       return cloneFeedEntries(normalized);
-    } catch (error) {
-      feedCache = null;
-      throw error;
     } finally {
-      feedInFlight = null;
+      activityFeedInFlight.delete(normalizedScope);
     }
   })();
 
-  feedInFlight = fetchPromise;
+  activityFeedInFlight.set(normalizedScope, fetchPromise);
   return fetchPromise;
 }
 
@@ -556,6 +574,6 @@ export function clearCommunityCaches(): void {
   collectionInFlight.clear();
   followsCache.clear();
   followsInFlight.clear();
-  feedCache = null;
-  feedInFlight = null;
+  activityFeedCache.clear();
+  activityFeedInFlight.clear();
 }

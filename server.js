@@ -1196,23 +1196,46 @@ app.get(
   }
 );
 
-app.get("/api/community/feed", requireAuth, async (req, res) => {
-  console.log("Fetching community feed...");
+app.get("/api/activity", requireAuth, async (req, res) => {
+  const scopeRaw =
+    typeof req.query.scope === "string" ? req.query.scope.toLowerCase() : "friends";
+  const scope = scopeRaw === "you" ? "you" : "friends";
+  console.log(`Fetching activity feed for scope=${scope}`);
+
   try {
     const pool = await getPool();
-      const [rows] = await pool.query(
-    `SELECT r.id, r.name as record, r.artist, r.cover, r.rating,
-      r.release_year as 'release', r.added as added, r.tableId, r.isCustom as isCustom, r.masterId as masterId, r.review as review,
-              u.username, u.displayName, u.profilePic, t.name as tableName
-       FROM Record r
-       JOIN Follows f ON f.followsUuid = r.userUuid
-       JOIN User u ON u.uuid = r.userUuid
-  JOIN RecTable t ON r.tableId = t.id
-  WHERE f.userUuid = ? AND t.isPrivate = 0 
-       ORDER BY r.added DESC, r.id DESC
-       LIMIT 20`,
-      [req.userUuid]
-    );
+    let rows;
+
+    if (scope === "friends") {
+      [rows] = await pool.query(
+        `SELECT r.id, r.name as record, r.artist, r.cover, r.rating,
+                r.release_year as 'release', r.added as added, r.tableId, r.isCustom as isCustom,
+                r.masterId as masterId, r.review as review,
+                u.username, u.displayName, u.profilePic, t.name as tableName
+           FROM Record r
+           JOIN Follows f ON f.followsUuid = r.userUuid
+           JOIN User u ON u.uuid = r.userUuid
+           JOIN RecTable t ON r.tableId = t.id
+          WHERE f.userUuid = ? AND t.isPrivate = 0
+          ORDER BY r.added DESC, r.id DESC
+          LIMIT 20`,
+        [req.userUuid]
+      );
+    } else {
+      [rows] = await pool.query(
+        `SELECT r.id, r.name as record, r.artist, r.cover, r.rating,
+                r.release_year as 'release', r.added as added, r.tableId, r.isCustom as isCustom,
+                r.masterId as masterId, r.review as review,
+                u.username, u.displayName, u.profilePic, t.name as tableName
+           FROM Record r
+           JOIN User u ON u.uuid = r.userUuid
+           LEFT JOIN RecTable t ON r.tableId = t.id
+          WHERE r.userUuid = ?
+          ORDER BY r.added DESC, r.id DESC
+          LIMIT 20`,
+        [req.userUuid]
+      );
+    }
 
     if (!Array.isArray(rows) || rows.length === 0) {
       return res.json([]);
@@ -1285,7 +1308,7 @@ app.get("/api/community/feed", requireAuth, async (req, res) => {
 
     res.json(feed);
   } catch (error) {
-    console.error("Failed to load community feed", error);
+    console.error("Failed to load activity feed", error);
     res.status(500).json({ error: "Failed to load feed" });
   }
 });

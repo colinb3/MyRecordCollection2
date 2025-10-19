@@ -15,7 +15,7 @@ import Register from "./Register";
 import RequireAuth from "./RequireAuth";
 import NotFound from "./NotFound";
 import Settings from "./Settings";
-import Community from "./Community";
+import Activity from "./Activity";
 import CommunityProfile from "./CommunityProfile";
 import CommunityCollection from "./CommunityCollection";
 import CommunityFollows from "./CommunityFollows";
@@ -130,10 +130,10 @@ export default function AppRouter() {
           }
         />
         <Route
-          path="/community"
+          path="/activity"
           element={
             <RequireAuth>
-              <Community />
+              <Activity />
             </RequireAuth>
           }
         />

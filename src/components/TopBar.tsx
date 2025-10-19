@@ -186,7 +186,7 @@ export default function TopBar({
                       `/community/${encodeURIComponent(trimmedUsername)}`
                     );
                   } else {
-                    navigate("/community");
+                    navigate("/activity");
                   }
                   handleMenuClose();
                 }}
@@ -198,14 +198,14 @@ export default function TopBar({
               </MenuItem>
               <MenuItem
                 onClick={() => {
-                  navigate("/community");
+                  navigate("/activity");
                   handleMenuClose();
                 }}
               >
                 <ListItemIcon>
                   <PeopleAltIcon />
                 </ListItemIcon>
-                <ListItemText>Community</ListItemText>
+                <ListItemText>Activity</ListItemText>
               </MenuItem>
               <Divider sx={{ my: 0.5 }} />
               <MenuItem onClick={() => navigate("/mycollection")}>
