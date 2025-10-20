@@ -35,6 +35,7 @@ export default function EditRecordDialog({
   tagOptions = [],
 }: EditRecordDialogProps) {
   const [editedRecord, setEditedRecord] = useState<Record | null>(null);
+  const [tagInputValue, setTagInputValue] = useState<string>("");
   const [imageUrl, setImageUrl] = useState("");
   const [recommendedTags, setRecommendedTags] = useState<string[]>([]);
   const [fetchingRecommendedTags, setFetchingRecommendedTags] =
@@ -59,6 +60,8 @@ export default function EditRecordDialog({
       window.clearTimeout(pendingFetchRef.current);
       pendingFetchRef.current = null;
     }
+    // clear the tag input when dialog or record resets
+    setTagInputValue("");
   }, [record, open]);
 
   // Generic handler for simple text field changes
@@ -90,6 +93,20 @@ export default function EditRecordDialog({
     if (editedRecord) {
       setEditedRecord({ ...editedRecord, tags: newValue });
     }
+  };
+
+  // Helper to add a tag if it's not already present (case-insensitive)
+  const addTagIfMissing = (tag: string) => {
+    const normalized = tag.trim();
+    if (!normalized) return;
+    setEditedRecord((prev) => {
+      if (!prev) return prev;
+      const exists = prev.tags.some(
+        (t) => t.toLowerCase() === normalized.toLowerCase()
+      );
+      if (exists) return prev;
+      return { ...prev, tags: [...prev.tags, normalized] };
+    });
   };
 
   // Handler for the Slider rating input
@@ -161,16 +178,8 @@ export default function EditRecordDialog({
   }, [open, editedRecord]);
 
   const handleAddRecommendedTag = (tag: string) => {
-    setEditedRecord((prev) => {
-      if (!prev) return prev;
-      const normalized = tag.trim();
-      if (!normalized) return prev;
-      const exists = prev.tags.some(
-        (existing) => existing.toLowerCase() === normalized.toLowerCase()
-      );
-      if (exists) return prev;
-      return { ...prev, tags: [...prev.tags, normalized] };
-    });
+    addTagIfMissing(tag);
+    setTagInputValue("");
   };
 
   const handleSaveChanges = () => {
@@ -339,6 +348,8 @@ export default function EditRecordDialog({
               filterSelectedOptions
               value={editedRecord.tags}
               onChange={handleTagsChange}
+              inputValue={tagInputValue}
+              onInputChange={(_e, newInput) => setTagInputValue(newInput)}
               size="small"
               fullWidth
               sx={{
@@ -369,19 +380,51 @@ export default function EditRecordDialog({
                   );
                 })
               }
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  variant="outlined"
-                  label="Tags"
-                  placeholder="Add tags"
-                  sx={{
-                    "& .MuiOutlinedInput-root": {
-                      backgroundColor: "background.paper",
-                    },
-                  }}
-                />
-              )}
+              renderInput={(params) => {
+                // Preserve any existing onKeyDown handler and wrap it so Enter will add the tag
+                const origOnKeyDown = params.inputProps?.onKeyDown as
+                  | React.KeyboardEventHandler<
+                      HTMLInputElement | HTMLTextAreaElement
+                    >
+                  | undefined;
+
+                const handleKeyDown: React.KeyboardEventHandler<
+                  HTMLInputElement | HTMLTextAreaElement
+                > = (e) => {
+                  if (e.key === "Enter") {
+                    const candidate = tagInputValue.trim();
+                    if (candidate) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      addTagIfMissing(candidate);
+                      setTagInputValue("");
+                      return;
+                    }
+                  }
+                  if (origOnKeyDown) {
+                    origOnKeyDown(e);
+                  }
+                };
+
+                return (
+                  <TextField
+                    {...params}
+                    variant="outlined"
+                    label="Tags"
+                    placeholder="Add tags"
+                    inputProps={{
+                      ...params.inputProps,
+                      enterKeyHint: "done",
+                      onKeyDown: handleKeyDown,
+                    }}
+                    sx={{
+                      "& .MuiOutlinedInput-root": {
+                        backgroundColor: "background.paper",
+                      },
+                    }}
+                  />
+                );
+              }}
             />
 
             <Box sx={{ mt: 1 }}>

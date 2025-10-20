@@ -126,6 +126,7 @@ export default function RecordDetails() {
     message: string;
     severity: "success" | "error";
   }>({ open: false, message: "", severity: "success" });
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
 
   useEffect(() => {
     if (locationState?.record) {
@@ -143,7 +144,27 @@ export default function RecordDetails() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const info = await loadUserInfo();
+      const [info, tags] = await Promise.all([
+        loadUserInfo(),
+        (async () => {
+          try {
+            const res = await fetch(apiUrl("/api/tags"), {
+              credentials: "include",
+            });
+            if (!res.ok) {
+              return null;
+            }
+            const raw = (await res.json().catch(() => [])) as unknown[];
+            return raw
+              .filter((tag): tag is string => typeof tag === "string")
+              .map((tag) => tag.trim())
+              .filter((tag) => tag.length > 0);
+          } catch {
+            return null;
+          }
+        })(),
+      ]);
+
       if (cancelled) return;
       if (!info) {
         navigate("/login");
@@ -156,6 +177,21 @@ export default function RecordDetails() {
         setUserId(info.userUuid);
       } catch {
         /* ignore analytics errors */
+      }
+
+      if (Array.isArray(tags)) {
+        const seen = new Map<string, string>();
+        for (const tag of tags) {
+          const lower = tag.toLowerCase();
+          if (!seen.has(lower)) {
+            seen.set(lower, tag);
+          }
+        }
+        setAvailableTags(
+          Array.from(seen.values()).sort((a, b) =>
+            a.localeCompare(b, undefined, { sensitivity: "base" })
+          )
+        );
       }
     })();
     return () => {
@@ -401,6 +437,27 @@ export default function RecordDetails() {
     inferCollectionFromLabel(fromInfo?.label) ??
     null;
 
+  const tagOptions = useMemo(() => {
+    const seen = new Map<string, string>();
+    const addTags = (tags?: string[] | null) => {
+      if (!Array.isArray(tags)) return;
+      for (const tag of tags) {
+        if (typeof tag !== "string") continue;
+        const trimmed = tag.trim();
+        if (!trimmed) continue;
+        const lower = trimmed.toLowerCase();
+        if (!seen.has(lower)) {
+          seen.set(lower, trimmed);
+        }
+      }
+    };
+    addTags(availableTags);
+    addTags(record?.tags ?? null);
+    return Array.from(seen.values()).sort((a, b) =>
+      a.localeCompare(b, undefined, { sensitivity: "base" })
+    );
+  }, [availableTags, record?.tags]);
+
   const handleOpenEditDialog = () => {
     if (!record) return;
     setEditDialogOpen(true);
@@ -435,6 +492,26 @@ export default function RecordDetails() {
             }
           : saved
       );
+      setAvailableTags((prev) => {
+        const seen = new Map<string, string>();
+        const addTags = (tags?: string[] | null) => {
+          if (!Array.isArray(tags)) return;
+          for (const tag of tags) {
+            if (typeof tag !== "string") continue;
+            const trimmed = tag.trim();
+            if (!trimmed) continue;
+            const lower = trimmed.toLowerCase();
+            if (!seen.has(lower)) {
+              seen.set(lower, trimmed);
+            }
+          }
+        };
+        addTags(prev);
+        addTags(saved.tags);
+        return Array.from(seen.values()).sort((a, b) =>
+          a.localeCompare(b, undefined, { sensitivity: "base" })
+        );
+      });
       const updatedCollection = saved.collectionName ?? saved.tableName ?? null;
       if (updatedCollection) {
         setFromInfo((prev) =>
@@ -948,7 +1025,7 @@ export default function RecordDetails() {
         onClose={() => setEditDialogOpen(false)}
         onSave={handleSaveRecordChanges}
         record={record}
-        tagOptions={record?.tags ?? []}
+        tagOptions={tagOptions}
       />
       <Dialog
         open={deleteDialogOpen}
