@@ -64,6 +64,8 @@ export default function Activity() {
       year: "numeric",
       month: "short",
       day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
     });
   }, []);
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
@@ -369,9 +371,7 @@ export default function Activity() {
                   </Box>
                 )}
                 {currentStatus === "ready" && currentEntries.length === 0 && (
-                  <Typography color="text.secondary">
-                    {emptyMessage}
-                  </Typography>
+                  <Typography color="text.secondary">{emptyMessage}</Typography>
                 )}
                 {currentStatus === "ready" && currentEntries.length > 0 && (
                   <List disablePadding>
@@ -382,11 +382,16 @@ export default function Activity() {
                           : "";
                       const ownerDisplay =
                         rawDisplayName || entry.owner.username;
-                      const avatarSource = rawDisplayName || entry.owner.username;
-                      const avatarInitial = avatarSource.charAt(0).toUpperCase();
+                      const avatarSource =
+                        rawDisplayName || entry.owner.username;
+                      const avatarInitial = avatarSource
+                        .charAt(0)
+                        .toUpperCase();
                       const addedDate = entry.record.added
-                        ? formatLocalDate(entry.record.added, feedDateFormatter) ??
-                          entry.record.added
+                        ? formatLocalDate(
+                            entry.record.added,
+                            feedDateFormatter
+                          ) ?? entry.record.added
                         : null;
                       const tagsLabel =
                         entry.record.tags && entry.record.tags.length > 0
@@ -401,7 +406,9 @@ export default function Activity() {
                             ? entry.record.tableName.trim()
                             : "";
                         if (!raw) {
-                          return isFriendsView ? "their collection" : "your collection";
+                          return isFriendsView
+                            ? "their collection"
+                            : "your collection";
                         }
                         const normalized = raw.toLowerCase();
                         if (normalized === "my collection") {
@@ -481,7 +488,8 @@ export default function Activity() {
                                       flex: "0 0 auto",
                                     }}
                                   >
-                                    {!entry.owner.profilePicUrl && avatarInitial}
+                                    {!entry.owner.profilePicUrl &&
+                                      avatarInitial}
                                   </Avatar>
 
                                   <Typography

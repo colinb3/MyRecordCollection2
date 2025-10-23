@@ -1256,9 +1256,7 @@ app.get("/api/activity", requireAuth, async (req, res) => {
       const masterIdRaw = Number(row.masterId);
       const masterId =
         Number.isInteger(masterIdRaw) && masterIdRaw > 0 ? masterIdRaw : null;
-      const addedValue = row.added;
-      const added =
-        addedValue instanceof Date ? addedValue.toISOString().slice(0, 10) : addedValue;
+      const added = row.added;
       const cover =
         typeof row.cover === "string" && row.cover ? row.cover : undefined;
       const tags = tagsByRecord[row.id] || [];
