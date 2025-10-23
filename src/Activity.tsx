@@ -64,8 +64,6 @@ export default function Activity() {
       year: "numeric",
       month: "short",
       day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
     });
   }, []);
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
