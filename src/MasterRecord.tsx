@@ -198,6 +198,7 @@ export default function MasterRecord() {
     open: boolean;
     message: string;
     severity: "success" | "error";
+    action?: ReactNode;
   }>({ open: false, message: "", severity: "success" });
   const [masterInfo, setMasterInfo] = useState<MasterInfo | null>(null);
   const [masterLoading, setMasterLoading] = useState(false);
@@ -293,18 +294,15 @@ export default function MasterRecord() {
 
       if (cancelled) return;
 
-      if (!info) {
-        navigate("/login");
-        return;
-      }
-
-      setUsername(info.username);
-      setDisplayName(info.displayName ?? "");
-      setProfilePicUrl(info.profilePicUrl ?? null);
-      try {
-        setUserId(info.userUuid);
-      } catch {
-        /* ignore analytics errors */
+      if (info) {
+        setUsername(info.username);
+        setDisplayName(info.displayName ?? "");
+        setProfilePicUrl(info.profilePicUrl ?? null);
+        try {
+          setUserId(info.userUuid);
+        } catch {
+          /* ignore analytics errors */
+        }
       }
       if (Array.isArray(tags)) {
         setAvailableTags(tags);
@@ -653,7 +651,63 @@ export default function MasterRecord() {
         } else {
           const problem = await res.json().catch(() => ({}));
           const msg = problem.error || `Failed to add record (${res.status})`;
-          setSnackbar({ open: true, message: msg, severity: "error" });
+
+          // If there's a conflict with an existing record in a different collection, show Move button
+          if (
+            res.status === 409 &&
+            problem.existingRecordId &&
+            problem.existingCollection &&
+            problem.existingCollection !== tableName
+          ) {
+            const handleMove = async () => {
+              try {
+                const moveRes = await fetch(apiUrl("/api/records/move"), {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  credentials: "include",
+                  body: JSON.stringify({
+                    id: problem.existingRecordId,
+                    targetTableName: tableName,
+                  }),
+                });
+
+                if (moveRes.ok) {
+                  setSnackbar({
+                    open: true,
+                    message: `Record moved to ${tableName}`,
+                    severity: "success",
+                  });
+                } else {
+                  const moveError = await moveRes.json().catch(() => ({}));
+                  setSnackbar({
+                    open: true,
+                    message: moveError.error || "Failed to move record",
+                    severity: "error",
+                  });
+                }
+              } catch (error) {
+                console.error(error);
+                setSnackbar({
+                  open: true,
+                  message: "Network error moving record",
+                  severity: "error",
+                });
+              }
+            };
+
+            setSnackbar({
+              open: true,
+              message: msg,
+              severity: "error",
+              action: (
+                <Button color="inherit" size="small" onClick={handleMove}>
+                  Move
+                </Button>
+              ),
+            });
+          } else {
+            setSnackbar({ open: true, message: msg, severity: "error" });
+          }
         }
       } catch (error) {
         console.error(error);
@@ -675,16 +729,28 @@ export default function MasterRecord() {
   );
 
   const handleAddRecord = useCallback(() => {
+    if (!username) {
+      navigate("/login");
+      return;
+    }
     void submitRecord(DEFAULT_COLLECTION_NAME, "Record added to collection");
-  }, [submitRecord]);
+  }, [submitRecord, username, navigate]);
 
   const handleAddWishlistRecord = useCallback(() => {
+    if (!username) {
+      navigate("/login");
+      return;
+    }
     void submitRecord(WISHLIST_COLLECTION_NAME, "Record added to wishlist");
-  }, [submitRecord]);
+  }, [submitRecord, username, navigate]);
 
   const handleAddListenedRecord = useCallback(() => {
+    if (!username) {
+      navigate("/login");
+      return;
+    }
     void submitRecord(LISTENED_COLLECTION_NAME, "Record added to listened");
-  }, [submitRecord]);
+  }, [submitRecord, username, navigate]);
 
   const handleOpenMasterReviews = useCallback(() => {
     const resolvedMasterId = masterInfo?.masterId ?? masterIdOverride;
@@ -939,6 +1005,7 @@ export default function MasterRecord() {
             severity={snackbar.severity}
             variant="filled"
             onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+            action={snackbar.action}
           >
             {snackbar.message}
           </Alert>

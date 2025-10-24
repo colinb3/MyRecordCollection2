@@ -663,7 +663,7 @@ app.get("/api/records", requireAuth, async (req, res) => {
   }
 });
 
-app.get("/api/records/master-info", requireAuth, async (req, res) => {
+app.get("/api/records/master-info", async (req, res) => {
   console.log("Fetching master info...");
 
   const masterIdParam = Number(req.query.masterId);
@@ -777,7 +777,7 @@ app.get("/api/records/master-info", requireAuth, async (req, res) => {
   }
 });
 
-app.get("/api/records/master-reviews", requireAuth, async (req, res) => {
+app.get("/api/records/master-reviews", async (req, res) => {
   console.log("Fetching master reviews...");
 
   const masterIdParam = Number(req.query.masterId);
@@ -951,7 +951,7 @@ app.get("/api/profile/recent", requireAuth, async (req, res) => {
   }
 });
 
-app.get("/api/community/search", requireAuth, async (req, res) => {
+app.get("/api/community/search", async (req, res) => {
   console.log("Community user search...");
   const rawQuery = typeof req.query.q === "string" ? req.query.q.trim() : "";
   if (rawQuery.length < 2) {
@@ -978,12 +978,25 @@ app.get("/api/community/search", requireAuth, async (req, res) => {
   }
 });
 
-app.get("/api/community/users/:username", requireAuth, async (req, res) => {
+app.get("/api/community/users/:username", async (req, res) => {
   console.log("Fetching public profile...");
   const targetUsername = req.params.username;
   if (!targetUsername) {
     return res.status(400).json({ error: "Username is required" });
   }
+  
+  // Optional auth - extract userUuid from token if present
+  let authenticatedUserUuid = null;
+  const token = req.cookies.token;
+  if (token) {
+    try {
+      const payload = jwt.verify(token, JWT_SECRET);
+      authenticatedUserUuid = payload.userUuid;
+    } catch {
+      // Invalid token, continue as unauthenticated
+    }
+  }
+  
   try {
     const pool = await getPool();
     const userRow = await getUserByUsername(pool, targetUsername);
@@ -994,10 +1007,10 @@ app.get("/api/community/users/:username", requireAuth, async (req, res) => {
     const publicUser = normalizePublicUser(userRow);
 
     let isFollowing = null;
-    if (userRow.uuid !== req.userUuid) {
+    if (authenticatedUserUuid && userRow.uuid !== authenticatedUserUuid) {
       const [followRows] = await pool.query(
         `SELECT 1 FROM Follows WHERE userUuid = ? AND followsUuid = ? LIMIT 1`,
-        [req.userUuid, userRow.uuid]
+        [authenticatedUserUuid, userRow.uuid]
       );
       isFollowing = Array.isArray(followRows) && followRows.length > 0;
     }
@@ -1019,7 +1032,7 @@ app.get("/api/community/users/:username", requireAuth, async (req, res) => {
       userRow.uuid,
       LISTENED_COLLECTION_NAME
     );
-    const isOwner = userRow.uuid === req.userUuid;
+    const isOwner = authenticatedUserUuid && userRow.uuid === authenticatedUserUuid;
     const collectionPrivate = defaultCollectionRow
       ? Number(defaultCollectionRow.isPrivate) === 1
       : false;
@@ -1119,13 +1132,25 @@ app.get("/api/community/users/:username", requireAuth, async (req, res) => {
 
 app.get(
   "/api/community/users/:username/collection",
-  requireAuth,
   async (req, res) => {
     console.log("Fetching public collection...");
     const targetUsername = req.params.username;
     if (!targetUsername) {
       return res.status(400).json({ error: "Username is required" });
     }
+    
+    // Optional auth - extract userUuid from token if present
+    let authenticatedUserUuid = null;
+    const token = req.cookies.token;
+    if (token) {
+      try {
+        const payload = jwt.verify(token, JWT_SECRET);
+        authenticatedUserUuid = payload.userUuid;
+      } catch {
+        // Invalid token, continue as unauthenticated
+      }
+    }
+    
     const rawTable =
       typeof req.query.table === "string" && req.query.table.trim()
         ? req.query.table.trim()
@@ -1142,7 +1167,8 @@ app.get(
         return res.status(404).json({ error: "Collection not found" });
       }
 
-      if (tableRow.isPrivate && userRow.uuid !== req.userUuid) {
+      const isOwner = authenticatedUserUuid && userRow.uuid === authenticatedUserUuid;
+      if (tableRow.isPrivate && !isOwner) {
         return res.status(403).json({ error: "This collection is private" });
       }
 
@@ -1168,7 +1194,6 @@ app.get(
 
 app.get(
   "/api/community/users/:username/follows",
-  requireAuth,
   async (req, res) => {
     console.log("Fetching followers/following...");
     const targetUsername = req.params.username;
@@ -1773,6 +1798,135 @@ if (process.env.NODE_ENV === 'production') {
   }
 }
 
+// Get a single record by ID
+// Supports both authenticated user's own records and public records when username query param is provided
+app.get('/api/records/:id', async (req, res) => {
+  console.log('Fetching single record...');
+  const recordId = Number.parseInt(req.params.id, 10);
+  const { username } = req.query;
+  
+  if (!Number.isInteger(recordId) || recordId <= 0) {
+    return res.status(400).json({ error: 'Invalid record ID' });
+  }
+  
+  // Optional auth - extract userUuid from token if present
+  let authenticatedUserUuid = null;
+  const token = req.cookies.token;
+  if (token) {
+    try {
+      const payload = jwt.verify(token, JWT_SECRET);
+      authenticatedUserUuid = payload.userUuid;
+    } catch {
+      // Invalid token, continue as unauthenticated
+    }
+  }
+
+  try {
+    const pool = await getPool();
+    
+    if (username && typeof username === 'string') {
+      // Public record access - fetch by username
+      const trimmedUsername = username.trim();
+      const [userRows] = await pool.execute(
+        'SELECT uuid, username, displayName, profilePic FROM User WHERE username = ? LIMIT 1',
+        [trimmedUsername]
+      );
+      
+      if (userRows.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      
+      const targetUser = userRows[0];
+      const targetUserUuid = targetUser.uuid;
+      
+      // Fetch the record owned by this user
+      const [recordRows] = await pool.execute(
+        `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', 
+                r.added, r.tableId, r.isCustom, r.masterId, r.review,
+                rt.name as tableName, rt.isPrivate
+         FROM Record r
+         JOIN RecTable rt ON r.tableId = rt.id
+         WHERE r.id = ? AND r.userUuid = ?
+         LIMIT 1`,
+        [recordId, targetUserUuid]
+      );
+      
+      if (recordRows.length === 0) {
+        return res.status(404).json({ error: 'Record not found' });
+      }
+      
+      const record = recordRows[0];
+      
+      // Check if collection is private and user is not authenticated as owner
+      if (record.isPrivate) {
+        const isOwner = authenticatedUserUuid && authenticatedUserUuid === targetUserUuid;
+        if (!isOwner) {
+          return res.status(403).json({ error: 'This record is private' });
+        }
+      }
+      
+      // Fetch tags
+      const [tagRows] = await pool.execute(
+        `SELECT t.name FROM Tag t JOIN Tagged tg ON t.id = tg.tagId WHERE tg.recordId = ?`,
+        [recordId]
+      );
+      record.tags = tagRows.map(t => t.name);
+      
+      // Add owner info
+      const owner = {
+        username: targetUser.username,
+        displayName: targetUser.displayName || null,
+        profilePicUrl: targetUser.profilePic ? `/uploads/profile/${targetUser.profilePic}` : null,
+      };
+      
+      // Format collection name
+      record.collectionName = record.tableName;
+      delete record.isPrivate;
+      delete record.tableName;
+      
+      res.json({ record, owner });
+    } else {
+      // Authenticated user's own record
+      if (!authenticatedUserUuid) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+      
+      const [recordRows] = await pool.execute(
+        `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release',
+                r.added, r.tableId, r.isCustom, r.masterId, r.review,
+                rt.name as tableName
+         FROM Record r
+         JOIN RecTable rt ON r.tableId = rt.id
+         WHERE r.id = ? AND r.userUuid = ?
+         LIMIT 1`,
+        [recordId, authenticatedUserUuid]
+      );
+      
+      if (recordRows.length === 0) {
+        return res.status(404).json({ error: 'Record not found' });
+      }
+      
+      const record = recordRows[0];
+      
+      // Fetch tags
+      const [tagRows] = await pool.execute(
+        `SELECT t.name FROM Tag t JOIN Tagged tg ON t.id = tg.tagId WHERE tg.recordId = ?`,
+        [recordId]
+      );
+      record.tags = tagRows.map(t => t.name);
+      
+      // Format collection name
+      record.collectionName = record.tableName;
+      delete record.tableName;
+      
+      res.json({ record, owner: null });
+    }
+  } catch (err) {
+    console.error('Failed to fetch record', err);
+    res.status(500).json({ error: 'Failed to fetch record' });
+  }
+});
+
 // Create or update a record
 app.post('/api/records/update', requireAuth, async (req, res) => {
   console.log("Updating record...");
@@ -1927,7 +2081,7 @@ app.post('/api/records/create', requireAuth, async (req, res) => {
 
     if (hasMaster) {
       const [existingRows] = await pool.execute(
-        `SELECT r.name AS record, t.name AS collectionName
+        `SELECT r.id, r.name AS record, t.name AS collectionName
          FROM Record r
          JOIN RecTable t ON r.tableId = t.id
          WHERE r.userUuid = ? AND r.masterId = ?
@@ -1944,6 +2098,7 @@ app.post('/api/records/create', requireAuth, async (req, res) => {
           error: `You already have "${conflictRecord}" in ${conflictCollection}.`,
           existingRecord: conflictRecord,
           existingCollection: conflictCollection,
+          existingRecordId: match.id,
         });
       }
       const masterCoverValue = masterCover || cleanCover || null;
@@ -2252,7 +2407,7 @@ app.post('/api/tags/clear', requireAuth, async (req, res) => {
 });
 
 // Proxy to Last.fm album.search (requires LASTFM_API_KEY in env)
-app.get('/api/lastfm/album.search', requireAuth, async (req, res) => {
+app.get('/api/lastfm/album.search', async (req, res) => {
   console.log("Proxying Last.fm album.search...");
   const { q } = req.query;
   if (!q || typeof q !== 'string') return res.status(400).json({ error: 'Missing q param' });
@@ -2508,7 +2663,7 @@ app.post('/api/records/move', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Record is already in that collection' });
     }
     const [updateResult] = await pool.execute(
-      `UPDATE Record SET tableId = ? WHERE id = ? AND userUuid = ?`,
+      `UPDATE Record SET tableId = ?, added = UTC_TIMESTAMP() WHERE id = ? AND userUuid = ?`,
       [destTableId, id, req.userUuid]
     );
     if (!updateResult || updateResult.affectedRows === 0) {

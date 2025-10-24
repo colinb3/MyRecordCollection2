@@ -106,26 +106,9 @@ export default function Collection({ tableName, title }: CollectionProps) {
 
   const navigateToRecordDetails = useCallback(
     (record: Record) => {
-      const originPath = `${location.pathname}${location.search}${location.hash}`;
-
-      navigate(`/record/${record.id}`, {
-        state: {
-          from: {
-            path: originPath,
-            label: title ?? tableName,
-          },
-          record,
-        },
-      });
+      navigate(`/record/${record.id}`);
     },
-    [
-      navigate,
-      location.pathname,
-      location.search,
-      location.hash,
-      title,
-      tableName,
-    ]
+    [navigate]
   );
 
   const resetFilters = () => {

@@ -5,7 +5,7 @@ import Paper from "@mui/material/Paper";
 import Typography from "@mui/material/Typography";
 import placeholderCover from "../assets/missingImg.jpg";
 import type { Record } from "../types";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Divider } from "@mui/material";
 import { formatLocalDate } from "../dateUtils";
 
@@ -13,10 +13,7 @@ interface RecordPreviewGridProps {
   records: Record[];
   keyPrefix?: string;
   showDateAdded?: boolean;
-  fromTitle?: string;
   ownerUsername: string;
-  ownerDisplayName?: string | null;
-  ownerProfilePicUrl?: string | null;
   isOwnerViewing?: boolean;
 }
 
@@ -24,14 +21,10 @@ export default function RecordPreviewGrid({
   records,
   keyPrefix,
   showDateAdded = false,
-  fromTitle,
   ownerUsername,
-  ownerDisplayName,
-  ownerProfilePicUrl,
   isOwnerViewing = false,
 }: RecordPreviewGridProps) {
   const navigate = useNavigate();
-  const location = useLocation();
 
   const dateFormatter = useMemo(() => {
     return new Intl.DateTimeFormat(undefined, {
@@ -46,30 +39,11 @@ export default function RecordPreviewGrid({
       return;
     }
 
-    const originPath = `${location.pathname}${location.search}${location.hash}`;
-    const ownerDisplay = (ownerDisplayName ?? "").trim() || ownerUsername;
-    const ownerState = isOwnerViewing
-      ? null
-      : {
-          username: ownerUsername,
-          displayName: ownerDisplayName ?? null,
-          profilePicUrl: ownerProfilePicUrl ?? null,
-        };
-
     const targetPath = isOwnerViewing
       ? `/record/${record.id}`
       : `/community/${encodeURIComponent(ownerUsername)}/record/${record.id}`;
 
-    navigate(targetPath, {
-      state: {
-        from: {
-          path: originPath,
-          label: fromTitle || `${ownerDisplay}'s Profile`,
-        },
-        record,
-        owner: ownerState,
-      },
-    });
+    navigate(targetPath);
   };
 
   return (

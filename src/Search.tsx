@@ -87,18 +87,15 @@ export default function Search() {
 
       if (cancelled) return;
 
-      if (!info) {
-        navigate("/login");
-        return;
-      }
-
-      setUsername(info.username);
-      setDisplayName(info.displayName ?? "");
-      setProfilePicUrl(info.profilePicUrl ?? null);
-      try {
-        setUserId(info.userUuid);
-      } catch {
-        /* ignore analytics errors */
+      if (info) {
+        setUsername(info.username);
+        setDisplayName(info.displayName ?? "");
+        setProfilePicUrl(info.profilePicUrl ?? null);
+        try {
+          setUserId(info.userUuid);
+        } catch {
+          /* ignore analytics errors */
+        }
       }
     })();
 

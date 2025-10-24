@@ -80,31 +80,10 @@ export default function AppRouter() {
             </RequireAuth>
           }
         />
-        <Route
-          path="/search"
-          element={
-            <RequireAuth>
-              <Search />
-            </RequireAuth>
-          }
-        />
+        <Route path="/search" element={<Search />} />
         <Route path="/findrecord" element={<Navigate to="/search" replace />} />
-        <Route
-          path="/master/:masterId/reviews"
-          element={
-            <RequireAuth>
-              <MasterReviews />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/master/:masterId?"
-          element={
-            <RequireAuth>
-              <MasterRecordPage />
-            </RequireAuth>
-          }
-        />
+        <Route path="/master/:masterId/reviews" element={<MasterReviews />} />
+        <Route path="/master/:masterId?" element={<MasterRecordPage />} />
         <Route
           path="/record/:recordId"
           element={
@@ -115,11 +94,7 @@ export default function AppRouter() {
         />
         <Route
           path="/community/:username/record/:recordId"
-          element={
-            <RequireAuth>
-              <RecordDetails />
-            </RequireAuth>
-          }
+          element={<RecordDetails />}
         />
         <Route
           path="/settings"
@@ -137,29 +112,14 @@ export default function AppRouter() {
             </RequireAuth>
           }
         />
-        <Route
-          path="/community/:username"
-          element={
-            <RequireAuth>
-              <CommunityProfile />
-            </RequireAuth>
-          }
-        />
+        <Route path="/community/:username" element={<CommunityProfile />} />
         <Route
           path="/community/:username/collection"
-          element={
-            <RequireAuth>
-              <CommunityCollection />
-            </RequireAuth>
-          }
+          element={<CommunityCollection />}
         />
         <Route
           path="/community/:username/follows"
-          element={
-            <RequireAuth>
-              <CommunityFollows />
-            </RequireAuth>
-          }
+          element={<CommunityFollows />}
         />
         <Route
           path="/login"

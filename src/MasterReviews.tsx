@@ -114,17 +114,15 @@ export default function MasterReviews() {
     (async () => {
       const info = await loadUserInfo();
       if (cancelled) return;
-      if (!info) {
-        navigate("/login");
-        return;
-      }
-      setUsername(info.username);
-      setDisplayName(info.displayName ?? "");
-      setProfilePicUrl(info.profilePicUrl ?? null);
-      try {
-        setUserId(info.userUuid);
-      } catch {
-        /* ignore analytics errors */
+      if (info) {
+        setUsername(info.username);
+        setDisplayName(info.displayName ?? "");
+        setProfilePicUrl(info.profilePicUrl ?? null);
+        try {
+          setUserId(info.userUuid);
+        } catch {
+          /* ignore analytics errors */
+        }
       }
     })();
 

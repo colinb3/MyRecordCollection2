@@ -100,17 +100,16 @@ export default function CommunityProfile() {
     (async () => {
       const info = await loadUserInfo();
       if (cancelled) return;
-      if (!info) {
-        navigate("/login");
-        return;
-      }
-      setUsername(info.username);
-      setDisplayName(info.displayName ?? "");
-      setProfilePicUrl(info.profilePicUrl ?? null);
-      try {
-        setUserId(info.userUuid);
-      } catch {
-        /* ignore analytics errors */
+      // Allow unauthenticated access - don't redirect to login
+      if (info) {
+        setUsername(info.username);
+        setDisplayName(info.displayName ?? "");
+        setProfilePicUrl(info.profilePicUrl ?? null);
+        try {
+          setUserId(info.userUuid);
+        } catch {
+          /* ignore analytics errors */
+        }
       }
     })();
 
@@ -569,12 +568,7 @@ export default function CommunityProfile() {
                     <RecordPreviewGrid
                       records={highlights}
                       keyPrefix="highlight"
-                      fromTitle={`${targetDisplayName}'s Highlights`}
                       ownerUsername={profileUsername}
-                      ownerDisplayName={
-                        profile?.displayName ?? targetDisplayName
-                      }
-                      ownerProfilePicUrl={profile?.profilePicUrl ?? null}
                       isOwnerViewing={isViewingOwnProfile}
                     />
                   )}
@@ -602,12 +596,7 @@ export default function CommunityProfile() {
                         records={recentRecords}
                         keyPrefix="recent"
                         showDateAdded
-                        fromTitle={`${targetDisplayName}'s Collection`}
                         ownerUsername={profileUsername}
-                        ownerDisplayName={
-                          profile?.displayName ?? targetDisplayName
-                        }
-                        ownerProfilePicUrl={profile?.profilePicUrl ?? null}
                         isOwnerViewing={isViewingOwnProfile}
                       />
                     )}
@@ -647,12 +636,7 @@ export default function CommunityProfile() {
                         records={listenedRecords}
                         keyPrefix="listened"
                         showDateAdded={true}
-                        fromTitle={`${targetDisplayName}'s Listened`}
                         ownerUsername={profileUsername}
-                        ownerDisplayName={
-                          profile?.displayName ?? targetDisplayName
-                        }
-                        ownerProfilePicUrl={profile?.profilePicUrl ?? null}
                         isOwnerViewing={isViewingOwnProfile}
                       />
                     )}
@@ -688,12 +672,7 @@ export default function CommunityProfile() {
                       <RecordPreviewGrid
                         records={wishlistRecords}
                         keyPrefix="wishlist"
-                        fromTitle={`${targetDisplayName}'s Wishlist`}
                         ownerUsername={profileUsername}
-                        ownerDisplayName={
-                          profile?.displayName ?? targetDisplayName
-                        }
-                        ownerProfilePicUrl={profile?.profilePicUrl ?? null}
                         isOwnerViewing={isViewingOwnProfile}
                       />
                     )}

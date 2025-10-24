@@ -23,7 +23,7 @@ import {
   ButtonBase,
   Stack,
 } from "@mui/material";
-import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import TopBar from "./components/TopBar";
 import { darkTheme } from "./theme";
 import {
@@ -53,7 +53,6 @@ interface ActivityFeedState {
 
 export default function Activity() {
   const navigate = useNavigate();
-  const location = useLocation();
   const cachedUser = getCachedUserInfo();
   const [username, setUsername] = useState<string>(cachedUser?.username ?? "");
   const [displayName, setDisplayName] = useState<string>(
@@ -232,49 +231,15 @@ export default function Activity() {
       const isOwnRecord =
         normalizedOwner.length > 0 && normalizedOwner === normalizedViewer;
 
-      const originPath = `${location.pathname}${location.search}${location.hash}`;
-      const ownerDisplay =
-        (entry.owner.displayName ?? "").trim() || ownerUsername;
-      const rawCollectionName = (
-        entry.record.collectionName ||
-        entry.record.tableName ||
-        ""
-      ).trim();
-      const collectionLabel = (() => {
-        if (!rawCollectionName) return "Collection";
-        const normalized = rawCollectionName.toLowerCase();
-        if (normalized === "my collection") return "Collection";
-        if (normalized === "wishlist") return "Wishlist";
-        if (normalized === "listened") return "Listened";
-        return rawCollectionName;
-      })();
-
-      const fromLabel = `${ownerDisplay}'s ${collectionLabel}`;
-
       const targetPath = isOwnRecord
         ? `/record/${entry.record.id}`
         : `/community/${encodeURIComponent(ownerUsername)}/record/${
             entry.record.id
           }`;
 
-      navigate(targetPath, {
-        state: {
-          from: {
-            path: originPath,
-            label: fromLabel,
-          },
-          record: entry.record,
-          owner: isOwnRecord
-            ? null
-            : {
-                username: ownerUsername,
-                displayName: entry.owner.displayName ?? null,
-                profilePicUrl: entry.owner.profilePicUrl ?? null,
-              },
-        },
-      });
+      navigate(targetPath);
     },
-    [location.hash, location.pathname, location.search, navigate, username]
+    [navigate, username]
   );
 
   const isFriendsView = activeView === "friends";

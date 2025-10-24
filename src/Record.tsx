@@ -37,16 +37,8 @@ import {
 } from "./userInfo";
 import { setUserId } from "./analytics";
 import { clearRecordTablePreferencesCache } from "./preferences";
-import {
-  clearCollectionRecordsCache,
-  loadAllCollectionRecords,
-  loadCollectionRecords,
-} from "./collectionRecords";
-import {
-  clearCommunityCaches,
-  loadPublicUserCollection,
-  loadPublicUserProfile,
-} from "./communityUsers";
+import { clearCollectionRecordsCache } from "./collectionRecords";
+import { clearCommunityCaches } from "./communityUsers";
 import { clearProfileHighlightsCache } from "./profileHighlights";
 import type { Record as MrcRecord, RecordOwnerInfo } from "./types";
 import EditRecordDialog from "./components/EditRecordDialog";
@@ -54,34 +46,10 @@ import MoveRecordDialog from "./components/MoveRecordDialog";
 import { formatLocalDate } from "./dateUtils";
 
 const DEFAULT_COLLECTION_NAME = "My Collection";
-const WISHLIST_COLLECTION_NAME = "Wishlist";
-const LISTENED_COLLECTION_NAME = "Listened";
-
-type FromState = {
-  path?: string;
-  label?: string;
-};
-
-type LocationState = {
-  record?: MrcRecord;
-  from?: FromState;
-  owner?: RecordOwnerInfo | null;
-};
-
-function inferCollectionFromLabel(label?: string | null): string | null {
-  if (!label) return null;
-  const lower = label.toLowerCase();
-  if (lower.includes("wishlist")) return WISHLIST_COLLECTION_NAME;
-  if (lower.includes("listened")) return LISTENED_COLLECTION_NAME;
-  if (lower.includes("collection")) return DEFAULT_COLLECTION_NAME;
-  return null;
-}
 
 export default function RecordDetails() {
   const navigate = useNavigate();
   const location = useLocation();
-  const locationState =
-    (location.state as LocationState | undefined) ?? undefined;
   const params = useParams<{ recordId: string; username?: string }>();
   const ownerUsername = params.username ?? null;
   const recordIdParam = params.recordId ?? "";
@@ -98,24 +66,9 @@ export default function RecordDetails() {
     cachedUser?.profilePicUrl ?? null
   );
 
-  const [record, setRecord] = useState<MrcRecord | null>(
-    locationState?.record ?? null
-  );
-  const [fromInfo, setFromInfo] = useState<FromState | null>(
-    locationState?.from ?? null
-  );
-  const [owner, setOwner] = useState<RecordOwnerInfo | null>(() => {
-    if (locationState?.owner) return locationState.owner;
-    if (!ownerUsername) return null;
-    return {
-      username: ownerUsername,
-      displayName: null,
-      profilePicUrl: null,
-    };
-  });
-  const [loadingRecord, setLoadingRecord] = useState<boolean>(
-    () => !locationState?.record
-  );
+  const [record, setRecord] = useState<MrcRecord | null>(null);
+  const [owner, setOwner] = useState<RecordOwnerInfo | null>(null);
+  const [loadingRecord, setLoadingRecord] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -127,19 +80,6 @@ export default function RecordDetails() {
     severity: "success" | "error";
   }>({ open: false, message: "", severity: "success" });
   const [availableTags, setAvailableTags] = useState<string[]>([]);
-
-  useEffect(() => {
-    if (locationState?.record) {
-      setRecord((prev) => prev ?? locationState.record ?? null);
-      setLoadingRecord(false);
-    }
-    if (locationState?.from) {
-      setFromInfo((prev) => prev ?? locationState.from ?? null);
-    }
-    if (locationState?.owner) {
-      setOwner((prev) => prev ?? locationState.owner ?? null);
-    }
-  }, [locationState]);
 
   useEffect(() => {
     let cancelled = false;
@@ -166,17 +106,20 @@ export default function RecordDetails() {
       ]);
 
       if (cancelled) return;
-      if (!info) {
+      if (!info && !ownerUsername) {
+        // Only require login if viewing own records, not community records
         navigate("/login");
         return;
       }
-      setUsername(info.username);
-      setDisplayName(info.displayName ?? "");
-      setProfilePicUrl(info.profilePicUrl ?? null);
-      try {
-        setUserId(info.userUuid);
-      } catch {
-        /* ignore analytics errors */
+      if (info) {
+        setUsername(info.username);
+        setDisplayName(info.displayName ?? "");
+        setProfilePicUrl(info.profilePicUrl ?? null);
+        try {
+          setUserId(info.userUuid);
+        } catch {
+          /* ignore analytics errors */
+        }
       }
 
       if (Array.isArray(tags)) {
@@ -199,42 +142,10 @@ export default function RecordDetails() {
     };
   }, [navigate]);
 
-  useEffect(() => {
-    if (!ownerUsername) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const profile = await loadPublicUserProfile(ownerUsername);
-        if (cancelled) return;
-        setOwner({
-          username: profile.username,
-          displayName: profile.displayName,
-          profilePicUrl: profile.profilePicUrl,
-        });
-      } catch {
-        if (cancelled) return;
-        setOwner(
-          (prev) =>
-            prev ?? {
-              username: ownerUsername,
-              displayName: null,
-              profilePicUrl: null,
-            }
-        );
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [ownerUsername]);
-
+  // Fetch the record from the API
   useEffect(() => {
     if (!isValidRecordId) {
       setError("Invalid record id.");
-      setLoadingRecord(false);
-      return;
-    }
-    if (record) {
       setLoadingRecord(false);
       return;
     }
@@ -245,79 +156,27 @@ export default function RecordDetails() {
 
     const fetchRecord = async () => {
       try {
-        if (ownerUsername) {
-          const inferred = inferCollectionFromLabel(fromInfo?.label);
-          const tableOrder = Array.from(
-            new Set(
-              [
-                inferred,
-                DEFAULT_COLLECTION_NAME,
-                WISHLIST_COLLECTION_NAME,
-                LISTENED_COLLECTION_NAME,
-              ].filter((value): value is string => Boolean(value))
+        const url = ownerUsername
+          ? apiUrl(
+              `/api/records/${recordIdNumber}?username=${encodeURIComponent(
+                ownerUsername
+              )}`
             )
-          );
+          : apiUrl(`/api/records/${recordIdNumber}`);
 
-          let found: MrcRecord | null = null;
-          let sawPrivate = false;
-          let lastError: unknown = null;
+        const res = await fetch(url, { credentials: "include" });
 
-          for (const tableName of tableOrder) {
-            try {
-              const records = await loadPublicUserCollection(
-                ownerUsername,
-                tableName
-              );
-              if (cancelled) return;
-              const match = records.find((item) => item.id === recordIdNumber);
-              if (match) {
-                found = { ...match, collectionName: tableName };
-                break;
-              }
-            } catch (err: unknown) {
-              lastError = err;
-              if ((err as any)?.status === 403) {
-                sawPrivate = true;
-              }
-            }
-          }
-
-          if (cancelled) return;
-
-          if (found) {
-            setRecord(found);
-          } else if (sawPrivate) {
-            setError("This record is private or unavailable.");
-          } else if (lastError instanceof Error) {
-            setError(lastError.message || "Failed to load record.");
-          } else {
-            setError("Record not found.");
-          }
-        } else {
-          const inferred = inferCollectionFromLabel(fromInfo?.label);
-          if (inferred) {
-            try {
-              const records = await loadCollectionRecords(inferred);
-              if (cancelled) return;
-              const match = records.find((item) => item.id === recordIdNumber);
-              if (match) {
-                setRecord({ ...match, collectionName: inferred });
-                return;
-              }
-            } catch {
-              /* ignore and fall back */
-            }
-          }
-
-          const records = await loadAllCollectionRecords();
-          if (cancelled) return;
-          const match = records.find((item) => item.id === recordIdNumber);
-          if (match) {
-            setRecord(match);
-          } else {
-            setError("Record not found.");
-          }
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData.error || "Failed to load record");
         }
+
+        const data = await res.json();
+
+        if (cancelled) return;
+
+        setRecord(data.record);
+        setOwner(data.owner);
       } catch (err: unknown) {
         if (cancelled) return;
         const message =
@@ -335,7 +194,7 @@ export default function RecordDetails() {
     return () => {
       cancelled = true;
     };
-  }, [record, isValidRecordId, recordIdNumber, ownerUsername, fromInfo?.label]);
+  }, [isValidRecordId, recordIdNumber, ownerUsername]);
 
   const handleLogout = useCallback(async () => {
     await fetch(apiUrl("/api/logout"), {
@@ -356,16 +215,12 @@ export default function RecordDetails() {
   }, [navigate]);
 
   const handleBack = useCallback(() => {
-    if (fromInfo?.path) {
-      navigate(fromInfo.path);
-      return;
-    }
     if (ownerUsername) {
       navigate(`/community/${encodeURIComponent(ownerUsername)}/collection`);
       return;
     }
     navigate("/mycollection");
-  }, [fromInfo, navigate, ownerUsername]);
+  }, [navigate, ownerUsername]);
 
   const handleOpenMasterRecord = useCallback(() => {
     if (!record) return;
@@ -376,11 +231,9 @@ export default function RecordDetails() {
       : ownerUsername
       ? `@${ownerUsername}`
       : null;
-    const fromTitle = fromInfo?.label
-      ? fromInfo.label
-      : ownerDisplay
+    const fromTitle = ownerDisplay
       ? `${ownerDisplay}'s Collection`
-      : DEFAULT_COLLECTION_NAME;
+      : record.collectionName || record.tableName || DEFAULT_COLLECTION_NAME;
 
     const albumPayload = {
       id: `record-${record.id}`,
@@ -415,14 +268,16 @@ export default function RecordDetails() {
         },
       });
     }
-  }, [location, navigate, owner, ownerUsername, record, fromInfo]);
+  }, [location, navigate, owner, ownerUsername, record]);
 
   const handleOpenOwnerProfile = useCallback(() => {
     if (!ownerUsername) return;
     navigate(`/community/${encodeURIComponent(ownerUsername)}`);
   }, [navigate, ownerUsername]);
 
-  const isOwnerView = ownerUsername ? ownerUsername === username : true;
+  const isOwnerView = ownerUsername
+    ? ownerUsername === username
+    : Boolean(username);
   const ownerDisplayName = owner?.displayName?.trim() || null;
   const ownerHandle = ownerUsername ? `@${ownerUsername}` : null;
   const ownerInitial = useMemo(() => {
@@ -432,10 +287,7 @@ export default function RecordDetails() {
   }, [ownerDisplayName, ownerUsername]);
   const ownerProfileAlt = ownerDisplayName ?? ownerHandle ?? "Record owner";
   const currentCollectionName =
-    record?.collectionName ??
-    record?.tableName ??
-    inferCollectionFromLabel(fromInfo?.label) ??
-    null;
+    record?.collectionName ?? record?.tableName ?? null;
 
   const tagOptions = useMemo(() => {
     const seen = new Map<string, string>();
@@ -512,12 +364,6 @@ export default function RecordDetails() {
           a.localeCompare(b, undefined, { sensitivity: "base" })
         );
       });
-      const updatedCollection = saved.collectionName ?? saved.tableName ?? null;
-      if (updatedCollection) {
-        setFromInfo((prev) =>
-          prev ? { ...prev, label: updatedCollection } : prev
-        );
-      }
 
       setEditDialogOpen(false);
       setSnackbar({
@@ -569,11 +415,9 @@ export default function RecordDetails() {
       clearCollectionRecordsCache();
       clearProfileHighlightsCache();
       clearCommunityCaches();
-      navigateTo =
-        fromInfo?.path ??
-        (ownerUsername
-          ? `/community/${encodeURIComponent(ownerUsername)}/collection`
-          : "/mycollection");
+      navigateTo = ownerUsername
+        ? `/community/${encodeURIComponent(ownerUsername)}/collection`
+        : "/mycollection";
     } catch {
       setSnackbar({
         open: true,
@@ -600,16 +444,18 @@ export default function RecordDetails() {
     targetCollection: string,
     serverMessage?: string
   ) => {
+    // Update the record with new collection and current date
     setRecord((prev) =>
       prev
         ? {
             ...prev,
             collectionName: targetCollection,
             tableName: targetCollection,
+            added: new Date().toISOString(),
           }
         : prev
     );
-    setFromInfo((prev) => (prev ? { ...prev, label: targetCollection } : prev));
+
     setMoveDialogOpen(false);
     setSnackbar({
       open: true,
@@ -620,7 +466,6 @@ export default function RecordDetails() {
     clearProfileHighlightsCache();
     clearCommunityCaches();
   };
-
   const handleSnackbarClose = (_: unknown, reason?: string) => {
     if (reason === "clickaway") return;
     setSnackbar((prev) => ({ ...prev, open: false }));
@@ -631,11 +476,12 @@ export default function RecordDetails() {
       year: "numeric",
       month: "short",
       day: "numeric",
+      hour: "numeric",
+      minute: "numeric",
     });
   }, []);
 
   const collectionLabel = useMemo(() => {
-    if (fromInfo?.label) return fromInfo.label;
     if (record?.collectionName) return record.collectionName;
     if (record?.tableName) return record.tableName;
     if (ownerUsername) {
@@ -645,7 +491,7 @@ export default function RecordDetails() {
       return `${ownerDisplay}'s Collection`;
     }
     return DEFAULT_COLLECTION_NAME;
-  }, [fromInfo, record, ownerUsername, owner]);
+  }, [record, ownerUsername, owner]);
 
   const ratingText =
     record && record.rating > 0 ? `${record.rating}/10` : "Not rated";

@@ -13,12 +13,7 @@ import {
 } from "@mui/material";
 import Grid from "@mui/material/Grid";
 import FilterListAltIcon from "@mui/icons-material/FilterListAlt";
-import {
-  useNavigate,
-  useParams,
-  useSearchParams,
-  useLocation,
-} from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import TopBar from "./components/TopBar";
 import { darkTheme } from "./theme";
 import {
@@ -52,7 +47,6 @@ const LISTENED_COLLECTION_NAME = "Listened";
 
 export default function CommunityCollection() {
   const navigate = useNavigate();
-  const location = useLocation();
   const params = useParams<{ username: string }>();
   const [searchParams] = useSearchParams();
   const cachedUser = getCachedUserInfo();
@@ -103,17 +97,16 @@ export default function CommunityCollection() {
     (async () => {
       const info = await loadUserInfo();
       if (cancelled) return;
-      if (!info) {
-        navigate("/login");
-        return;
-      }
-      setUsername(info.username);
-      setDisplayName(info.displayName ?? "");
-      setProfilePicUrl(info.profilePicUrl ?? null);
-      try {
-        setUserId(info.userUuid);
-      } catch {
-        /* ignore analytics errors */
+      // Allow unauthenticated access - don't redirect to login
+      if (info) {
+        setUsername(info.username);
+        setDisplayName(info.displayName ?? "");
+        setProfilePicUrl(info.profilePicUrl ?? null);
+        try {
+          setUserId(info.userUuid);
+        } catch {
+          /* ignore analytics errors */
+        }
       }
     })();
 
@@ -265,48 +258,15 @@ export default function CommunityCollection() {
     : "No records to display.";
   const navigateToRecordDetails = useCallback(
     (record: MrcRecord) => {
-      const originPath = `${location.pathname}${location.search}${location.hash}`;
-
       const targetPath = viewingOwnCollection
         ? `/record/${record.id}`
         : `/community/${encodeURIComponent(targetUsername)}/record/${
             record.id
           }`;
 
-      navigate(targetPath, {
-        state: {
-          from: {
-            path: originPath,
-            label: isWishlistView
-              ? `${targetDisplayName}'s Wishlist`
-              : isListenedView
-              ? `${targetDisplayName}'s Listened`
-              : `${targetDisplayName}'s Collection`,
-          },
-          record,
-          owner: viewingOwnCollection
-            ? null
-            : {
-                username: targetUsername,
-                displayName: profile?.displayName ?? null,
-                profilePicUrl: profile?.profilePicUrl ?? null,
-              },
-        },
-      });
+      navigate(targetPath);
     },
-    [
-      navigate,
-      location.pathname,
-      location.search,
-      location.hash,
-      isWishlistView,
-      isListenedView,
-      targetDisplayName,
-      targetUsername,
-      profile?.displayName,
-      profile?.profilePicUrl,
-      viewingOwnCollection,
-    ]
+    [navigate, targetUsername, viewingOwnCollection]
   );
 
   const handleSelectRecord = useCallback(
