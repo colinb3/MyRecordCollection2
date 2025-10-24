@@ -35,6 +35,7 @@ import {
   getCachedUserInfo,
   loadUserInfo,
 } from "./userInfo";
+import { loadUserTags, clearTagsCache } from "./userTags";
 import { setUserId } from "./analytics";
 import { clearRecordTablePreferencesCache } from "./preferences";
 import { clearCollectionRecordsCache } from "./collectionRecords";
@@ -86,23 +87,7 @@ export default function RecordDetails() {
     (async () => {
       const [info, tags] = await Promise.all([
         loadUserInfo(),
-        (async () => {
-          try {
-            const res = await fetch(apiUrl("/api/tags"), {
-              credentials: "include",
-            });
-            if (!res.ok) {
-              return null;
-            }
-            const raw = (await res.json().catch(() => [])) as unknown[];
-            return raw
-              .filter((tag): tag is string => typeof tag === "string")
-              .map((tag) => tag.trim())
-              .filter((tag) => tag.length > 0);
-          } catch {
-            return null;
-          }
-        })(),
+        loadUserTags(),
       ]);
 
       if (cancelled) return;
@@ -206,6 +191,7 @@ export default function RecordDetails() {
     clearProfileHighlightsCache();
     clearCommunityCaches();
     clearUserInfoCache();
+    clearTagsCache();
     try {
       setUserId(undefined);
     } catch {
@@ -476,8 +462,6 @@ export default function RecordDetails() {
       year: "numeric",
       month: "short",
       day: "numeric",
-      hour: "numeric",
-      minute: "numeric",
     });
   }, []);
 

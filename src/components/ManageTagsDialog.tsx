@@ -1,5 +1,6 @@
 import { useState } from "react";
 import apiUrl from "../api";
+import { updateTagsCache } from "../userTags";
 import {
   Dialog,
   DialogTitle,
@@ -75,6 +76,7 @@ export default function ManageTagsDialog({
       const data = await res.json();
       if (res.ok) {
         onTagsUpdated(data.tags);
+        updateTagsCache(data.tags);
         setNewTag("");
         openSnack("Tag added");
       } else {
@@ -113,6 +115,7 @@ export default function ManageTagsDialog({
       const data = await res.json();
       if (res.ok) {
         onTagsUpdated(data.tags);
+        updateTagsCache(data.tags);
         setRenaming(null);
         if (onTagRenamed) {
           onTagRenamed(renaming, renameValue.trim());
@@ -148,6 +151,7 @@ export default function ManageTagsDialog({
       const data = await res.json();
       if (res.ok) {
         onTagsUpdated(data.tags);
+        updateTagsCache(data.tags);
         if (renaming === confirmDeleteTag) setRenaming(null);
         openSnack("Tag deleted");
       } else {

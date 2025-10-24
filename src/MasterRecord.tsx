@@ -30,6 +30,7 @@ import {
   getCachedUserInfo,
   loadUserInfo,
 } from "./userInfo";
+import { loadUserTags, clearTagsCache } from "./userTags";
 import { clearRecordTablePreferencesCache } from "./preferences";
 import { clearCommunityCaches } from "./communityUsers";
 import { wikiGenres } from "./wiki";
@@ -279,17 +280,7 @@ export default function MasterRecord() {
     (async () => {
       const [info, tags] = await Promise.all([
         loadUserInfo(),
-        (async () => {
-          try {
-            const res = await fetch(apiUrl("/api/tags"), {
-              credentials: "include",
-            });
-            if (!res.ok) return null;
-            return (await res.json()) as string[];
-          } catch {
-            return null;
-          }
-        })(),
+        loadUserTags(),
       ]);
 
       if (cancelled) return;
@@ -370,6 +361,7 @@ export default function MasterRecord() {
     });
     clearRecordTablePreferencesCache();
     clearUserInfoCache();
+    clearTagsCache();
     clearCommunityCaches();
     try {
       setUserId(undefined);

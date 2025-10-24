@@ -32,6 +32,7 @@ import {
   getCachedUserInfo,
   loadUserInfo,
 } from "./userInfo";
+import { loadUserTags, clearTagsCache } from "./userTags";
 import { clearCommunityCaches } from "./communityUsers";
 import { useNavigate } from "react-router-dom";
 import { useLocation } from "react-router-dom";
@@ -173,16 +174,7 @@ export default function Collection({ tableName, title }: CollectionProps) {
             }
             return (await res.json()) as Record[];
           })(),
-          (async () => {
-            const res = await fetch(apiUrl("/api/tags"), {
-              credentials: "include",
-            });
-            if (!res.ok) {
-              console.error("Failed to fetch tags", res.status);
-              return null;
-            }
-            return (await res.json()) as string[];
-          })(),
+          loadUserTags(),
           loadRecordTablePreferences(),
         ]);
 
@@ -266,6 +258,7 @@ export default function Collection({ tableName, title }: CollectionProps) {
     });
     clearRecordTablePreferencesCache();
     clearUserInfoCache();
+    clearTagsCache();
     clearCommunityCaches();
     try {
       setUserId(undefined);

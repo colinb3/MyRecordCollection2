@@ -44,6 +44,7 @@ import Papa, { type ParseResult } from "papaparse";
 import apiUrl from "../../api";
 import { wikiGenres } from "../../wiki";
 import { clearCommunityCaches } from "../../communityUsers";
+import { updateTagsCache } from "../../userTags";
 import {
   loadCollectionPrivacy,
   updateCollectionPrivacyCache,
@@ -1214,6 +1215,7 @@ export default function CollectionSettings() {
                       } tags (removed ${data.taggedDeleted || 0} tag links)`,
                       severity: "success",
                     });
+                    updateTagsCache([]);
                   }
                 } catch (err) {
                   setSnackbar({
