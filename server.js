@@ -406,8 +406,7 @@ async function fetchTagsByRecordIds(pool, recordIds) {
 function buildDiscogsSearchUrl(artist, record) {
   const url = new URL(DISCOGS_API_URL);
   url.searchParams.set("type", "master");
-  url.searchParams.set("release_title", record);
-  url.searchParams.set("artist", artist);
+  url.searchParams.set("query", artist + " - " + record);
   if (DISCOGS_API_KEY && DISCOGS_API_SECRET) {
     url.searchParams.set("key", DISCOGS_API_KEY);
     url.searchParams.set("secret", DISCOGS_API_SECRET);

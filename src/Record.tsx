@@ -85,10 +85,7 @@ export default function RecordDetails() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [info, tags] = await Promise.all([
-        loadUserInfo(),
-        loadUserTags(),
-      ]);
+      const [info, tags] = await Promise.all([loadUserInfo(), loadUserTags()]);
 
       if (cancelled) return;
       if (!info && !ownerUsername) {
