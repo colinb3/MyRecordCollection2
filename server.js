@@ -507,9 +507,14 @@ async function lookupDiscogsByBarcode(barcode) {
         ? prioritized.thumb.trim()
         : null;
 
+    // Remove trailing (digit) from artist name
+    const cleanedArtist = artist
+      ? artist.replace(/\s*\(\d+\)\s*$/, "").trim()
+      : null;
+
     return {
       masterId: Number.isInteger(masterId) && masterId > 0 ? masterId : null,
-      artist: artist || null,
+      artist: cleanedArtist || null,
       record: record || null,
       releaseYear,
       discogsCover: cover,
