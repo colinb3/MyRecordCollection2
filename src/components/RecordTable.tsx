@@ -102,7 +102,7 @@ const columns: GridColDef[] = [
     field: "added",
     headerName: "Added",
     flex: 0.6,
-    minWidth: 100,
+    minWidth: 105,
     renderCell: (params) => {
       const val = params.value;
       if (typeof val === "string") {

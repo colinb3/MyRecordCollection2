@@ -1,7 +1,6 @@
 import {
   useCallback,
   useEffect,
-  useMemo,
   useState,
   type MouseEvent,
   type SyntheticEvent,
@@ -40,7 +39,7 @@ import { clearCommunityCaches, loadActivityFeed } from "./communityUsers";
 import apiUrl from "./api";
 import placeholderCover from "./assets/missingImg.jpg";
 import { Grid } from "@mui/system";
-import { formatLocalDate } from "./dateUtils";
+import { formatRelativeTime } from "./dateUtils";
 
 type ActivityView = "friends" | "you";
 type FeedStatus = "idle" | "loading" | "error" | "ready";
@@ -58,13 +57,6 @@ export default function Activity() {
   const [displayName, setDisplayName] = useState<string>(
     cachedUser?.displayName ?? ""
   );
-  const feedDateFormatter = useMemo(() => {
-    return new Intl.DateTimeFormat(undefined, {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  }, []);
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
     cachedUser?.profilePicUrl ?? null
   );
@@ -351,10 +343,8 @@ export default function Activity() {
                         .charAt(0)
                         .toUpperCase();
                       const addedDate = entry.record.added
-                        ? formatLocalDate(
-                            entry.record.added,
-                            feedDateFormatter
-                          ) ?? entry.record.added
+                        ? formatRelativeTime(entry.record.added) ??
+                          entry.record.added
                         : null;
                       const tagsLabel =
                         entry.record.tags && entry.record.tags.length > 0

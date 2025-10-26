@@ -503,12 +503,16 @@ export default function EditRecordDialog({
               fullWidth
               multiline
               size="small"
-              maxRows={1}
+              minRows={2}
+              maxRows={4}
               value={editedRecord.review ?? ""}
               inputProps={{ maxLength: 4000 }}
               onChange={handleChange}
               sx={{
                 mt: 2.2,
+                "& .MuiInputBase-root": {
+                  height: "auto",
+                },
                 "& .MuiOutlinedInput-root": {
                   backgroundColor: "background.paper",
                 },

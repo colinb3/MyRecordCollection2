@@ -948,7 +948,7 @@ export default function MasterRecord() {
           promptRecordRemoval(
             membership.wishlist,
             "Record removed from Wishlist",
-            "Record already in wishlist. Remove it?"
+            "Record already in Wishlist. Remove it?"
           ),
         icon: <FavoriteIcon />,
       }
@@ -969,7 +969,7 @@ export default function MasterRecord() {
           promptRecordRemoval(
             membership.listened,
             "Record removed from Listened",
-            "Record already in listened. Remove it?"
+            "Record already in Listened. Remove it?"
           ),
         icon: <HeadphonesIcon />,
       }
@@ -990,7 +990,7 @@ export default function MasterRecord() {
           promptRecordRemoval(
             membership.collection,
             "Record removed from My Collection",
-            "Record already in collection. Remove it?"
+            "Record already in My Collection. Remove it?"
           ),
         icon: <AddCircleIcon />,
       }

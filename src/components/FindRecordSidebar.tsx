@@ -253,12 +253,17 @@ export default function FindRecordSidebar({
           placeholder="Write a brief review..."
           fullWidth
           multiline
-          maxRows={1}
+          minRows={2}
+          maxRows={4}
+          size="small"
           value={review}
           onChange={(event) => onReviewChange(event.target.value)}
           inputProps={{ maxLength: 4000 }}
           sx={{
             mb: 0,
+            "& .MuiInputBase-root": {
+              height: "auto",
+            },
           }}
         />
       </Box>

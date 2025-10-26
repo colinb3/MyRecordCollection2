@@ -66,3 +66,36 @@ export function formatLocalDateTime(
   if (!parsed) return null;
   return (formatter ?? defaultDateTimeFormatter).format(parsed);
 }
+
+export function formatRelativeTime(
+  value: string | null | undefined
+): string | null {
+  const parsed = parseUtcDate(value);
+  if (!parsed) return null;
+
+  // Get current time in UTC to match the parsed UTC time
+  const now = new Date();
+  const diffMs = now.getTime() - parsed.getTime();
+  const diffMinutes = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  // Last hour: "x minutes ago"
+  if (diffMinutes < 60) {
+    if (diffMinutes < 1) return "just now";
+    return diffMinutes === 1 ? "1 minute ago" : `${diffMinutes} minutes ago`;
+  }
+
+  // Last day: "x hours ago"
+  if (diffHours < 24) {
+    return diffHours === 1 ? "1 hour ago" : `${diffHours} hours ago`;
+  }
+
+  // Last week: "x days ago"
+  if (diffDays < 7) {
+    return diffDays === 1 ? "1 day ago" : `${diffDays} days ago`;
+  }
+
+  // Otherwise, show the formatted date
+  return defaultDateFormatter.format(parsed);
+}
