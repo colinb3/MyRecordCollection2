@@ -85,14 +85,7 @@ export default function AppRouter() {
         <Route path="/findrecord" element={<Navigate to="/search" replace />} />
         <Route path="/master/:masterId/reviews" element={<MasterReviews />} />
         <Route path="/master/:masterId?" element={<MasterRecordPage />} />
-        <Route
-          path="/scan"
-          element={
-            <RequireAuth>
-              <BarcodeScanner />
-            </RequireAuth>
-          }
-        />
+        <Route path="/scan" element={<BarcodeScanner />} />
         <Route
           path="/record/:recordId"
           element={

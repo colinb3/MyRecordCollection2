@@ -128,7 +128,12 @@ export default function TopBar({
         <TextField
           variant="outlined"
           placeholder={searchPlaceholder || "Search..."}
-          sx={{ width: 300, pl: 1 }}
+          sx={{
+            width: 300,
+            ml: 1,
+            backgroundColor: "background.paper",
+            borderRadius: 1,
+          }}
           value={value}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
@@ -136,7 +141,7 @@ export default function TopBar({
           slotProps={{
             input: {
               sx: { pr: 1 },
-              endAdornment: username ? (
+              endAdornment: (
                 <Tooltip title="Scan barcode">
                   <IconButton
                     size="small"
@@ -147,7 +152,7 @@ export default function TopBar({
                     <QrCodeScannerIcon />
                   </IconButton>
                 </Tooltip>
-              ) : null,
+              ),
             },
           }}
         />

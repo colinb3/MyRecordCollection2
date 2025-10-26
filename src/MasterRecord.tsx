@@ -1214,7 +1214,7 @@ export default function MasterRecord() {
                   p: { xs: 2, md: 3 },
                   mt: { xs: -1, md: 0 },
                   mb: { xs: 2, md: 0 },
-                  maxHeight: { xs: "87vh", md: "none" },
+                  maxHeight: { xs: 720, md: "none" },
                   display: "flex",
                   flexDirection: "column",
                 }}

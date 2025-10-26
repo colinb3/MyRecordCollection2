@@ -983,7 +983,7 @@ app.get("/api/records/master-info", async (req, res) => {
   }
 });
 
-app.post("/api/barcode_search", requireAuth, async (req, res) => {
+app.post("/api/barcode_search", async (req, res) => {
   console.log("Performing barcode search...");
   const rawBarcode =
     typeof req.body?.barcode === "string" ? req.body.barcode.trim() : "";

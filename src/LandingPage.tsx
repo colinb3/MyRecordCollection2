@@ -14,6 +14,8 @@ import {
 import { useNavigate } from "react-router-dom";
 import "./LandingPage.css";
 import { darkTheme } from "./theme";
+import TopBar from "./components/TopBar";
+import { loadUserInfo, getCachedUserInfo } from "./userInfo";
 import icon from "./assets/icon.png";
 import collectionViewImg from "./assets/collectionview.png";
 import editViewImg from "./assets/editview.png";
@@ -30,6 +32,17 @@ import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
 
 export default function LandingPage() {
   const navigate = useNavigate();
+  const cachedUserInfo = getCachedUserInfo();
+  const [username, setUsername] = useState<string>(
+    cachedUserInfo?.username ?? ""
+  );
+  const [displayName, setDisplayName] = useState<string>(
+    cachedUserInfo?.displayName ?? ""
+  );
+  const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
+    cachedUserInfo?.profilePicUrl ?? null
+  );
+
   const carouselSlides = useMemo(
     () => [
       {
@@ -88,6 +101,24 @@ export default function LandingPage() {
   );
 
   const [activeSlide, setActiveSlide] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      const info = await loadUserInfo();
+      if (cancelled) return;
+      if (info) {
+        setUsername(info.username);
+        setDisplayName(info.displayName ?? "");
+        setProfilePicUrl(info.profilePicUrl ?? null);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (carouselSlides.length <= 1) return undefined;
@@ -204,13 +235,21 @@ export default function LandingPage() {
           sx={{
             position: "relative",
             overflow: "hidden",
-            py: { xs: 10, md: 14 },
+            pb: { xs: 10, md: 14 },
             color: "common.white",
             background: (theme) =>
               `radial-gradient(circle at top left, ${theme.palette.primary.dark} 0%, ${theme.palette.background.default} 55%, ${theme.palette.background.paper} 100%)`,
           }}
         >
           <Container maxWidth="lg">
+            <Box sx={{ mb: 4, mr: { xs: -1, sm: -2 }, pt: 1 }}>
+              <TopBar
+                title=""
+                username={username}
+                displayName={displayName}
+                profilePicUrl={profilePicUrl ?? undefined}
+              />
+            </Box>
             <Box
               sx={{
                 display: "grid",
