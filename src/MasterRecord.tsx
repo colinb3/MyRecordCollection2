@@ -20,8 +20,8 @@ import {
   Divider,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import AddCircleIcon from "@mui/icons-material/AddCircle";
-import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
+import AddBoxIcon from "@mui/icons-material/AddBox";
+import AddBoxOutlinedIcon from "@mui/icons-material/AddBoxOutlined";
 import FavoriteIcon from "@mui/icons-material/Favorite";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import HeadphonesIcon from "@mui/icons-material/Headphones";
@@ -59,6 +59,8 @@ interface LocationState {
     title?: string;
     tableName?: string;
   };
+  suggestedReleaseYear?: number;
+  fromScanner?: boolean;
 }
 
 interface MasterInfo {
@@ -162,6 +164,7 @@ export default function MasterRecord() {
   const navigate = useNavigate();
   const location = useLocation();
   const { masterId: masterIdParam } = useParams<{ masterId?: string }>();
+  const searchParams = new URLSearchParams(location.search);
   const locationState = (location.state as LocationState | undefined) ?? {};
   const initialAlbum = locationState.album ?? null;
   const fromCollection = locationState.fromCollection;
@@ -169,8 +172,16 @@ export default function MasterRecord() {
     typeof fromCollection?.path === "string"
       ? fromCollection.path.trim() || null
       : null;
+  const fromScanner =
+    locationState.fromScanner === true ||
+    searchParams.get("origin") === "scanner";
   const searchQuery =
     typeof locationState.query === "string" ? locationState.query.trim() : "";
+  const suggestedReleaseYear =
+    typeof locationState.suggestedReleaseYear === "number" &&
+    Number.isInteger(locationState.suggestedReleaseYear)
+      ? locationState.suggestedReleaseYear
+      : null;
   const cachedUser = getCachedUserInfo();
 
   const parseMasterId = (value: string | null | undefined): number | null => {
@@ -180,9 +191,7 @@ export default function MasterRecord() {
   };
 
   const masterIdFromParam = parseMasterId(masterIdParam);
-  const masterIdFromQuery = parseMasterId(
-    new URLSearchParams(location.search).get("q")
-  );
+  const masterIdFromQuery = parseMasterId(searchParams.get("q"));
   const initialMasterId =
     typeof locationState.masterId === "number" && locationState.masterId > 0
       ? locationState.masterId
@@ -205,7 +214,9 @@ export default function MasterRecord() {
   const [wikiLoading, setWikiLoading] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [rating, setRating] = useState(0);
-  const [releaseYear, setReleaseYear] = useState(new Date().getFullYear());
+  const [releaseYear, setReleaseYear] = useState(
+    suggestedReleaseYear ?? new Date().getFullYear()
+  );
   const [reviewText, setReviewText] = useState("");
   const [adding, setAdding] = useState(false);
   const [snackbar, setSnackbar] = useState<{
@@ -234,6 +245,16 @@ export default function MasterRecord() {
   useEffect(() => {
     releaseYearTouchedRef.current = releaseYearTouched;
   }, [releaseYearTouched]);
+
+  useEffect(() => {
+    if (
+      suggestedReleaseYear &&
+      Number.isInteger(suggestedReleaseYear) &&
+      !releaseYearTouchedRef.current
+    ) {
+      setReleaseYear(suggestedReleaseYear);
+    }
+  }, [suggestedReleaseYear]);
 
   useEffect(() => {
     setReviewText("");
@@ -281,11 +302,23 @@ export default function MasterRecord() {
     if (currentParamMasterId === masterIdOverride) {
       return;
     }
-    navigate(`/master/${masterIdOverride}`, {
-      replace: true,
-      state: { ...locationState, masterId: masterIdOverride },
-    });
-  }, [masterIdOverride, navigate, masterIdParam, locationState]);
+    navigate(
+      {
+        pathname: `/master/${masterIdOverride}`,
+        search: location.search,
+      },
+      {
+        replace: true,
+        state: { ...locationState, masterId: masterIdOverride },
+      }
+    );
+  }, [
+    masterIdOverride,
+    navigate,
+    masterIdParam,
+    location.search,
+    locationState,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -892,6 +925,10 @@ export default function MasterRecord() {
   ]);
 
   const handleBack = useCallback(() => {
+    if (fromScanner) {
+      navigate("/scan");
+      return;
+    }
     if (fromCollectionPath) {
       navigate(fromCollectionPath);
       return;
@@ -901,7 +938,7 @@ export default function MasterRecord() {
     } else {
       navigate("/search");
     }
-  }, [navigate, fromCollectionPath, searchQuery]);
+  }, [navigate, fromScanner, fromCollectionPath, searchQuery]);
 
   const promptRecordRemoval = useCallback(
     (
@@ -992,14 +1029,14 @@ export default function MasterRecord() {
             "Record removed from My Collection",
             "Record already in My Collection. Remove it?"
           ),
-        icon: <AddCircleIcon />,
+        icon: <AddBoxIcon />,
       }
     : {
         label: "Add to Collection",
         variant: "outlined" as const,
         disabled: adding,
         onClick: handleAddRecord,
-        icon: <AddCircleOutlineIcon />,
+        icon: <AddBoxOutlinedIcon />,
       };
 
   if (!album) {

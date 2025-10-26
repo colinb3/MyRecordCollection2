@@ -305,7 +305,7 @@ export default function Collection({ tableName, title }: CollectionProps) {
           <TextField
             variant="outlined"
             type="search"
-            placeholder={`Search ${title ?? tableName}`}
+            placeholder={`Search ${title ?? tableName}...`}
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
             sx={{

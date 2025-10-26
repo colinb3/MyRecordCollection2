@@ -24,6 +24,7 @@ import { loadUserInfo } from "./userInfo";
 import MasterRecordPage from "./MasterRecord";
 import RecordDetails from "./Record";
 import MasterReviews from "./MasterReviews";
+import BarcodeScanner from "./BarcodeScanner.tsx";
 
 // Component that prevents authenticated users from seeing auth pages
 function RedirectIfAuthed({ children }: { children: React.ReactNode }) {
@@ -84,6 +85,14 @@ export default function AppRouter() {
         <Route path="/findrecord" element={<Navigate to="/search" replace />} />
         <Route path="/master/:masterId/reviews" element={<MasterReviews />} />
         <Route path="/master/:masterId?" element={<MasterRecordPage />} />
+        <Route
+          path="/scan"
+          element={
+            <RequireAuth>
+              <BarcodeScanner />
+            </RequireAuth>
+          }
+        />
         <Route
           path="/record/:recordId"
           element={

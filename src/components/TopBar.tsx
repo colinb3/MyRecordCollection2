@@ -11,6 +11,7 @@ import {
   ListItemText,
   Divider,
   Grid,
+  Tooltip,
 } from "@mui/material";
 import AccountCircle from "@mui/icons-material/AccountCircle";
 import LogoutIcon from "@mui/icons-material/Logout";
@@ -21,6 +22,7 @@ import SettingsIcon from "@mui/icons-material/Settings";
 import PeopleAltIcon from "@mui/icons-material/PeopleAlt";
 import LoginIcon from "@mui/icons-material/Login";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
+import QrCodeScannerIcon from "@mui/icons-material/QrCodeScanner";
 import { useNavigate } from "react-router-dom";
 
 interface TopBarProps {
@@ -110,7 +112,6 @@ export default function TopBar({
           display: "flex",
           alignItems: "center",
           mb: 0.5,
-          gap: 1,
           mt: -0.5,
         }}
       >
@@ -126,15 +127,31 @@ export default function TopBar({
         </Typography>
         <TextField
           variant="outlined"
-          placeholder={searchPlaceholder || "Search Records or Users"}
-          sx={{ width: 300 }}
+          placeholder={searchPlaceholder || "Search..."}
+          sx={{ width: 300, pl: 1 }}
           value={value}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
-          type="search"
           inputProps={{ enterKeyHint: "search" }}
+          slotProps={{
+            input: {
+              sx: { pr: 1 },
+              endAdornment: username ? (
+                <Tooltip title="Scan barcode">
+                  <IconButton
+                    size="small"
+                    color="inherit"
+                    onClick={() => navigate("/scan")}
+                    edge="end"
+                  >
+                    <QrCodeScannerIcon />
+                  </IconButton>
+                </Tooltip>
+              ) : null,
+            },
+          }}
         />
-        <Box sx={{ mx: -1 }}>
+        <Box sx={{ mr: -1 }}>
           <IconButton
             size="large"
             aria-label="account menu"

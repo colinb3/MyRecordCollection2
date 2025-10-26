@@ -422,6 +422,104 @@ function normalizeDiscogsReleaseYear(raw) {
   return null;
 }
 
+function buildDiscogsBarcodeSearchUrl(barcode) {
+  const url = new URL(DISCOGS_API_URL);
+  url.searchParams.set("type", "release");
+  url.searchParams.set("barcode", barcode);
+  url.searchParams.set("per_page", "5");
+  if (DISCOGS_API_KEY && DISCOGS_API_SECRET) {
+    url.searchParams.set("key", DISCOGS_API_KEY);
+    url.searchParams.set("secret", DISCOGS_API_SECRET);
+  }
+  return url.toString();
+}
+
+function splitDiscogsTitle(title) {
+  const value = typeof title === "string" ? title.trim() : "";
+  if (!value) {
+    return { artist: null, record: null };
+  }
+
+  const separators = [" - ", " – "];
+  for (const separator of separators) {
+    const index = value.indexOf(separator);
+    if (index > 0) {
+      const artist = value.slice(0, index).trim();
+      const record = value.slice(index + separator.length).trim();
+      return {
+        artist: artist || null,
+        record: record || null,
+      };
+    }
+  }
+
+  return {
+    artist: null,
+    record: value || null,
+  };
+}
+
+async function lookupDiscogsByBarcode(barcode) {
+  const trimmed = typeof barcode === "string" ? barcode.trim() : "";
+  if (!trimmed) {
+    return null;
+  }
+
+  const requestUrl = buildDiscogsBarcodeSearchUrl(trimmed);
+
+  try {
+    const response = await fetch(requestUrl, {
+      headers: {
+        "User-Agent": DISCOGS_USER_AGENT,
+        Accept: "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return null;
+      }
+      const status = response.status;
+      const text = await response.text().catch(() => "");
+      throw new Error(`Discogs barcode request failed (${status}): ${text}`);
+    }
+
+    const data = await response.json();
+    const results = Array.isArray(data?.results) ? data.results : [];
+    if (results.length === 0) {
+      return null;
+    }
+
+    const prioritized =
+      results.find((item) => Number(item?.master_id) > 0) ?? results[0];
+    if (!prioritized) {
+      return null;
+    }
+
+    const { artist, record } = splitDiscogsTitle(prioritized?.title);
+    const masterIdRaw = prioritized?.master_id;
+    const masterId = Number(masterIdRaw);
+    const releaseYear = normalizeDiscogsReleaseYear(prioritized?.year);
+    const cover =
+      typeof prioritized?.cover_image === "string" && prioritized.cover_image.trim()
+        ? prioritized.cover_image.trim()
+        : typeof prioritized?.thumb === "string" && prioritized.thumb.trim()
+        ? prioritized.thumb.trim()
+        : null;
+
+    return {
+      masterId: Number.isInteger(masterId) && masterId > 0 ? masterId : null,
+      artist: artist || null,
+      record: record || null,
+      releaseYear,
+      discogsCover: cover,
+    };
+  } catch (error) {
+    console.warn("Discogs barcode lookup failed", error);
+    throw error;
+  }
+}
+
 async function lookupDiscogsMaster(artist, record) {
   const trimmedArtist = typeof artist === "string" ? artist.trim() : "";
   const trimmedRecord = typeof record === "string" ? record.trim() : "";
@@ -877,6 +975,86 @@ app.get("/api/records/master-info", async (req, res) => {
   } catch (error) {
     console.error("Failed to load master info", error);
     res.status(502).json({ error: "Failed to fetch master information" });
+  }
+});
+
+app.post("/api/barcode_search", requireAuth, async (req, res) => {
+  console.log("Performing barcode search...");
+  const rawBarcode =
+    typeof req.body?.barcode === "string" ? req.body.barcode.trim() : "";
+
+  if (!rawBarcode) {
+    return res.status(400).json({ error: "barcode is required" });
+  }
+
+  const normalizedCandidates = Array.from(
+    new Set(
+      [rawBarcode, rawBarcode.replace(/[^0-9A-Za-z]/g, "")].filter(
+        (value) => value && value.length > 0
+      )
+    )
+  );
+
+  let lookupResult = null;
+  for (const candidate of normalizedCandidates) {
+    try {
+      lookupResult = await lookupDiscogsByBarcode(candidate);
+      if (lookupResult) {
+        break;
+      }
+    } catch (error) {
+      console.warn("Barcode lookup attempt failed", error);
+    }
+  }
+
+  if (!lookupResult) {
+    return res.status(404).json({ error: "No results found for that barcode" });
+  }
+
+  try {
+    const pool = await getPool();
+
+    if (lookupResult.masterId) {
+      const [existingRows] = await pool.query(
+        `SELECT 1 FROM Master WHERE id = ? LIMIT 1`,
+        [lookupResult.masterId]
+      );
+      if (Array.isArray(existingRows) && existingRows.length > 0) {
+        return res.json({
+          status: "existing",
+          masterId: lookupResult.masterId,
+        });
+      }
+    }
+
+    const artist =
+      typeof lookupResult.artist === "string" && lookupResult.artist.trim()
+        ? lookupResult.artist.trim()
+        : null;
+    const record =
+      typeof lookupResult.record === "string" && lookupResult.record.trim()
+        ? lookupResult.record.trim()
+        : null;
+
+    let cover = null;
+    if (artist && record) {
+      cover = await fetchLastFmCover(artist, record);
+    }
+    if (!cover && lookupResult.discogsCover) {
+      cover = lookupResult.discogsCover;
+    }
+
+    return res.json({
+      status: "new",
+      masterId: lookupResult.masterId,
+      artist,
+      record,
+      cover: cover ?? null,
+      releaseYear: lookupResult.releaseYear ?? null,
+    });
+  } catch (error) {
+    console.error("Failed to complete barcode search", error);
+    return res.status(502).json({ error: "Failed to process barcode search" });
   }
 });
 
