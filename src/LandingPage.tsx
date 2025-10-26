@@ -242,7 +242,7 @@ export default function LandingPage() {
           }}
         >
           <Container maxWidth="lg">
-            <Box sx={{ mb: 4, mr: { xs: -1, sm: -2 }, pt: 1 }}>
+            <Box sx={{ mb: 4, mr: { xs: -1, sm: -2 }, pt: { xs: 1, md: 1.5 } }}>
               <TopBar
                 title=""
                 username={username}
