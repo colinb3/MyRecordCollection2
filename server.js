@@ -532,6 +532,75 @@ async function getUserTableId(pool, userUuid, tableName) {
   return row ? row.id : null;
 }
 
+async function getUserCollectionsForRecord(pool, userUuid, { masterId, artist, recordName }) {
+  if (!userUuid) {
+    return [];
+  }
+
+  const normalizedArtist = typeof artist === "string" ? artist.trim() : "";
+  const normalizedRecord = typeof recordName === "string" ? recordName.trim() : "";
+
+  const results = [];
+  const seen = new Set();
+
+  if (Number.isInteger(masterId) && masterId > 0) {
+    const [rows] = await pool.query(
+      `SELECT r.id AS recordId, rt.name AS tableName
+         FROM Record r
+         JOIN RecTable rt ON r.tableId = rt.id
+        WHERE r.userUuid = ? AND r.masterId = ?`,
+      [userUuid, masterId]
+    );
+    if (Array.isArray(rows)) {
+      for (const row of rows) {
+        const recordIdNumber = Number(row?.recordId);
+        const tableName = typeof row?.tableName === "string" ? row.tableName : null;
+        if (!tableName || !Number.isInteger(recordIdNumber) || recordIdNumber <= 0) {
+          continue;
+        }
+        if (seen.has(recordIdNumber)) {
+          continue;
+        }
+        seen.add(recordIdNumber);
+        results.push({ tableName, recordId: recordIdNumber });
+      }
+    }
+  }
+
+  if (
+    results.length === 0 &&
+    normalizedArtist &&
+    normalizedRecord
+  ) {
+    const [rows] = await pool.query(
+      `SELECT r.id AS recordId, rt.name AS tableName
+         FROM Record r
+         JOIN RecTable rt ON r.tableId = rt.id
+        WHERE r.userUuid = ?
+          AND r.masterId IS NULL
+          AND r.artist = ?
+          AND r.name = ?`,
+      [userUuid, normalizedArtist, normalizedRecord]
+    );
+    if (Array.isArray(rows)) {
+      for (const row of rows) {
+        const recordIdNumber = Number(row?.recordId);
+        const tableName = typeof row?.tableName === "string" ? row.tableName : null;
+        if (!tableName || !Number.isInteger(recordIdNumber) || recordIdNumber <= 0) {
+          continue;
+        }
+        if (seen.has(recordIdNumber)) {
+          continue;
+        }
+        seen.add(recordIdNumber);
+        results.push({ tableName, recordId: recordIdNumber });
+      }
+    }
+  }
+
+  return results;
+}
+
 async function fetchLastFmCover(artist, record) {
   const apiKey = process.env.LASTFM_API_KEY;
   if (!apiKey) return null;
@@ -665,6 +734,19 @@ app.get("/api/records", requireAuth, async (req, res) => {
 app.get("/api/records/master-info", async (req, res) => {
   console.log("Fetching master info...");
 
+  let authenticatedUserUuid = null;
+  const token = req.cookies?.token;
+  if (token) {
+    try {
+      const payload = jwt.verify(token, JWT_SECRET);
+      if (payload && typeof payload.userUuid === "string") {
+        authenticatedUserUuid = payload.userUuid;
+      }
+    } catch {
+      // ignore invalid tokens for this optional check
+    }
+  }
+
   const masterIdParam = Number(req.query.masterId);
   const hasMasterId = Number.isInteger(masterIdParam) && masterIdParam > 0;
 
@@ -680,7 +762,14 @@ app.get("/api/records/master-info", async (req, res) => {
            LIMIT 1`,
         [masterIdParam]
       );
-      if (!rows || rows.length === 0) {
+      const row = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+      const userCollections = await getUserCollectionsForRecord(pool, authenticatedUserUuid, {
+        masterId: masterIdParam,
+        artist: row?.artist ?? null,
+        recordName: row?.name ?? null,
+      });
+
+      if (!row) {
         return res.json({
           masterId: masterIdParam,
           releaseYear: null,
@@ -689,10 +778,10 @@ app.get("/api/records/master-info", async (req, res) => {
           ratingCounts: null,
           record: null,
           artist: null,
+          userCollections,
         });
       }
 
-      const row = rows[0];
       const ratingAverageRaw = row.ratingAve;
       const ratingAverage = ratingAverageRaw != null ? Number(ratingAverageRaw) : null;
       const releaseYearValue = row.release_year != null ? Number(row.release_year) : null;
@@ -712,6 +801,7 @@ app.get("/api/records/master-info", async (req, res) => {
         ratingCounts,
         record: typeof row.name === "string" ? row.name : null,
         artist: typeof row.artist === "string" ? row.artist : null,
+        userCollections,
       });
     } catch (error) {
       console.error("Failed to load master info", error);
@@ -730,7 +820,14 @@ app.get("/api/records/master-info", async (req, res) => {
     const result = await lookupDiscogsMaster(artist, recordName);
     console.log("Fetching discogs result");
 
+    const pool = await getPool();
+
     if (!result) {
+      const userCollections = await getUserCollectionsForRecord(pool, authenticatedUserUuid, {
+        masterId: null,
+        artist,
+        recordName,
+      });
       return res.json({
         masterId: null,
         releaseYear: null,
@@ -739,10 +836,10 @@ app.get("/api/records/master-info", async (req, res) => {
         ratingCounts: null,
         record: recordName,
         artist,
+        userCollections,
       });
     }
 
-    const pool = await getPool();
     const [rows] = await pool.query(
       `SELECT ratingAve, rating1, rating2, rating3, rating4, rating5, rating6, rating7, rating8, rating9, rating10
          FROM Master
@@ -761,6 +858,12 @@ app.get("/api/records/master-info", async (req, res) => {
         })
       : null;
 
+    const userCollections = await getUserCollectionsForRecord(pool, authenticatedUserUuid, {
+      masterId: result.masterId,
+      artist,
+      recordName,
+    });
+
     res.json({
       masterId: result.masterId,
       releaseYear: result.releaseYear,
@@ -769,6 +872,7 @@ app.get("/api/records/master-info", async (req, res) => {
       ratingCounts,
       record: recordName,
       artist,
+      userCollections,
     });
   } catch (error) {
     console.error("Failed to load master info", error);

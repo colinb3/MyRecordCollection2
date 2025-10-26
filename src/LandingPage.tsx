@@ -91,12 +91,38 @@ export default function LandingPage() {
 
   useEffect(() => {
     if (carouselSlides.length <= 1) return undefined;
-    const timer = window.setInterval(() => {
+
+    let timer = window.setInterval(() => {
       setActiveSlide((prev) =>
         prev + 1 === carouselSlides.length ? 0 : prev + 1
       );
-    }, 12000);
-    return () => window.clearInterval(timer);
+    }, 8000);
+
+    const resetTimer = () => {
+      window.clearInterval(timer);
+      timer = window.setInterval(() => {
+        setActiveSlide((prev) =>
+          prev + 1 === carouselSlides.length ? 0 : prev + 1
+        );
+      }, 8000);
+    };
+
+    document
+      .getElementById("prevButton")
+      ?.addEventListener("click", resetTimer);
+    document
+      .getElementById("nextButton")
+      ?.addEventListener("click", resetTimer);
+
+    return () => {
+      window.clearInterval(timer);
+      document
+        .getElementById("prevButton")
+        ?.removeEventListener("click", resetTimer);
+      document
+        .getElementById("nextButton")
+        ?.removeEventListener("click", resetTimer);
+    };
   }, [carouselSlides.length]);
 
   const handlePrevSlide = () => {
@@ -285,6 +311,7 @@ export default function LandingPage() {
               <IconButton
                 aria-label="Previous highlight"
                 onClick={handlePrevSlide}
+                id="prevButton"
                 sx={{
                   position: "absolute",
                   top: "50%",
@@ -301,6 +328,7 @@ export default function LandingPage() {
               <IconButton
                 aria-label="Next highlight"
                 onClick={handleNextSlide}
+                id="nextButton"
                 sx={{
                   position: "absolute",
                   top: "50%",

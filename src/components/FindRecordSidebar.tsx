@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import {
   Paper,
   Typography,
@@ -15,9 +16,6 @@ import {
   CircularProgress,
   Stack,
 } from "@mui/material";
-import AddIcon from "@mui/icons-material/Add";
-import FavoriteIcon from "@mui/icons-material/Favorite";
-import HeadphonesIcon from "@mui/icons-material/Headphones";
 
 export interface AlbumListItem {
   id: string;
@@ -41,10 +39,17 @@ interface FindRecordSidebarProps {
   onReleaseYearChange: (value: number) => void;
   review: string;
   onReviewChange: (value: string) => void;
-  canAdd: boolean;
-  onAddRecord: () => void;
-  onWishlistRecord: () => void;
-  onListenedRecord: () => void;
+  wishlistButton: SidebarActionConfig;
+  listenedButton: SidebarActionConfig;
+  collectionButton: SidebarActionConfig;
+}
+
+interface SidebarActionConfig {
+  label: string;
+  variant: "contained" | "outlined";
+  onClick: () => void;
+  disabled?: boolean;
+  icon?: ReactNode;
 }
 
 export default function FindRecordSidebar({
@@ -60,10 +65,9 @@ export default function FindRecordSidebar({
   onReleaseYearChange,
   review,
   onReviewChange,
-  canAdd,
-  onAddRecord,
-  onWishlistRecord,
-  onListenedRecord,
+  wishlistButton,
+  listenedButton,
+  collectionButton,
 }: FindRecordSidebarProps) {
   const handleSlider = (_: Event, val: number | number[]) => {
     onRatingChange(val as number);
@@ -261,35 +265,35 @@ export default function FindRecordSidebar({
       <Box sx={{ mx: { xs: 1.3, sm: 1.5, md: 2 }, my: 1 }}>
         <Stack direction={"row"} spacing={1}>
           <Button
-            disabled={!canAdd}
-            variant="outlined"
-            onClick={onWishlistRecord}
+            disabled={wishlistButton.disabled ?? false}
+            variant={wishlistButton.variant}
+            onClick={wishlistButton.onClick}
             sx={{ fontWeight: 700, flex: 1 }}
-            endIcon={<FavoriteIcon />}
+            endIcon={wishlistButton.icon}
           >
-            Wishlist
+            {wishlistButton.label}
           </Button>
           <Button
-            disabled={!canAdd}
-            variant="outlined"
-            onClick={onListenedRecord}
+            disabled={listenedButton.disabled ?? false}
+            variant={listenedButton.variant}
+            onClick={listenedButton.onClick}
             sx={{ fontWeight: 700, flex: 1 }}
-            endIcon={<HeadphonesIcon />}
+            endIcon={listenedButton.icon}
           >
-            Listened
+            {listenedButton.label}
           </Button>
         </Stack>
       </Box>
       <Box sx={{ mx: { xs: 1.3, sm: 1.5, md: 2 }, mb: 2 }}>
         <Button
-          disabled={!canAdd}
-          variant="contained"
+          disabled={collectionButton.disabled ?? false}
+          variant={collectionButton.variant}
           fullWidth
-          onClick={onAddRecord}
+          onClick={collectionButton.onClick}
           sx={{ fontWeight: 700 }}
-          endIcon={<AddIcon />}
+          endIcon={collectionButton.icon}
         >
-          Add to Collection
+          {collectionButton.label}
         </Button>
       </Box>
     </Paper>

@@ -3,6 +3,7 @@ import {
   useEffect,
   useCallback,
   useRef,
+  useMemo,
   type ReactNode,
 } from "react";
 import {
@@ -19,6 +20,12 @@ import {
   Divider,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import AddCircleIcon from "@mui/icons-material/AddCircle";
+import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
+import FavoriteIcon from "@mui/icons-material/Favorite";
+import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
+import HeadphonesIcon from "@mui/icons-material/Headphones";
+import HeadphonesOutlinedIcon from "@mui/icons-material/HeadphonesOutlined";
 import apiUrl from "./api";
 import TopBar from "./components/TopBar";
 import { darkTheme } from "./theme";
@@ -60,6 +67,12 @@ interface MasterInfo {
   releaseYear: number | null;
   cover: string | null;
   ratingCounts: number[] | null;
+  userCollections: UserCollectionEntry[];
+}
+
+interface UserCollectionEntry {
+  tableName: string;
+  recordId: number;
 }
 
 const DEFAULT_COLLECTION_NAME = "My Collection";
@@ -198,7 +211,7 @@ export default function MasterRecord() {
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
-    severity: "success" | "error";
+    severity: "success" | "error" | "info";
     action?: ReactNode;
   }>({ open: false, message: "", severity: "success" });
   const [masterInfo, setMasterInfo] = useState<MasterInfo | null>(null);
@@ -391,10 +404,11 @@ export default function MasterRecord() {
   }, []);
 
   const loadMasterInfo = useCallback(
-    async (options?: { preserveReleaseYear?: boolean }) => {
+    async (options?: { preserveReleaseYear?: boolean; force?: boolean }) => {
       const masterIdToUse = masterIdOverride;
       const preserveReleaseYear =
         options?.preserveReleaseYear ?? releaseYearTouchedRef.current;
+      const forceRefresh = options?.force ?? false;
       const targetAlbumId =
         album?.id ?? (masterIdToUse ? `master-${masterIdToUse}` : null);
 
@@ -424,8 +438,9 @@ export default function MasterRecord() {
       }
 
       if (
-        fetchKey === masterFetchKeyRef.current ||
-        fetchKey === masterFetchInFlightKeyRef.current
+        !forceRefresh &&
+        (fetchKey === masterFetchKeyRef.current ||
+          fetchKey === masterFetchInFlightKeyRef.current)
       ) {
         return;
       }
@@ -477,6 +492,39 @@ export default function MasterRecord() {
               return Number.isFinite(num) && num >= 0 ? num : 0;
             })
           : null;
+        const userCollectionsValue = Array.isArray(data?.userCollections)
+          ? data.userCollections
+              .map((entry: unknown): UserCollectionEntry | null => {
+                if (!entry || typeof entry !== "object") {
+                  return null;
+                }
+                const typed = entry as {
+                  tableName?: unknown;
+                  recordId?: unknown;
+                };
+                const tableName =
+                  typeof typed.tableName === "string"
+                    ? typed.tableName.trim()
+                    : null;
+                const recordIdNumber = Number(typed.recordId);
+                if (
+                  !tableName ||
+                  !Number.isInteger(recordIdNumber) ||
+                  recordIdNumber <= 0
+                ) {
+                  return null;
+                }
+                return {
+                  tableName,
+                  recordId: recordIdNumber,
+                };
+              })
+              .filter(
+                (
+                  value: UserCollectionEntry | null
+                ): value is UserCollectionEntry => value !== null
+              )
+          : [];
 
         const normalized: MasterInfo = {
           masterId:
@@ -496,6 +544,7 @@ export default function MasterRecord() {
             ratingCountsValue && ratingCountsValue.length === 10
               ? ratingCountsValue
               : null,
+          userCollections: userCollectionsValue,
         };
 
         if (!album) {
@@ -598,6 +647,46 @@ export default function MasterRecord() {
     void loadMasterInfo({ preserveReleaseYear: false });
   }, [album, masterIdOverride, loadMasterInfo]);
 
+  const removeExistingRecord = useCallback(
+    async (recordId: number, successMessage: string) => {
+      setAdding(true);
+      try {
+        const res = await fetch(apiUrl("/api/records/delete"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ id: recordId }),
+        });
+
+        if (res.ok) {
+          setSnackbar({
+            open: true,
+            message: successMessage,
+            severity: "success",
+          });
+          await loadMasterInfo({ preserveReleaseYear: true, force: true });
+        } else {
+          const problem = await res.json().catch(() => ({}));
+          setSnackbar({
+            open: true,
+            message: problem.error || "Failed to remove record",
+            severity: "error",
+          });
+        }
+      } catch (error) {
+        console.error(error);
+        setSnackbar({
+          open: true,
+          message: "Network error removing record",
+          severity: "error",
+        });
+      } finally {
+        setAdding(false);
+      }
+    },
+    [loadMasterInfo]
+  );
+
   const submitRecord = useCallback(
     async (tableName: string, successMessage: string) => {
       if (!album) return;
@@ -637,6 +726,7 @@ export default function MasterRecord() {
             message: successMessage,
             severity: "success",
           });
+          await loadMasterInfo({ preserveReleaseYear: true, force: true });
         } else {
           const problem = await res.json().catch(() => ({}));
           const msg = problem.error || `Failed to add record (${res.status})`;
@@ -661,6 +751,10 @@ export default function MasterRecord() {
                 });
 
                 if (moveRes.ok) {
+                  await loadMasterInfo({
+                    preserveReleaseYear: true,
+                    force: true,
+                  });
                   setSnackbar({
                     open: true,
                     message: `Record moved to ${tableName}`,
@@ -714,6 +808,7 @@ export default function MasterRecord() {
       selectedTags,
       masterInfo,
       masterIdOverride,
+      loadMasterInfo,
     ]
   );
 
@@ -740,6 +835,35 @@ export default function MasterRecord() {
     }
     void submitRecord(LISTENED_COLLECTION_NAME, "Record added to listened");
   }, [submitRecord, username, navigate]);
+
+  const membership = useMemo(() => {
+    const empty = {
+      collection: null as UserCollectionEntry | null,
+      wishlist: null as UserCollectionEntry | null,
+      listened: null as UserCollectionEntry | null,
+    };
+    if (!Array.isArray(masterInfo?.userCollections)) {
+      return empty;
+    }
+    const defaultKey = DEFAULT_COLLECTION_NAME.trim().toLowerCase();
+    const wishlistKey = WISHLIST_COLLECTION_NAME.trim().toLowerCase();
+    const listenedKey = LISTENED_COLLECTION_NAME.trim().toLowerCase();
+    const next = { ...empty };
+    for (const entry of masterInfo.userCollections) {
+      if (!entry || typeof entry.tableName !== "string") {
+        continue;
+      }
+      const normalized = entry.tableName.trim().toLowerCase();
+      if (normalized === defaultKey) {
+        next.collection = entry;
+      } else if (normalized === wishlistKey) {
+        next.wishlist = entry;
+      } else if (normalized === listenedKey) {
+        next.listened = entry;
+      }
+    }
+    return next;
+  }, [masterInfo?.userCollections]);
 
   const handleOpenMasterReviews = useCallback(() => {
     const resolvedMasterId = masterInfo?.masterId ?? masterIdOverride;
@@ -778,6 +902,105 @@ export default function MasterRecord() {
       navigate("/search");
     }
   }, [navigate, fromCollectionPath, searchQuery]);
+
+  const promptRecordRemoval = useCallback(
+    (
+      entry: UserCollectionEntry | null,
+      successMessage: string,
+      infoMessage: string
+    ) => {
+      if (!entry) {
+        return;
+      }
+      if (!username) {
+        navigate("/login");
+        return;
+      }
+      setSnackbar({
+        open: true,
+        message: infoMessage,
+        severity: "error",
+        action: (
+          <Button
+            color="inherit"
+            size="small"
+            onClick={() => {
+              setSnackbar((prev) => ({ ...prev, open: false }));
+              if (!adding) {
+                void removeExistingRecord(entry.recordId, successMessage);
+              }
+            }}
+          >
+            Remove
+          </Button>
+        ),
+      });
+    },
+    [adding, navigate, removeExistingRecord, username]
+  );
+
+  const wishlistButtonConfig = membership.wishlist
+    ? {
+        label: "Wishlisted",
+        variant: "contained" as const,
+        disabled: adding,
+        onClick: () =>
+          promptRecordRemoval(
+            membership.wishlist,
+            "Record removed from Wishlist",
+            "Record already in wishlist. Remove it?"
+          ),
+        icon: <FavoriteIcon />,
+      }
+    : {
+        label: "Wishlist",
+        variant: "outlined" as const,
+        disabled: adding,
+        onClick: handleAddWishlistRecord,
+        icon: <FavoriteBorderIcon />,
+      };
+
+  const listenedButtonConfig = membership.listened
+    ? {
+        label: "Listened",
+        variant: "contained" as const,
+        disabled: adding,
+        onClick: () =>
+          promptRecordRemoval(
+            membership.listened,
+            "Record removed from Listened",
+            "Record already in listened. Remove it?"
+          ),
+        icon: <HeadphonesIcon />,
+      }
+    : {
+        label: "Listen",
+        variant: "outlined" as const,
+        disabled: adding,
+        onClick: handleAddListenedRecord,
+        icon: <HeadphonesOutlinedIcon />,
+      };
+
+  const collectionButtonConfig = membership.collection
+    ? {
+        label: "Added to Collection",
+        variant: "contained" as const,
+        disabled: adding,
+        onClick: () =>
+          promptRecordRemoval(
+            membership.collection,
+            "Record removed from My Collection",
+            "Record already in collection. Remove it?"
+          ),
+        icon: <AddCircleIcon />,
+      }
+    : {
+        label: "Add to Collection",
+        variant: "outlined" as const,
+        disabled: adding,
+        onClick: handleAddRecord,
+        icon: <AddCircleOutlineIcon />,
+      };
 
   if (!album) {
     return null;
@@ -972,10 +1195,9 @@ export default function MasterRecord() {
                   onReleaseYearChange={handleReleaseYearChange}
                   review={reviewText}
                   onReviewChange={handleReviewChange}
-                  canAdd={!adding}
-                  onAddRecord={handleAddRecord}
-                  onWishlistRecord={handleAddWishlistRecord}
-                  onListenedRecord={handleAddListenedRecord}
+                  wishlistButton={wishlistButtonConfig}
+                  listenedButton={listenedButtonConfig}
+                  collectionButton={collectionButtonConfig}
                 />
               </Box>
             </Paper>
