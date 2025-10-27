@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import apiUrl from "./api";
 import {
   ThemeProvider,
@@ -41,7 +41,7 @@ import { setUserId } from "./analytics";
 // Import Components
 import TopBar from "./components/TopBar";
 import RecordTable from "./components/RecordTable";
-import FilterSidebar from "./components/FilterSidebar";
+const FilterSidebar = lazy(() => import("./components/FilterSidebar"));
 import ManageTagsDialog from "./components/ManageTagsDialog";
 
 interface CollectionProps {
@@ -345,14 +345,16 @@ export default function Collection({ tableName, title }: CollectionProps) {
           </Grid>
           {isLargeScreen && (
             <Grid size={{ xs: 3 }} sx={{ height: "100%", minHeight: 0 }}>
-              <FilterSidebar
-                tags={allTags}
-                currentFilters={filters}
-                onFiltersChange={handleFilterChange}
-                onResetFilters={resetFilters}
-                onOpenManageTags={() => setManageTagsOpen(true)}
-                tagsLoading={loading}
-              />
+              <Suspense fallback={<Box sx={{ p: 2 }}>Loading filters…</Box>}>
+                <FilterSidebar
+                  tags={allTags}
+                  currentFilters={filters}
+                  onFiltersChange={handleFilterChange}
+                  onResetFilters={resetFilters}
+                  onOpenManageTags={() => setManageTagsOpen(true)}
+                  tagsLoading={loading}
+                />
+              </Suspense>
             </Grid>
           )}
         </Grid>
@@ -405,14 +407,16 @@ export default function Collection({ tableName, title }: CollectionProps) {
               },
             }}
           >
-            <FilterSidebar
-              tags={allTags}
-              currentFilters={filters}
-              onFiltersChange={handleFilterChange}
-              onResetFilters={resetFilters}
-              onOpenManageTags={() => setManageTagsOpen(true)}
-              tagsLoading={loading}
-            />
+            <Suspense fallback={<Box sx={{ p: 2 }}>Loading filters…</Box>}>
+              <FilterSidebar
+                tags={allTags}
+                currentFilters={filters}
+                onFiltersChange={handleFilterChange}
+                onResetFilters={resetFilters}
+                onOpenManageTags={() => setManageTagsOpen(true)}
+                tagsLoading={loading}
+              />
+            </Suspense>
             <Box sx={{ textAlign: "right", p: 1 }}>
               <IconButton onClick={() => setSidebarOpen(false)}>
                 <span style={{ fontSize: 24, fontWeight: "bold" }}>

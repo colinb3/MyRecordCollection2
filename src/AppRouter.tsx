@@ -6,25 +6,24 @@ import {
   Navigate,
   useLocation,
 } from "react-router-dom";
-import { useEffect, useState } from "react";
+import React, { Suspense, lazy, useEffect, useState } from "react";
 import LandingPage from "./LandingPage";
-import Collection from "./Collection";
-import Search from "./Search";
-import Login from "./Login";
-import Register from "./Register";
+const Collection = lazy(() => import("./Collection"));
+const Search = lazy(() => import("./Search"));
+const Login = lazy(() => import("./Login"));
+const Register = lazy(() => import("./Register"));
 import RequireAuth from "./RequireAuth";
-import NotFound from "./NotFound";
-import Settings from "./Settings";
-import Activity from "./Activity";
-import CommunityProfile from "./CommunityProfile";
-import CommunityCollection from "./CommunityCollection";
-import CommunityFollows from "./CommunityFollows";
-import { trackPage } from "./analytics";
+const NotFound = lazy(() => import("./NotFound"));
+const Settings = lazy(() => import("./Settings"));
+const Activity = lazy(() => import("./Activity"));
+const CommunityProfile = lazy(() => import("./CommunityProfile"));
+const CommunityCollection = lazy(() => import("./CommunityCollection"));
+const CommunityFollows = lazy(() => import("./CommunityFollows"));
 import { loadUserInfo } from "./userInfo";
-import MasterRecordPage from "./MasterRecord";
-import RecordDetails from "./Record";
-import MasterReviews from "./MasterReviews";
-import BarcodeScanner from "./BarcodeScanner.tsx";
+const MasterRecordPage = lazy(() => import("./MasterRecord"));
+const RecordDetails = lazy(() => import("./Record"));
+const MasterReviews = lazy(() => import("./MasterReviews"));
+const BarcodeScanner = lazy(() => import("./BarcodeScanner"));
 
 // Component that prevents authenticated users from seeing auth pages
 function RedirectIfAuthed({ children }: { children: React.ReactNode }) {
@@ -61,7 +60,9 @@ export default function AppRouter() {
           path="/mycollection"
           element={
             <RequireAuth>
-              <Collection tableName="My Collection" title="My Collection" />
+              <Suspense fallback={<div />}>
+                <Collection tableName="My Collection" title="My Collection" />
+              </Suspense>
             </RequireAuth>
           }
         />
@@ -69,7 +70,9 @@ export default function AppRouter() {
           path="/wishlist"
           element={
             <RequireAuth>
-              <Collection tableName="Wishlist" title="Wishlist" />
+              <Suspense fallback={<div />}>
+                <Collection tableName="Wishlist" title="Wishlist" />
+              </Suspense>
             </RequireAuth>
           }
         />
@@ -77,32 +80,70 @@ export default function AppRouter() {
           path="/listened"
           element={
             <RequireAuth>
-              <Collection tableName="Listened" title="Listened" />
+              <Suspense fallback={<div />}>
+                <Collection tableName="Listened" title="Listened" />
+              </Suspense>
             </RequireAuth>
           }
         />
-        <Route path="/search" element={<Search />} />
+        <Route
+          path="/search"
+          element={
+            <Suspense fallback={<div />}>
+              <Search />
+            </Suspense>
+          }
+        />
         <Route path="/findrecord" element={<Navigate to="/search" replace />} />
-        <Route path="/master/:masterId/reviews" element={<MasterReviews />} />
-        <Route path="/master/:masterId?" element={<MasterRecordPage />} />
-        <Route path="/scan" element={<BarcodeScanner />} />
+        <Route
+          path="/master/:masterId/reviews"
+          element={
+            <Suspense fallback={<div />}>
+              <MasterReviews />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/master/:masterId?"
+          element={
+            <Suspense fallback={<div />}>
+              <MasterRecordPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/scan"
+          element={
+            <Suspense fallback={<div />}>
+              <BarcodeScanner />
+            </Suspense>
+          }
+        />
         <Route
           path="/record/:recordId"
           element={
             <RequireAuth>
-              <RecordDetails />
+              <Suspense fallback={<div />}>
+                <RecordDetails />
+              </Suspense>
             </RequireAuth>
           }
         />
         <Route
           path="/community/:username/record/:recordId"
-          element={<RecordDetails />}
+          element={
+            <Suspense fallback={<div />}>
+              <RecordDetails />
+            </Suspense>
+          }
         />
         <Route
           path="/settings"
           element={
             <RequireAuth>
-              <Settings />
+              <Suspense fallback={<div />}>
+                <Settings />
+              </Suspense>
             </RequireAuth>
           }
         />
@@ -110,24 +151,43 @@ export default function AppRouter() {
           path="/activity"
           element={
             <RequireAuth>
-              <Activity />
+              <Suspense fallback={<div />}>
+                <Activity />
+              </Suspense>
             </RequireAuth>
           }
         />
-        <Route path="/community/:username" element={<CommunityProfile />} />
+        <Route
+          path="/community/:username"
+          element={
+            <Suspense fallback={<div />}>
+              <CommunityProfile />
+            </Suspense>
+          }
+        />
         <Route
           path="/community/:username/collection"
-          element={<CommunityCollection />}
+          element={
+            <Suspense fallback={<div />}>
+              <CommunityCollection />
+            </Suspense>
+          }
         />
         <Route
           path="/community/:username/follows"
-          element={<CommunityFollows />}
+          element={
+            <Suspense fallback={<div />}>
+              <CommunityFollows />
+            </Suspense>
+          }
         />
         <Route
           path="/login"
           element={
             <RedirectIfAuthed>
-              <Login />
+              <Suspense fallback={<div />}>
+                <Login />
+              </Suspense>
             </RedirectIfAuthed>
           }
         />
@@ -135,12 +195,21 @@ export default function AppRouter() {
           path="/register"
           element={
             <RedirectIfAuthed>
-              <Register />
+              <Suspense fallback={<div />}>
+                <Register />
+              </Suspense>
             </RedirectIfAuthed>
           }
         />
         {/* Fallback: show a friendly 404 page for unknown client-side routes */}
-        <Route path="*" element={<NotFound />} />
+        <Route
+          path="*"
+          element={
+            <Suspense fallback={<div />}>
+              <NotFound />
+            </Suspense>
+          }
+        />
       </Routes>
       {/* Track page views on location change */}
       <RouteTracker />
@@ -151,7 +220,16 @@ export default function AppRouter() {
 function RouteTracker() {
   const location = useLocation();
   useEffect(() => {
-    trackPage(location.pathname + location.search + location.hash);
+    (async () => {
+      try {
+        const mod = await import("./analytics");
+        if (mod?.trackPage) {
+          mod.trackPage(location.pathname + location.search + location.hash);
+        }
+      } catch (e) {
+        /* ignore analytics errors */
+      }
+    })();
   }, [location]);
   return null;
 }
