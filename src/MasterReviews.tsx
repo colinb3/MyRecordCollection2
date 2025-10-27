@@ -294,11 +294,26 @@ export default function MasterReviews() {
 
   const handleBack = useCallback(() => {
     if (fromMasterPath) {
-      navigate(fromMasterPath);
+      // When navigating back to the master page, preserve the original state
+      // (album, query, fromCollection) so the master page's back button can
+      // correctly return to the originating page (e.g., a record or profile).
+      navigate(fromMasterPath, {
+        state: {
+          album: locationState.album,
+          query: locationState.query,
+          fromCollection: locationState.fromCollection,
+        },
+      });
       return;
     }
     if (safeMasterId) {
-      navigate(`/master/${safeMasterId}`);
+      navigate(`/master/${safeMasterId}`, {
+        state: {
+          album: locationState.album,
+          query: locationState.query,
+          fromCollection: locationState.fromCollection,
+        },
+      });
     } else {
       navigate("/search");
     }

@@ -930,7 +930,20 @@ export default function MasterRecord() {
       return;
     }
     if (fromCollectionPath) {
-      navigate(fromCollectionPath);
+      // Preserve any upstream origin (fromPath) when navigating back to the
+      // collection/record so that subsequent back actions can continue to
+      // return the user to the original page (e.g., Activity or Profile).
+      const upstreamFromPath =
+        (locationState.fromCollection as any)?.fromPath ??
+        (locationState as any)?.fromPath;
+      navigate(fromCollectionPath, {
+        state: {
+          album: locationState.album,
+          query: locationState.query,
+          fromCollection: locationState.fromCollection,
+          fromPath: upstreamFromPath,
+        },
+      });
       return;
     }
     if (searchQuery) {

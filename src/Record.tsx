@@ -198,6 +198,12 @@ export default function RecordDetails() {
   }, [navigate]);
 
   const handleBack = useCallback(() => {
+    const locState = (location.state as any) ?? {};
+    // If a fromPath was provided by the caller, go back there first
+    if (typeof locState.fromPath === "string" && locState.fromPath) {
+      navigate(locState.fromPath);
+      return;
+    }
     if (ownerUsername) {
       navigate(`/community/${encodeURIComponent(ownerUsername)}/collection`);
       return;
@@ -209,6 +215,7 @@ export default function RecordDetails() {
     if (!record) return;
     const masterId = record.masterId ?? null;
     const originPath = `${location.pathname}${location.search}${location.hash}`;
+    const locState = (location.state as any) ?? {};
     const ownerDisplay = owner?.displayName?.trim()
       ? owner.displayName
       : ownerUsername
@@ -225,17 +232,24 @@ export default function RecordDetails() {
       cover: record.cover ?? "",
     };
 
+    const fromCollectionState = {
+      path: originPath,
+      title: fromTitle,
+      tableName: record.collectionName ?? record.tableName,
+      // propagate any upstream origin so back navigation can return all the way
+      // to the original page (e.g., Activity or Profile)
+      fromPath: locState?.fromPath ?? undefined,
+    };
+
     if (masterId) {
       navigate(`/master/${masterId}`, {
         state: {
           album: albumPayload,
           masterId,
           query: record.record,
-          fromCollection: {
-            path: originPath,
-            title: fromTitle,
-            tableName: record.collectionName ?? record.tableName,
-          },
+          fromCollection: fromCollectionState,
+          // also pass along any original fromPath at top-level for convenience
+          fromPath: locState?.fromPath ?? undefined,
         },
       });
     } else {
@@ -243,11 +257,8 @@ export default function RecordDetails() {
         state: {
           album: albumPayload,
           query: `${record.artist} ${record.record}`.trim(),
-          fromCollection: {
-            path: originPath,
-            title: fromTitle,
-            tableName: record.collectionName ?? record.tableName,
-          },
+          fromCollection: fromCollectionState,
+          fromPath: locState?.fromPath ?? undefined,
         },
       });
     }

@@ -107,7 +107,8 @@ export default function Collection({ tableName, title }: CollectionProps) {
 
   const navigateToRecordDetails = useCallback(
     (record: Record) => {
-      navigate(`/record/${record.id}`);
+      const originPath = `${location.pathname}${location.search}${location.hash}`;
+      navigate(`/record/${record.id}`, { state: { fromPath: originPath } });
     },
     [navigate]
   );

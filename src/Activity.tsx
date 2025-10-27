@@ -22,7 +22,7 @@ import {
   ButtonBase,
   Stack,
 } from "@mui/material";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import TopBar from "./components/TopBar";
 import { darkTheme } from "./theme";
 import {
@@ -211,6 +211,8 @@ export default function Activity() {
     [navigate]
   );
 
+  const location = useLocation();
+
   const handleRecordNavigate = useCallback(
     (entry: CommunityFeedEntry) => {
       if (!entry.record || entry.record.id <= 0) {
@@ -229,9 +231,10 @@ export default function Activity() {
             entry.record.id
           }`;
 
-      navigate(targetPath);
+      const originPath = `${location.pathname}${location.search}${location.hash}`;
+      navigate(targetPath, { state: { fromPath: originPath } });
     },
-    [navigate, username]
+    [navigate, username, location]
   );
 
   const isFriendsView = activeView === "friends";

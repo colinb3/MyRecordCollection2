@@ -5,7 +5,7 @@ import Paper from "@mui/material/Paper";
 import Typography from "@mui/material/Typography";
 import placeholderCover from "../assets/missingImg.jpg";
 import type { Record } from "../types";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Divider } from "@mui/material";
 import { formatLocalDate } from "../dateUtils";
 
@@ -25,6 +25,7 @@ export default function RecordPreviewGrid({
   isOwnerViewing = false,
 }: RecordPreviewGridProps) {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const dateFormatter = useMemo(() => {
     return new Intl.DateTimeFormat(undefined, {
@@ -43,7 +44,8 @@ export default function RecordPreviewGrid({
       ? `/record/${record.id}`
       : `/community/${encodeURIComponent(ownerUsername)}/record/${record.id}`;
 
-    navigate(targetPath);
+    const originPath = `${location.pathname}${location.search}${location.hash}`;
+    navigate(targetPath, { state: { fromPath: originPath } });
   };
 
   return (
