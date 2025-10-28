@@ -13,6 +13,7 @@ const Search = lazy(() => import("./Search"));
 const Login = lazy(() => import("./Login"));
 const Register = lazy(() => import("./Register"));
 import RequireAuth from "./RequireAuth";
+import RequireAdmin from "./RequireAdmin";
 const NotFound = lazy(() => import("./NotFound"));
 const Settings = lazy(() => import("./Settings"));
 const Activity = lazy(() => import("./Activity"));
@@ -24,6 +25,7 @@ const MasterRecordPage = lazy(() => import("./MasterRecord"));
 const RecordDetails = lazy(() => import("./Record"));
 const MasterReviews = lazy(() => import("./MasterReviews"));
 const BarcodeScanner = lazy(() => import("./BarcodeScanner"));
+const AdminPanel = lazy(() => import("./Admin"));
 
 // Component that prevents authenticated users from seeing auth pages
 function RedirectIfAuthed({ children }: { children: React.ReactNode }) {
@@ -144,6 +146,18 @@ export default function AppRouter() {
               <Suspense fallback={<div />}>
                 <Settings />
               </Suspense>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <RequireAuth>
+              <RequireAdmin>
+                <Suspense fallback={<div />}>
+                  <AdminPanel />
+                </Suspense>
+              </RequireAdmin>
             </RequireAuth>
           }
         />

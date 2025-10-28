@@ -19,12 +19,15 @@ import {
   DialogActions,
   DialogContentText,
   ButtonBase,
+  IconButton,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import LaunchIcon from "@mui/icons-material/Launch";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import DriveFileMoveOutlinedIcon from "@mui/icons-material/DriveFileMoveOutlined";
+import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
+import FavoriteIcon from "@mui/icons-material/Favorite";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import TopBar from "./components/TopBar";
 import { darkTheme } from "./theme";
@@ -81,6 +84,10 @@ export default function RecordDetails() {
     severity: "success" | "error";
   }>({ open: false, message: "", severity: "success" });
   const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [reviewLikes, setReviewLikes] = useState<number>(0);
+  const [viewerHasLikedReview, setViewerHasLikedReview] =
+    useState<boolean>(false);
+  const [likeLoading, setLikeLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -159,6 +166,9 @@ export default function RecordDetails() {
 
         setRecord(data.record);
         setOwner(data.owner);
+        const likesValue = Number(data.record?.reviewLikes ?? 0);
+        setReviewLikes(Number.isFinite(likesValue) ? likesValue : 0);
+        setViewerHasLikedReview(Boolean(data.record?.viewerHasLikedReview));
       } catch (err: unknown) {
         if (cancelled) return;
         const message =
@@ -338,6 +348,9 @@ export default function RecordDetails() {
             }
           : saved
       );
+      const savedLikesValue = Number(saved.reviewLikes ?? 0);
+      setReviewLikes(Number.isFinite(savedLikesValue) ? savedLikesValue : 0);
+      setViewerHasLikedReview(Boolean(saved.viewerHasLikedReview));
       setAvailableTags((prev) => {
         const seen = new Map<string, string>();
         const addTags = (tags?: string[] | null) => {
@@ -497,6 +510,80 @@ export default function RecordDetails() {
   const showActionRow = showMasterButton || showOwnerActions;
   const hasReview = Boolean(record?.review && record.review.trim());
   const tags = record?.tags ?? [];
+  const canLikeReview = hasReview && !isOwnerView;
+
+  const handleToggleReviewLike = useCallback(async () => {
+    if (!record || !record.review || !record.review.trim() || isOwnerView) {
+      return;
+    }
+    if (likeLoading) return;
+    setLikeLoading(true);
+    try {
+      const method = viewerHasLikedReview ? "DELETE" : "POST";
+      const response = await fetch(
+        apiUrl(`/api/records/${record.id}/review/like`),
+        {
+          method,
+          credentials: "include",
+        }
+      );
+
+      if (response.status === 401) {
+        setSnackbar({
+          open: true,
+          severity: "error",
+          message: "Log in to like reviews.",
+        });
+        navigate("/login", {
+          state: {
+            fromPath: `${location.pathname}${location.search}${location.hash}`,
+          },
+        });
+        return;
+      }
+
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(body?.error || "Failed to update review like");
+      }
+
+      let nextLikes = Number(body?.reviewLikes);
+      if (!Number.isFinite(nextLikes)) {
+        nextLikes = viewerHasLikedReview
+          ? Math.max(0, reviewLikes - 1)
+          : reviewLikes + 1;
+      }
+      const normalizedLikes = Number.isFinite(nextLikes) ? nextLikes : 0;
+      const nextLiked =
+        typeof body?.liked === "boolean" ? body.liked : !viewerHasLikedReview;
+
+      setReviewLikes(normalizedLikes);
+      setViewerHasLikedReview(nextLiked);
+      setRecord((prev) =>
+        prev
+          ? {
+              ...prev,
+              reviewLikes: normalizedLikes,
+              viewerHasLikedReview: nextLiked,
+            }
+          : prev
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to update review like";
+      setSnackbar({ open: true, message, severity: "error" });
+    } finally {
+      setLikeLoading(false);
+    }
+  }, [
+    record,
+    isOwnerView,
+    likeLoading,
+    viewerHasLikedReview,
+    reviewLikes,
+    navigate,
+    location,
+  ]);
 
   return (
     <ThemeProvider theme={darkTheme}>
@@ -768,13 +855,61 @@ export default function RecordDetails() {
 
                             {hasReview ? (
                               <Box pb={1}>
-                                <Typography
-                                  variant="overline"
-                                  color="text.secondary"
-                                  sx={{ letterSpacing: 0.6 }}
+                                <Stack
+                                  direction="row"
+                                  alignItems="center"
+                                  justifyContent="space-between"
+                                  spacing={1}
+                                  sx={{ mb: 0.5 }}
                                 >
-                                  Review
-                                </Typography>
+                                  <Typography
+                                    variant="overline"
+                                    color="text.secondary"
+                                    sx={{ letterSpacing: 0.6, flexGrow: 1 }}
+                                  >
+                                    Review
+                                  </Typography>
+                                  <Stack
+                                    direction="row"
+                                    alignItems="center"
+                                    spacing={0.5}
+                                  >
+                                    <IconButton
+                                      size="small"
+                                      onClick={handleToggleReviewLike}
+                                      disabled={!canLikeReview || likeLoading}
+                                      aria-pressed={viewerHasLikedReview}
+                                      aria-label={
+                                        viewerHasLikedReview
+                                          ? "Unlike review"
+                                          : "Like review"
+                                      }
+                                      sx={{
+                                        color: viewerHasLikedReview
+                                          ? "error.main"
+                                          : "text.secondary",
+                                        "&.Mui-disabled": {
+                                          color: viewerHasLikedReview
+                                            ? "error.dark"
+                                            : "action.disabled",
+                                        },
+                                      }}
+                                    >
+                                      {viewerHasLikedReview ? (
+                                        <FavoriteIcon fontSize="small" />
+                                      ) : (
+                                        <FavoriteBorderIcon fontSize="small" />
+                                      )}
+                                    </IconButton>
+                                    <Typography
+                                      variant="body2"
+                                      color="text.secondary"
+                                      sx={{ minWidth: 20, textAlign: "center" }}
+                                    >
+                                      {reviewLikes}
+                                    </Typography>
+                                  </Stack>
+                                </Stack>
 
                                 <Typography
                                   variant="body1"

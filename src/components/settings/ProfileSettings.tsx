@@ -22,10 +22,7 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import placeholderCover from "../../assets/missingImg.jpg";
-import {
-  DEFAULT_COLLECTION_NAME,
-  loadCollectionRecords,
-} from "../../collectionRecords";
+import { loadCollectionRecords } from "../../collectionRecords";
 import {
   loadProfileHighlights,
   setCachedProfileHighlights,
@@ -56,6 +53,12 @@ const ALLOWED_PROFILE_MIME_TYPES = [
   "image/webp",
   "image/avif",
 ];
+
+const HIGHLIGHT_SOURCE_COLLECTIONS = [
+  "My Collection",
+  "Wishlist",
+  "Listened",
+] as const;
 
 export default function ProfileSettings({
   username,
@@ -183,15 +186,38 @@ export default function ProfileSettings({
     setCandidatesLoading(true);
     setCandidateError(null);
     try {
-      const records = await loadCollectionRecords(
-        DEFAULT_COLLECTION_NAME,
-        true
+      // Load records from all three collections
+      const results = await Promise.all(
+        HIGHLIGHT_SOURCE_COLLECTIONS.map((collectionName) =>
+          loadCollectionRecords(collectionName, true)
+        )
       );
-      setAvailableRecords(records);
+
+      // Deduplicate records by ID and attach collection source
+      const deduped: MrcRecord[] = [];
+      const seenIds = new Set<number>();
+
+      results.forEach((records, index) => {
+        const sourceCollection = HIGHLIGHT_SOURCE_COLLECTIONS[index];
+        records.forEach((record) => {
+          if (seenIds.has(record.id)) {
+            return;
+          }
+          seenIds.add(record.id);
+          deduped.push({
+            ...record,
+            tags: [...record.tags],
+            collectionName: record.collectionName ?? sourceCollection,
+          });
+        });
+      });
+
+      setAvailableRecords(deduped);
       setHasLoadedCandidates(true);
     } catch (error) {
       console.warn("Failed to load available records", error);
       setAvailableRecords([]);
+      setHasLoadedCandidates(false);
       setCandidateError("Failed to load records. Please try again.");
     } finally {
       setCandidatesLoading(false);
@@ -800,7 +826,7 @@ export default function ProfileSettings({
                 label="Search records to highlight"
                 placeholder={
                   highlightLimitReached
-                    ? "Maximum of four highlights reached"
+                    ? "Maximum of three highlights reached"
                     : "Type to search for a record"
                 }
                 size="small"
@@ -827,6 +853,9 @@ export default function ProfileSettings({
                   <Typography variant="body1">{option.record}</Typography>
                   <Typography variant="body2" color="text.secondary">
                     {option.artist}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {option.collectionName ?? "My Collection"}
                   </Typography>
                 </Box>
               </li>

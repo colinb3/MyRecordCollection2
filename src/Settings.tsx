@@ -128,6 +128,11 @@ export default function Settings() {
                   followersCount: cachedUser?.followersCount ?? 0,
                   followingCount: cachedUser?.followingCount ?? 0,
                   joinedDate: cachedUser?.joinedDate ?? null,
+                  isAdmin: cachedUser?.isAdmin ?? false,
+                  adminPermissions: cachedUser?.adminPermissions ?? {
+                    canManageAdmins: false,
+                    canDeleteUsers: false,
+                  },
                 });
                 setUserUuid(uuid);
               }

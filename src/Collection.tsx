@@ -354,6 +354,7 @@ export default function Collection({ tableName, title }: CollectionProps) {
                   onResetFilters={resetFilters}
                   onOpenManageTags={() => setManageTagsOpen(true)}
                   tagsLoading={loading}
+                  displayedRecords={filteredRecords}
                 />
               </Suspense>
             </Grid>
@@ -416,6 +417,7 @@ export default function Collection({ tableName, title }: CollectionProps) {
                 onResetFilters={resetFilters}
                 onOpenManageTags={() => setManageTagsOpen(true)}
                 tagsLoading={loading}
+                displayedRecords={filteredRecords}
               />
             </Suspense>
             <Box sx={{ textAlign: "right", p: 1 }}>

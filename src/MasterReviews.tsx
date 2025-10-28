@@ -18,8 +18,14 @@ import {
   Divider,
   Alert,
   ButtonBase,
+  IconButton,
+  Snackbar,
+  ToggleButton,
+  ToggleButtonGroup,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import FavoriteIcon from "@mui/icons-material/Favorite";
+import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import TopBar from "./components/TopBar";
 import { darkTheme } from "./theme";
@@ -57,6 +63,45 @@ interface ReviewsLocationState {
 }
 
 type FetchStatus = "loading" | "ready" | "empty" | "error";
+type SortOption = "likes" | "date" | "friends";
+
+function sortMasterReviews(
+  entries: MasterReviewEntry[],
+  sortOption: SortOption
+): MasterReviewEntry[] {
+  const list = [...entries];
+  const parseDate = (value: string) => {
+    const time = Date.parse(value);
+    return Number.isFinite(time) ? time : 0;
+  };
+  const compareByDate = (a: MasterReviewEntry, b: MasterReviewEntry) => {
+    const delta = parseDate(b.added) - parseDate(a.added);
+    if (delta !== 0) {
+      return delta;
+    }
+    return b.recordId - a.recordId;
+  };
+
+  if (sortOption === "likes") {
+    list.sort((a, b) => {
+      if (b.reviewLikes !== a.reviewLikes) {
+        return b.reviewLikes - a.reviewLikes;
+      }
+      return compareByDate(a, b);
+    });
+  } else if (sortOption === "friends") {
+    list.sort((a, b) => {
+      if (Number(b.isFriend) !== Number(a.isFriend)) {
+        return Number(b.isFriend) - Number(a.isFriend);
+      }
+      return compareByDate(a, b);
+    });
+  } else {
+    list.sort(compareByDate);
+  }
+
+  return list;
+}
 
 export default function MasterReviews() {
   const navigate = useNavigate();
@@ -92,6 +137,13 @@ export default function MasterReviews() {
   const [reviews, setReviews] = useState<MasterReviewEntry[]>([]);
   const [fetchStatus, setFetchStatus] = useState<FetchStatus>("loading");
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [sortOption, setSortOption] = useState<SortOption>("likes");
+  const [likeBusy, setLikeBusy] = useState<Record<number, boolean>>({});
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: "success" | "error" | "info";
+  }>({ open: false, message: "", severity: "success" });
 
   const normalizeProfilePicUrl = useCallback((raw: unknown): string | null => {
     if (typeof raw !== "string") {
@@ -140,6 +192,126 @@ export default function MasterReviews() {
     [navigate]
   );
 
+  const handleSortChange = useCallback(
+    (_event: MouseEvent<HTMLElement>, next: SortOption | null) => {
+      if (!next || next === sortOption) {
+        return;
+      }
+      if (next === "friends" && !username) {
+        setSnackbar({
+          open: true,
+          message: "Log in to see friends' reviews.",
+          severity: "info",
+        });
+        return;
+      }
+      setFetchStatus("loading");
+      setFetchError(null);
+      setSortOption(next);
+    },
+    [sortOption, username, setSnackbar, setFetchStatus, setFetchError]
+  );
+
+  const handleToggleReviewLike = useCallback(
+    async (recordId: number) => {
+      if (likeBusy[recordId]) {
+        return;
+      }
+
+      const target = reviews.find((entry) => entry.recordId === recordId);
+      if (!target) {
+        return;
+      }
+
+      if (username && target.owner.username === username) {
+        setSnackbar({
+          open: true,
+          message: "You can't like your own review.",
+          severity: "info",
+        });
+        return;
+      }
+
+      setLikeBusy((prev) => ({ ...prev, [recordId]: true }));
+
+      try {
+        const method = target.likedByViewer ? "DELETE" : "POST";
+        const response = await fetch(
+          apiUrl(`/api/records/${recordId}/review/like`),
+          {
+            method,
+            credentials: "include",
+          }
+        );
+
+        if (response.status === 401) {
+          setSnackbar({
+            open: true,
+            message: "Log in to like reviews.",
+            severity: "error",
+          });
+          navigate("/login", {
+            state: {
+              fromPath: `${location.pathname}${location.search}${location.hash}`,
+            },
+          });
+          return;
+        }
+
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(body?.error || "Failed to update review like");
+        }
+
+        let nextLikes = Number(body?.reviewLikes);
+        if (!Number.isFinite(nextLikes)) {
+          nextLikes = target.likedByViewer
+            ? Math.max(0, target.reviewLikes - 1)
+            : target.reviewLikes + 1;
+        }
+        const normalizedLikes = Number.isFinite(nextLikes) ? nextLikes : 0;
+        const nextLiked =
+          typeof body?.liked === "boolean"
+            ? body.liked
+            : !target.likedByViewer;
+
+        setReviews((prev) => {
+          const updated = prev.map((entry) =>
+            entry.recordId === recordId
+              ? {
+                  ...entry,
+                  reviewLikes: normalizedLikes,
+                  likedByViewer: nextLiked,
+                }
+              : entry
+          );
+          return sortMasterReviews(updated, sortOption);
+        });
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Failed to update review like";
+        setSnackbar({ open: true, message, severity: "error" });
+      } finally {
+        setLikeBusy((prev) => {
+          if (!prev[recordId]) return prev;
+          const next = { ...prev };
+          delete next[recordId];
+          return next;
+        });
+      }
+    },
+    [likeBusy, reviews, username, navigate, location, setSnackbar, sortOption]
+  );
+
+  const handleSnackbarClose = useCallback((_: unknown, reason?: string) => {
+    if (reason === "clickaway") {
+      return;
+    }
+    setSnackbar((prev) => ({ ...prev, open: false }));
+  }, [setSnackbar]);
+
   useEffect(() => {
     if (!safeMasterId) {
       setFetchStatus("error");
@@ -150,11 +322,16 @@ export default function MasterReviews() {
     let cancelled = false;
     setFetchStatus("loading");
     setFetchError(null);
+    setLikeBusy({});
 
     (async () => {
       try {
         const res = await fetch(
-          apiUrl(`/api/records/master-reviews?masterId=${safeMasterId}`),
+          apiUrl(
+            `/api/records/master-reviews?masterId=${safeMasterId}&sort=${encodeURIComponent(
+              sortOption
+            )}`
+          ),
           { credentials: "include" }
         );
         if (!res.ok) {
@@ -219,6 +396,12 @@ export default function MasterReviews() {
                     ? ownerValue.username
                     : null;
                 if (!username) return null;
+                const reviewLikesRaw =
+                  typeof value.reviewLikes === "number"
+                    ? value.reviewLikes
+                    : Number(value.reviewLikes);
+                const likedByViewerRaw = value.likedByViewer;
+                const isFriendRaw = value.isFriend;
                 const entry: MasterReviewEntry = {
                   recordId: Number(value.recordId) || 0,
                   record: typeof value.record === "string" ? value.record : "",
@@ -234,6 +417,17 @@ export default function MasterReviews() {
                       : null,
                   review: reviewText,
                   added: typeof value.added === "string" ? value.added : "",
+                  reviewLikes: Number.isFinite(reviewLikesRaw)
+                    ? reviewLikesRaw
+                    : 0,
+                  likedByViewer:
+                    typeof likedByViewerRaw === "boolean"
+                      ? likedByViewerRaw
+                      : Boolean(likedByViewerRaw),
+                  isFriend:
+                    typeof isFriendRaw === "boolean"
+                      ? isFriendRaw
+                      : Boolean(isFriendRaw),
                   owner: {
                     username,
                     displayName:
@@ -252,7 +446,7 @@ export default function MasterReviews() {
                   entry !== null
               )
           : [];
-        setReviews(normalized);
+  setReviews(sortMasterReviews(normalized, sortOption));
         setFetchStatus(normalized.length > 0 ? "ready" : "empty");
       } catch (error) {
         if (cancelled) return;
@@ -266,7 +460,7 @@ export default function MasterReviews() {
     return () => {
       cancelled = true;
     };
-  }, [safeMasterId, normalizeProfilePicUrl]);
+  }, [safeMasterId, normalizeProfilePicUrl, sortOption]);
 
   const dateTimeFormatter = useMemo(() => {
     return new Intl.DateTimeFormat(undefined, {
@@ -411,6 +605,35 @@ export default function MasterReviews() {
                   </Box>
                 </Stack>
                 <Divider sx={{ my: 2.5 }} />
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: { xs: "flex-start", sm: "flex-end" },
+                    mb: 2,
+                  }}
+                >
+                  <ToggleButtonGroup
+                    value={sortOption}
+                    exclusive
+                    onChange={handleSortChange}
+                    size="small"
+                    aria-label="Sort reviews"
+                  >
+                    <ToggleButton value="likes" aria-label="Sort by likes">
+                      Likes
+                    </ToggleButton>
+                    <ToggleButton value="date" aria-label="Sort by newest">
+                      Newest
+                    </ToggleButton>
+                    <ToggleButton
+                      value="friends"
+                      aria-label="Sort by friends"
+                      disabled={!username}
+                    >
+                      Friends
+                    </ToggleButton>
+                  </ToggleButtonGroup>
+                </Box>
                 {fetchStatus === "loading" && (
                   <Box
                     sx={{
@@ -449,6 +672,11 @@ export default function MasterReviews() {
                         .trim()
                         .charAt(0)
                         .toUpperCase();
+                      const isOwnReview =
+                        Boolean(username) &&
+                        entry.owner.username === username;
+                      const likeButtonDisabled =
+                        isOwnReview || Boolean(likeBusy[entry.recordId]);
                       return (
                         <Paper
                           key={`${entry.recordId}-${entry.owner.username}-${entry.added}`}
@@ -456,9 +684,10 @@ export default function MasterReviews() {
                           sx={{ p: { xs: 1.75, md: 2.25 }, borderRadius: 2 }}
                         >
                           <Stack
-                            direction="row"
-                            alignItems="center"
+                            direction={{ xs: "column", sm: "row" }}
+                            alignItems={{ xs: "flex-start", sm: "center" }}
                             justifyContent="space-between"
+                            spacing={{ xs: 1, sm: 1.5 }}
                           >
                             <ButtonBase
                               onClick={(event) =>
@@ -495,14 +724,63 @@ export default function MasterReviews() {
                                 </Typography>
                               </Stack>
                             </ButtonBase>
-                            <Typography
-                              variant="body2"
-                              color="text.secondary"
-                              noWrap
-                              overflow={"visible"}
+                            <Stack
+                              direction="row"
+                              alignItems="center"
+                              spacing={1}
+                              sx={{ alignSelf: { xs: "flex-end", sm: "auto" } }}
                             >
-                              {addedText}
-                            </Typography>
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                                noWrap
+                                sx={{ maxWidth: 160 }}
+                              >
+                                {addedText}
+                              </Typography>
+                              <Stack
+                                direction="row"
+                                alignItems="center"
+                                spacing={0.5}
+                              >
+                                <IconButton
+                                  size="small"
+                                  onClick={() =>
+                                    handleToggleReviewLike(entry.recordId)
+                                  }
+                                  disabled={likeButtonDisabled}
+                                  aria-pressed={entry.likedByViewer}
+                                  aria-label={
+                                    entry.likedByViewer
+                                      ? "Unlike review"
+                                      : "Like review"
+                                  }
+                                  sx={{
+                                    color: entry.likedByViewer
+                                      ? "error.main"
+                                      : "text.secondary",
+                                    "&.Mui-disabled": {
+                                      color: entry.likedByViewer
+                                        ? "error.dark"
+                                        : "action.disabled",
+                                    },
+                                  }}
+                                >
+                                  {entry.likedByViewer ? (
+                                    <FavoriteIcon fontSize="small" />
+                                  ) : (
+                                    <FavoriteBorderIcon fontSize="small" />
+                                  )}
+                                </IconButton>
+                                <Typography
+                                  variant="body2"
+                                  color="text.secondary"
+                                  sx={{ minWidth: 20, textAlign: "center" }}
+                                >
+                                  {entry.reviewLikes}
+                                </Typography>
+                              </Stack>
+                            </Stack>
                           </Stack>
                           <Divider sx={{ my: 1.5 }} />
                           {ratingText && (
@@ -527,6 +805,20 @@ export default function MasterReviews() {
           </Box>
         </Box>
       </Box>
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={handleSnackbarClose}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          severity={snackbar.severity}
+          variant="filled"
+          onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </ThemeProvider>
   );
 }

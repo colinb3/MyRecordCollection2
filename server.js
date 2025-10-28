@@ -383,6 +383,50 @@ function escapeForLike(term) {
   return term.replace(/[\\%_]/g, (match) => `\\${match}`);
 }
 
+async function getAdminPermissions(pool, userUuid) {
+  if (!userUuid) {
+    return null;
+  }
+  const [rows] = await pool.execute(
+    "SELECT canManageAdmins, canDeleteUsers FROM Admin WHERE userUuid = ? LIMIT 1",
+    [userUuid]
+  );
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return null;
+  }
+  const row = rows[0];
+  return {
+    canManageAdmins: Boolean(row.canManageAdmins),
+    canDeleteUsers: Boolean(row.canDeleteUsers),
+  };
+}
+
+async function countOtherAdmins(pool, excludedUuid) {
+  if (!excludedUuid) {
+    const [rows] = await pool.query("SELECT COUNT(*) AS total FROM Admin");
+    return Number(rows?.[0]?.total) || 0;
+  }
+  const [rows] = await pool.execute(
+    "SELECT COUNT(*) AS total FROM Admin WHERE userUuid <> ?",
+    [excludedUuid]
+  );
+  return Number(rows?.[0]?.total) || 0;
+}
+
+async function countOtherManageAdmins(pool, excludedUuid) {
+  if (!excludedUuid) {
+    const [rows] = await pool.query(
+      "SELECT COUNT(*) AS total FROM Admin WHERE canManageAdmins = TRUE"
+    );
+    return Number(rows?.[0]?.total) || 0;
+  }
+  const [rows] = await pool.execute(
+    "SELECT COUNT(*) AS total FROM Admin WHERE userUuid <> ? AND canManageAdmins = TRUE",
+    [excludedUuid]
+  );
+  return Number(rows?.[0]?.total) || 0;
+}
+
 async function fetchTagsByRecordIds(pool, recordIds) {
   const tagsByRecord = {};
   if (!Array.isArray(recordIds) || recordIds.length === 0) {
@@ -777,14 +821,37 @@ process.on('SIGTERM', shutdown);
 
 // JWT auth middleware
 function requireAuth(req, res, next) {
-  const token = req.cookies.token;
-  if (!token) return res.status(401).json({ error: "Not authenticated" });
+  const token = req.cookies?.token;
+  if (!token) {
+    return res.status(401).json({ error: "Not authenticated" });
+  }
   try {
     const payload = jwt.verify(token, JWT_SECRET);
     req.userUuid = payload.userUuid;
+    req.isAdmin = undefined;
+    req.adminPermissions = undefined;
     next();
   } catch {
     return res.status(401).json({ error: "Invalid token" });
+  }
+}
+
+async function requireAdmin(req, res, next) {
+  if (req.isAdmin === true && req.adminPermissions) {
+    return next();
+  }
+  try {
+    const pool = await getPool();
+    const permissions = await getAdminPermissions(pool, req.userUuid);
+    if (!permissions) {
+      return res.status(403).json({ error: "Admin privileges required" });
+    }
+    req.isAdmin = true;
+    req.adminPermissions = permissions;
+    next();
+  } catch (error) {
+    console.error("Failed to verify admin privileges", error);
+    res.status(500).json({ error: "Failed to verify admin privileges" });
   }
 }
 
@@ -1072,69 +1139,119 @@ app.get("/api/records/master-reviews", async (req, res) => {
     return res.status(400).json({ error: "masterId is required" });
   }
 
+  let viewerUuid = null;
+  const sortParamRaw = typeof req.query.sort === "string" ? req.query.sort.toLowerCase() : "date";
+  const allowedSorts = new Set(["date", "likes", "friends"]);
+  const sortOption = allowedSorts.has(sortParamRaw) ? sortParamRaw : "date";
+
+  const token = req.cookies?.token;
+  if (token) {
+    try {
+      const payload = jwt.verify(token, JWT_SECRET);
+      viewerUuid = payload.userUuid ?? null;
+    } catch {
+      viewerUuid = null;
+    }
+  }
+
   try {
     const pool = await getPool();
+
+    const selectExtras = viewerUuid
+      ? `, CASE WHEN f.userUuid IS NULL THEN 0 ELSE 1 END AS isFriend,
+         CASE WHEN lr.userUuid IS NULL THEN 0 ELSE 1 END AS likedByViewer`
+      : `, 0 AS isFriend, 0 AS likedByViewer`;
+
+    const joinExtras = viewerUuid
+      ? ` LEFT JOIN Follows f ON f.userUuid = ? AND f.followsUuid = u.uuid
+          LEFT JOIN LikedReview lr ON lr.userUuid = ? AND lr.recordId = r.id`
+      : ``;
+
+    let orderClause = "ORDER BY r.added DESC, r.id DESC";
+    if (sortOption === "likes") {
+      orderClause = "ORDER BY r.reviewLikes DESC, r.added DESC, r.id DESC";
+    } else if (sortOption === "friends" && viewerUuid) {
+      orderClause = "ORDER BY isFriend DESC, r.added DESC, r.id DESC";
+    }
+
+    const params = [];
+    if (viewerUuid) {
+      params.push(viewerUuid, viewerUuid);
+    }
+    params.push(masterId, MASTER_REVIEW_LIMIT);
+
     const [rows] = await pool.query(
-      `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.added, r.review,
+      `SELECT r.id, r.name AS record, r.artist, r.cover, r.rating, r.added, r.review, r.reviewLikes,
               u.username, u.displayName, u.profilePic
+              ${selectExtras}
          FROM Record r
          JOIN User u ON u.uuid = r.userUuid
          LEFT JOIN RecTable t ON t.id = r.tableId
+         ${joinExtras}
         WHERE r.masterId = ?
           AND r.review IS NOT NULL
           AND TRIM(r.review) <> ''
           AND (t.isPrivate = 0 OR t.isPrivate IS NULL)
-        ORDER BY r.added DESC, r.id DESC
+        ${orderClause}
         LIMIT ?`,
-      [masterId, MASTER_REVIEW_LIMIT]
+      params
     );
 
     const reviews = Array.isArray(rows)
-      ? rows.map((row) => {
-          const ratingValue = Number(row.rating);
-          const rating =
-            Number.isFinite(ratingValue) && ratingValue > 0 ? ratingValue : null;
-          const addedValue =
-            formatUtcDateTime(row.added) ?? formatUtcDateTime(new Date());
-          const reviewText =
-            typeof row.review === "string" ? row.review.trim() : "";
-          const displayName =
-            typeof row.displayName === "string" && row.displayName.trim()
-              ? row.displayName.trim()
-              : null;
-          const coverValue =
-            typeof row.cover === "string" && row.cover.trim()
-              ? row.cover.trim()
-              : null;
-          const username =
-            typeof row.username === "string" && row.username.trim()
-              ? row.username.trim()
-              : "";
+      ? rows
+          .map((row) => {
+            const reviewText =
+              typeof row.review === "string" ? row.review.trim() : "";
+            if (!reviewText) return null;
 
-          return {
-            recordId: row.id,
-            record:
-              typeof row.record === "string" && row.record.trim()
-                ? row.record.trim()
-                : "",
-            artist:
-              typeof row.artist === "string" && row.artist.trim()
-                ? row.artist.trim()
-                : "",
-            cover: coverValue,
-            rating,
-            review: reviewText,
-            added: addedValue,
-            owner: {
-              username,
-              displayName,
-              profilePicUrl: buildProfilePicPublicPath(row.profilePic),
-            },
-          };
-        })
-        : [];
+            const ratingValue = Number(row.rating);
+            const rating =
+              Number.isFinite(ratingValue) && ratingValue > 0 ? ratingValue : null;
+            const addedValue =
+              formatUtcDateTime(row.added) ?? formatUtcDateTime(new Date());
+            const coverValue =
+              typeof row.cover === "string" && row.cover.trim()
+                ? row.cover.trim()
+                : null;
+            const displayName =
+              typeof row.displayName === "string" && row.displayName.trim()
+                ? row.displayName.trim()
+                : null;
+            const username =
+              typeof row.username === "string" && row.username.trim()
+                ? row.username.trim()
+                : "";
+            const reviewLikesValue = Number(row.reviewLikes);
 
-    // Also fetch master metadata (record/artist/cover) plus average rating
+            return {
+              recordId: Number(row.id) || 0,
+              record:
+                typeof row.record === "string" && row.record.trim()
+                  ? row.record.trim()
+                  : "",
+              artist:
+                typeof row.artist === "string" && row.artist.trim()
+                  ? row.artist.trim()
+                  : "",
+              cover: coverValue,
+              rating,
+              review: reviewText,
+              added: addedValue,
+              reviewLikes: Number.isFinite(reviewLikesValue)
+                ? reviewLikesValue
+                : 0,
+              likedByViewer: Boolean(row.likedByViewer),
+              isFriend: Boolean(row.isFriend),
+              owner: {
+                username,
+                displayName,
+                profilePicUrl: buildProfilePicPublicPath(row.profilePic),
+              },
+            };
+          })
+          .filter((entry) => entry !== null)
+      : [];
+
     let ratingAverage = null;
     let masterRecord = null;
     let masterArtist = null;
@@ -1177,6 +1294,7 @@ app.get("/api/records/master-reviews", async (req, res) => {
       artist: masterArtist,
       cover: masterCover,
       reviews,
+      sort: sortOption,
     });
   } catch (error) {
     console.error("Failed to load master reviews", error);
@@ -1823,10 +1941,18 @@ app.get('/api/me', requireAuth, async (req, res) => {
   try {
     const pool = await getPool();
     const [rows] = await pool.execute(
-      `SELECT u.username, u.displayName, u.bio, u.profilePic, u.created,
+      `SELECT u.username,
+              u.displayName,
+              u.bio,
+              u.profilePic,
+              u.created,
+              CASE WHEN a.userUuid IS NOT NULL THEN 1 ELSE 0 END AS isAdmin,
+              COALESCE(a.canManageAdmins, 0) AS canManageAdmins,
+              COALESCE(a.canDeleteUsers, 0) AS canDeleteUsers,
               (SELECT COUNT(*) FROM Follows WHERE followsUuid = u.uuid) AS followersCount,
               (SELECT COUNT(*) FROM Follows WHERE userUuid = u.uuid) AS followingCount
        FROM User u
+       LEFT JOIN Admin a ON a.userUuid = u.uuid
        WHERE u.uuid = ?
        LIMIT 1`,
       [req.userUuid]
@@ -1843,6 +1969,14 @@ app.get('/api/me', requireAuth, async (req, res) => {
     const followingCount = Number.isFinite(followingCountRaw)
       ? Math.max(0, Math.trunc(followingCountRaw))
       : 0;
+    const isAdmin = Boolean(userRow.isAdmin);
+    const adminPermissions = {
+      canManageAdmins: Boolean(userRow.canManageAdmins),
+      canDeleteUsers: Boolean(userRow.canDeleteUsers),
+    };
+    req.isAdmin = isAdmin ? true : undefined;
+    req.adminPermissions = isAdmin ? adminPermissions : undefined;
+
     res.json({
       username: userRow.username,
       displayName: userRow.displayName,
@@ -1852,6 +1986,8 @@ app.get('/api/me', requireAuth, async (req, res) => {
       followersCount,
       followingCount,
       joinedDate: normalizeDateOnly(userRow.created),
+      isAdmin,
+      adminPermissions,
     });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch user info' });
@@ -2127,8 +2263,8 @@ app.get('/api/records/:id', async (req, res) => {
       
       // Fetch the record owned by this user
       const [recordRows] = await pool.execute(
-        `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', 
-                r.added, r.tableId, r.isCustom, r.masterId, r.review,
+  `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', 
+    r.added, r.tableId, r.isCustom, r.masterId, r.review, r.reviewLikes,
                 rt.name as tableName, rt.isPrivate
          FROM Record r
          JOIN RecTable rt ON r.tableId = rt.id
@@ -2157,12 +2293,27 @@ app.get('/api/records/:id', async (req, res) => {
         [recordId]
       );
       record.tags = tagRows.map(t => t.name);
+
+      const reviewLikesValue = Number(record.reviewLikes);
+      record.reviewLikes = Number.isFinite(reviewLikesValue)
+        ? reviewLikesValue
+        : 0;
+
+      let viewerHasLikedReview = false;
+      if (authenticatedUserUuid) {
+        const [likedRows] = await pool.execute(
+          `SELECT 1 FROM LikedReview WHERE userUuid = ? AND recordId = ? LIMIT 1`,
+          [authenticatedUserUuid, recordId]
+        );
+        viewerHasLikedReview = Array.isArray(likedRows) && likedRows.length > 0;
+      }
+      record.viewerHasLikedReview = viewerHasLikedReview;
       
       // Add owner info
       const owner = {
         username: targetUser.username,
         displayName: targetUser.displayName || null,
-        profilePicUrl: targetUser.profilePic ? `/uploads/profile/${targetUser.profilePic}` : null,
+        profilePicUrl: buildProfilePicPublicPath(targetUser.profilePic),
       };
       
       // Format collection name
@@ -2178,8 +2329,8 @@ app.get('/api/records/:id', async (req, res) => {
       }
       
       const [recordRows] = await pool.execute(
-        `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release',
-                r.added, r.tableId, r.isCustom, r.masterId, r.review,
+  `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release',
+    r.added, r.tableId, r.isCustom, r.masterId, r.review, r.reviewLikes,
                 rt.name as tableName
          FROM Record r
          JOIN RecTable rt ON r.tableId = rt.id
@@ -2200,6 +2351,12 @@ app.get('/api/records/:id', async (req, res) => {
         [recordId]
       );
       record.tags = tagRows.map(t => t.name);
+
+      const reviewLikesValue = Number(record.reviewLikes);
+      record.reviewLikes = Number.isFinite(reviewLikesValue)
+        ? reviewLikesValue
+        : 0;
+      record.viewerHasLikedReview = false;
       
       // Format collection name
       record.collectionName = record.tableName;
@@ -2210,6 +2367,80 @@ app.get('/api/records/:id', async (req, res) => {
   } catch (err) {
     console.error('Failed to fetch record', err);
     res.status(500).json({ error: 'Failed to fetch record' });
+  }
+});
+
+app.post('/api/records/:id/review/like', requireAuth, async (req, res) => {
+  const recordId = Number.parseInt(req.params.id, 10);
+  if (!Number.isInteger(recordId) || recordId <= 0) {
+    return res.status(400).json({ error: 'Invalid record ID' });
+  }
+
+  try {
+    const pool = await getPool();
+    const [recordRows] = await pool.execute(
+      `SELECT userUuid, review, reviewLikes FROM Record WHERE id = ? LIMIT 1`,
+      [recordId]
+    );
+
+    if (!Array.isArray(recordRows) || recordRows.length === 0) {
+      return res.status(404).json({ error: 'Record not found' });
+    }
+
+    const record = recordRows[0];
+    if (!record.review || !record.review.toString().trim()) {
+      return res.status(400).json({ error: 'That record does not have a review to like.' });
+    }
+
+    if (record.userUuid === req.userUuid) {
+      return res.status(400).json({ error: "You can't like your own review." });
+    }
+
+    await pool.execute(
+      `INSERT IGNORE INTO LikedReview (userUuid, recordId) VALUES (?, ?)` ,
+      [req.userUuid, recordId]
+    );
+
+    const [likesRows] = await pool.execute(
+      `SELECT reviewLikes FROM Record WHERE id = ? LIMIT 1`,
+      [recordId]
+    );
+    const likeCount = Array.isArray(likesRows) && likesRows.length > 0
+      ? Number(likesRows[0].reviewLikes) || 0
+      : 0;
+
+    res.json({ liked: true, reviewLikes: likeCount });
+  } catch (error) {
+    console.error('Failed to like review', error);
+    res.status(500).json({ error: 'Failed to like review' });
+  }
+});
+
+app.delete('/api/records/:id/review/like', requireAuth, async (req, res) => {
+  const recordId = Number.parseInt(req.params.id, 10);
+  if (!Number.isInteger(recordId) || recordId <= 0) {
+    return res.status(400).json({ error: 'Invalid record ID' });
+  }
+
+  try {
+    const pool = await getPool();
+    await pool.execute(
+      `DELETE FROM LikedReview WHERE userUuid = ? AND recordId = ?`,
+      [req.userUuid, recordId]
+    );
+
+    const [likesRows] = await pool.execute(
+      `SELECT reviewLikes FROM Record WHERE id = ? LIMIT 1`,
+      [recordId]
+    );
+    const likeCount = Array.isArray(likesRows) && likesRows.length > 0
+      ? Number(likesRows[0].reviewLikes) || 0
+      : 0;
+
+    res.json({ liked: false, reviewLikes: likeCount });
+  } catch (error) {
+    console.error('Failed to remove review like', error);
+    res.status(500).json({ error: 'Failed to update review like' });
   }
 });
 
@@ -2960,6 +3191,965 @@ app.post('/api/records/move', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('Failed to move record', err);
     res.status(500).json({ error: 'Failed to move record' });
+  }
+});
+
+// Admin management endpoints
+app.get('/api/admin/users', requireAuth, requireAdmin, async (req, res) => {
+  console.log('Admin listing users...');
+  const rawSearch = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+  const limitRaw = Number(req.query.limit);
+  const offsetRaw = Number(req.query.offset);
+  const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.trunc(limitRaw), 100) : 25;
+  const offset = Number.isFinite(offsetRaw) && offsetRaw >= 0 ? Math.trunc(offsetRaw) : 0;
+  const searchTerm = rawSearch.slice(0, 64);
+  const params = [];
+  let whereClause = '';
+  if (searchTerm) {
+    const like = `%${escapeForLike(searchTerm)}%`;
+    whereClause = 'WHERE (u.username LIKE ? OR u.displayName LIKE ? OR u.bio LIKE ?)' ;
+    params.push(like, like, like);
+  }
+
+  try {
+    const pool = await getPool();
+    const [rows] = await pool.query(
+      `SELECT u.uuid AS userUuid,
+              u.username,
+              u.displayName,
+              u.bio,
+              u.created,
+              CASE WHEN a.userUuid IS NOT NULL THEN 1 ELSE 0 END AS isAdmin,
+              COALESCE(a.canManageAdmins, 0) AS canManageAdmins,
+              COALESCE(a.canDeleteUsers, 0) AS canDeleteUsers,
+              (SELECT COUNT(*) FROM Follows WHERE followsUuid = u.uuid) AS followersCount,
+              (SELECT COUNT(*) FROM Follows WHERE userUuid = u.uuid) AS followingCount
+         FROM User u
+         LEFT JOIN Admin a ON a.userUuid = u.uuid
+         ${whereClause}
+         ORDER BY u.created DESC
+         LIMIT ? OFFSET ?`,
+      [...params, limit, offset]
+    );
+    const [countRows] = await pool.query(
+      `SELECT COUNT(*) AS total FROM User u ${whereClause}`,
+      params
+    );
+    const total = Number(countRows?.[0]?.total) || 0;
+    const users = rows.map((row) => ({
+      userUuid: row.userUuid,
+      username: row.username,
+      displayName: row.displayName ?? null,
+      bio: row.bio ?? null,
+      joinedDate: normalizeDateOnly(row.created),
+      followersCount: normalizeFollowCount(row.followersCount),
+      followingCount: normalizeFollowCount(row.followingCount),
+      isAdmin: Boolean(row.isAdmin),
+      adminPermissions: {
+        canManageAdmins: Boolean(row.canManageAdmins),
+        canDeleteUsers: Boolean(row.canDeleteUsers),
+      },
+    }));
+    res.json({ users, total, limit, offset });
+  } catch (error) {
+    console.error('Failed to list users for admin', error);
+    res.status(500).json({ error: 'Failed to list users' });
+  }
+});
+
+app.patch('/api/admin/users/:userUuid', requireAuth, requireAdmin, async (req, res) => {
+  console.log('Admin updating user...');
+  const targetUuid = typeof req.params.userUuid === 'string' ? req.params.userUuid.trim() : '';
+  if (!targetUuid) {
+    return res.status(400).json({ error: 'userUuid parameter is required' });
+  }
+
+  const {
+    username: rawUsername,
+    displayName: rawDisplayName,
+    bio: rawBio,
+    isAdmin,
+    adminPermissions: rawAdminPermissions,
+  } = req.body || {};
+
+  if (isAdmin !== undefined && typeof isAdmin !== 'boolean') {
+    return res.status(400).json({ error: 'isAdmin must be a boolean when provided' });
+  }
+
+  let normalizedUsername;
+  if (rawUsername !== undefined) {
+    if (typeof rawUsername !== 'string') {
+      return res.status(400).json({ error: 'username must be a string' });
+    }
+    const trimmed = rawUsername.trim();
+    if (trimmed.length < 3 || trimmed.length > 30) {
+      return res.status(400).json({ error: 'Username must be 3-30 characters' });
+    }
+    if (!/^[a-zA-Z0-9_]+$/.test(trimmed)) {
+      return res.status(400).json({ error: 'Username must contain only letters, numbers, and underscores' });
+    }
+    normalizedUsername = trimmed;
+  }
+
+  let normalizedDisplayName;
+  if (rawDisplayName !== undefined) {
+    if (rawDisplayName === null) {
+      normalizedDisplayName = null;
+    } else if (typeof rawDisplayName !== 'string' || !rawDisplayName.trim()) {
+      return res.status(400).json({ error: 'Display name cannot be empty' });
+    } else {
+      normalizedDisplayName = rawDisplayName.trim().slice(0, 50);
+    }
+  }
+
+  let normalizedBio;
+  if (rawBio !== undefined) {
+    if (rawBio === null) {
+      normalizedBio = null;
+    } else if (typeof rawBio !== 'string') {
+      return res.status(400).json({ error: 'Bio must be a string or null' });
+    } else {
+      const trimmedBio = rawBio.trim();
+      if (trimmedBio.length > 255) {
+        return res.status(400).json({ error: 'Bio must be 255 characters or fewer' });
+      }
+      normalizedBio = trimmedBio.length > 0 ? trimmedBio : null;
+    }
+  }
+
+  let normalizedAdminPermissions;
+  if (rawAdminPermissions !== undefined) {
+    if (typeof rawAdminPermissions !== 'object' || rawAdminPermissions === null) {
+      return res.status(400).json({ error: 'adminPermissions must be an object when provided' });
+    }
+    normalizedAdminPermissions = {
+      canManageAdmins: Boolean(rawAdminPermissions.canManageAdmins),
+      canDeleteUsers: Boolean(rawAdminPermissions.canDeleteUsers),
+    };
+  }
+
+  const requiresPrivilege = isAdmin !== undefined || normalizedAdminPermissions !== undefined;
+  if (requiresPrivilege && !req.adminPermissions?.canManageAdmins) {
+    return res.status(403).json({ error: 'Manage-admin privileges required' });
+  }
+
+  const updates = [];
+  const params = [];
+
+  try {
+    const pool = await getPool();
+    const [existingRows] = await pool.execute(
+      'SELECT uuid FROM User WHERE uuid = ? LIMIT 1',
+      [targetUuid]
+    );
+    if (!existingRows || existingRows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (normalizedUsername !== undefined) {
+      const [usernameRows] = await pool.execute(
+        'SELECT uuid FROM User WHERE username = ? AND uuid <> ? LIMIT 1',
+        [normalizedUsername, targetUuid]
+      );
+      if (usernameRows.length > 0) {
+        return res.status(409).json({ error: 'Username already taken' });
+      }
+      updates.push('username = ?');
+      params.push(normalizedUsername);
+    }
+
+    if (normalizedDisplayName !== undefined) {
+      updates.push('displayName = ?');
+      params.push(normalizedDisplayName);
+    }
+
+    if (normalizedBio !== undefined) {
+      updates.push('bio = ?');
+      params.push(normalizedBio);
+    }
+
+    if (updates.length > 0) {
+      params.push(targetUuid);
+      await pool.execute(`UPDATE User SET ${updates.join(', ')} WHERE uuid = ?`, params);
+    }
+
+    const [adminRows] = await pool.execute(
+      'SELECT canManageAdmins, canDeleteUsers FROM Admin WHERE userUuid = ? LIMIT 1',
+      [targetUuid]
+    );
+    const targetWasAdmin = Array.isArray(adminRows) && adminRows.length > 0;
+    const existingAdmin = targetWasAdmin ? adminRows[0] : null;
+
+    if (isAdmin === true) {
+      const permissionsToApply = normalizedAdminPermissions ?? {
+        canManageAdmins: targetWasAdmin ? Boolean(existingAdmin.canManageAdmins) : false,
+        canDeleteUsers: targetWasAdmin ? Boolean(existingAdmin.canDeleteUsers) : false,
+      };
+      if (targetWasAdmin) {
+        await pool.execute(
+          'UPDATE Admin SET canManageAdmins = ?, canDeleteUsers = ? WHERE userUuid = ?',
+          [permissionsToApply.canManageAdmins ? 1 : 0, permissionsToApply.canDeleteUsers ? 1 : 0, targetUuid]
+        );
+      } else {
+        await pool.execute(
+          'INSERT INTO Admin (userUuid, canManageAdmins, canDeleteUsers) VALUES (?, ?, ?)',
+          [targetUuid, permissionsToApply.canManageAdmins ? 1 : 0, permissionsToApply.canDeleteUsers ? 1 : 0]
+        );
+      }
+    } else if (isAdmin === false) {
+      if (targetWasAdmin) {
+        const remainingAdmins = await countOtherAdmins(pool, targetUuid);
+        if (remainingAdmins <= 0) {
+          return res.status(400).json({ error: 'At least one admin user is required' });
+        }
+        if (existingAdmin && existingAdmin.canManageAdmins) {
+          const remainingManagers = await countOtherManageAdmins(pool, targetUuid);
+          if (remainingManagers <= 0) {
+            return res.status(400).json({ error: 'At least one admin must retain canManageAdmins' });
+          }
+        }
+        await pool.execute('DELETE FROM Admin WHERE userUuid = ?', [targetUuid]);
+      }
+    } else if (normalizedAdminPermissions) {
+      if (!targetWasAdmin) {
+        return res.status(400).json({ error: 'User is not an admin' });
+      }
+      if (existingAdmin && existingAdmin.canManageAdmins && !normalizedAdminPermissions.canManageAdmins) {
+        const remainingManagers = await countOtherManageAdmins(pool, targetUuid);
+        if (remainingManagers <= 0) {
+          return res.status(400).json({ error: 'At least one admin must retain canManageAdmins' });
+        }
+      }
+      await pool.execute(
+        'UPDATE Admin SET canManageAdmins = ?, canDeleteUsers = ? WHERE userUuid = ?',
+        [normalizedAdminPermissions.canManageAdmins ? 1 : 0, normalizedAdminPermissions.canDeleteUsers ? 1 : 0, targetUuid]
+      );
+    }
+
+    const [rows] = await pool.query(
+      `SELECT u.uuid AS userUuid,
+              u.username,
+              u.displayName,
+              u.bio,
+              u.created,
+              CASE WHEN a.userUuid IS NOT NULL THEN 1 ELSE 0 END AS isAdmin,
+              COALESCE(a.canManageAdmins, 0) AS canManageAdmins,
+              COALESCE(a.canDeleteUsers, 0) AS canDeleteUsers,
+              (SELECT COUNT(*) FROM Follows WHERE followsUuid = u.uuid) AS followersCount,
+              (SELECT COUNT(*) FROM Follows WHERE userUuid = u.uuid) AS followingCount
+         FROM User u
+         LEFT JOIN Admin a ON a.userUuid = u.uuid
+         WHERE u.uuid = ?
+         LIMIT 1`,
+      [targetUuid]
+    );
+    if (!rows || rows.length === 0) {
+      return res.status(404).json({ error: 'User not found after update' });
+    }
+    const row = rows[0];
+    res.json({
+      user: {
+        userUuid: row.userUuid,
+        username: row.username,
+        displayName: row.displayName ?? null,
+        bio: row.bio ?? null,
+        joinedDate: normalizeDateOnly(row.created),
+        followersCount: normalizeFollowCount(row.followersCount),
+        followingCount: normalizeFollowCount(row.followingCount),
+        isAdmin: Boolean(row.isAdmin),
+        adminPermissions: {
+          canManageAdmins: Boolean(row.canManageAdmins),
+          canDeleteUsers: Boolean(row.canDeleteUsers),
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Failed to update user as admin', error);
+    res.status(500).json({ error: 'Failed to update user' });
+  }
+});
+
+app.delete('/api/admin/users/:userUuid', requireAuth, requireAdmin, async (req, res) => {
+  console.log('Admin deleting user...');
+  const targetUuid = typeof req.params.userUuid === 'string' ? req.params.userUuid.trim() : '';
+  if (!targetUuid) {
+    return res.status(400).json({ error: 'userUuid parameter is required' });
+  }
+  if (!req.adminPermissions?.canDeleteUsers) {
+    return res.status(403).json({ error: 'Delete-user privileges required' });
+  }
+  if (targetUuid === req.userUuid) {
+    return res.status(400).json({ error: 'You cannot delete your own account' });
+  }
+
+  try {
+    const pool = await getPool();
+    const existingPermissions = await getAdminPermissions(pool, targetUuid);
+    if (existingPermissions) {
+      const remainingAdmins = await countOtherAdmins(pool, targetUuid);
+      if (remainingAdmins <= 0) {
+        return res.status(400).json({ error: 'At least one admin user is required' });
+      }
+      if (existingPermissions.canManageAdmins) {
+        const remainingManagers = await countOtherManageAdmins(pool, targetUuid);
+        if (remainingManagers <= 0) {
+          return res.status(400).json({ error: 'At least one admin must retain canManageAdmins' });
+        }
+      }
+    }
+
+    const [result] = await pool.execute('DELETE FROM User WHERE uuid = ?', [targetUuid]);
+    if (!result || result.affectedRows === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Failed to delete user as admin', error);
+    res.status(500).json({ error: 'Failed to delete user' });
+  }
+});
+
+app.get('/api/admin/records', requireAuth, requireAdmin, async (req, res) => {
+  console.log('Admin listing records...');
+  const rawSearch = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+  const rawOwner = typeof req.query.user === 'string' ? req.query.user.trim() : '';
+  const rawMasterId = typeof req.query.masterId === 'string' ? req.query.masterId.trim() : '';
+  const limitRaw = Number(req.query.limit);
+  const offsetRaw = Number(req.query.offset);
+  const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.trunc(limitRaw), 100) : 25;
+  const offset = Number.isFinite(offsetRaw) && offsetRaw >= 0 ? Math.trunc(offsetRaw) : 0;
+  const searchTerm = rawSearch.slice(0, 64);
+  const conditions = [];
+  const params = [];
+
+  if (rawOwner) {
+    conditions.push('u.username = ?');
+    params.push(rawOwner);
+  }
+
+  if (searchTerm) {
+    const like = `%${escapeForLike(searchTerm)}%`;
+    conditions.push('(r.name LIKE ? OR r.artist LIKE ? OR u.username LIKE ? OR u.displayName LIKE ? OR r.review LIKE ? )');
+    params.push(like, like, like, like, like);
+  }
+
+  if (rawMasterId) {
+    const masterId = Number(rawMasterId);
+    if (Number.isInteger(masterId) && masterId > 0) {
+      conditions.push('r.masterId = ?');
+      params.push(masterId);
+    }
+  }
+
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  try {
+    const pool = await getPool();
+    const [rows] = await pool.query(
+      `SELECT r.id,
+              r.name,
+              r.artist,
+              r.cover,
+              r.rating,
+              r.review,
+              r.added,
+              r.isCustom,
+              r.masterId,
+              r.release_year,
+              u.username,
+              u.displayName,
+              rt.name AS tableName
+         FROM Record r
+         JOIN User u ON r.userUuid = u.uuid
+         LEFT JOIN RecTable rt ON r.tableId = rt.id
+         ${whereClause}
+         ORDER BY r.added DESC
+         LIMIT ? OFFSET ?`,
+      [...params, limit, offset]
+    );
+    const [countRows] = await pool.query(
+      `SELECT COUNT(*) AS total
+         FROM Record r
+         JOIN User u ON r.userUuid = u.uuid
+         LEFT JOIN RecTable rt ON r.tableId = rt.id
+         ${whereClause}`,
+      params
+    );
+    const total = Number(countRows?.[0]?.total) || 0;
+    const records = rows.map((row) => ({
+      id: row.id,
+      record: row.name,
+      artist: row.artist ?? null,
+      cover: row.cover ?? null,
+      rating: row.rating !== null && row.rating !== undefined ? Number(row.rating) : null,
+      review: row.review ?? null,
+      added: row.added ? formatUtcDateTime(row.added) : null,
+      isCustom: Boolean(row.isCustom),
+      masterId: row.masterId !== null && row.masterId !== undefined ? Number(row.masterId) : null,
+      releaseYear: row.release_year !== null && row.release_year !== undefined ? Number(row.release_year) : null,
+      owner: {
+        username: row.username,
+        displayName: row.displayName ?? null,
+      },
+      tableName: row.tableName ?? null,
+    }));
+    res.json({ records, total, limit, offset });
+  } catch (error) {
+    console.error('Failed to list records for admin', error);
+    res.status(500).json({ error: 'Failed to list records' });
+  }
+});
+
+app.patch('/api/admin/records/:recordId', requireAuth, requireAdmin, async (req, res) => {
+  console.log('Admin updating record...');
+  const recordId = Number(req.params.recordId);
+  if (!Number.isInteger(recordId) || recordId <= 0) {
+    return res.status(400).json({ error: 'recordId must be a positive integer' });
+  }
+
+  const {
+    record: recordName,
+    artist,
+    cover,
+    rating,
+    review,
+    masterId,
+    releaseYear,
+    isCustom,
+    added,
+  } = req.body || {};
+
+  const updates = [];
+  const params = [];
+
+  if (recordName !== undefined) {
+    if (typeof recordName !== 'string' || !recordName.trim()) {
+      return res.status(400).json({ error: 'record must be a non-empty string' });
+    }
+    updates.push('name = ?');
+    params.push(recordName.trim().slice(0, 255));
+  }
+
+  if (artist !== undefined) {
+    if (artist === null) {
+      updates.push('artist = ?');
+      params.push(null);
+    } else if (typeof artist !== 'string') {
+      return res.status(400).json({ error: 'artist must be a string or null' });
+    } else {
+      updates.push('artist = ?');
+      params.push(artist.trim().slice(0, 255));
+    }
+  }
+
+  if (cover !== undefined) {
+    if (cover === null) {
+      updates.push('cover = ?');
+      params.push(null);
+    } else if (typeof cover !== 'string') {
+      return res.status(400).json({ error: 'cover must be a string or null' });
+    } else {
+      updates.push('cover = ?');
+      params.push(cover.trim().slice(0, 255));
+    }
+  }
+
+  if (rating !== undefined) {
+    if (rating === null) {
+      updates.push('rating = ?');
+      params.push(null);
+    } else {
+      const ratingValue = Number(rating);
+      if (!Number.isFinite(ratingValue)) {
+        return res.status(400).json({ error: 'rating must be a number between 0 and 10' });
+      }
+      const clamped = Math.min(Math.max(Math.round(ratingValue), 0), 10);
+      updates.push('rating = ?');
+      params.push(clamped);
+    }
+  }
+
+  if (review !== undefined) {
+    if (review === null) {
+      updates.push('review = ?');
+      params.push(null);
+    } else if (typeof review !== 'string') {
+      return res.status(400).json({ error: 'review must be a string or null' });
+    } else {
+      const trimmedReview = review.trim();
+      if (trimmedReview.length > 5000) {
+        return res.status(400).json({ error: 'review must be 5000 characters or fewer' });
+      }
+      updates.push('review = ?');
+      params.push(trimmedReview.length > 0 ? trimmedReview : null);
+    }
+  }
+
+  if (masterId !== undefined) {
+    if (masterId === null) {
+      updates.push('masterId = ?');
+      params.push(null);
+    } else {
+      const masterValue = Number(masterId);
+      if (!Number.isInteger(masterValue) || masterValue <= 0) {
+        return res.status(400).json({ error: 'masterId must be a positive integer or null' });
+      }
+      updates.push('masterId = ?');
+      params.push(masterValue);
+    }
+  }
+
+  if (releaseYear !== undefined) {
+    if (releaseYear === null) {
+      updates.push('release_year = ?');
+      params.push(null);
+    } else {
+      const releaseValue = Number(releaseYear);
+      if (!Number.isInteger(releaseValue) || releaseValue < 1800 || releaseValue > 2100) {
+        return res.status(400).json({ error: 'releaseYear must be between 1800 and 2100' });
+      }
+      updates.push('release_year = ?');
+      params.push(releaseValue);
+    }
+  }
+
+  if (isCustom !== undefined) {
+    if (typeof isCustom !== 'boolean') {
+      return res.status(400).json({ error: 'isCustom must be a boolean when provided' });
+    }
+    updates.push('isCustom = ?');
+    params.push(isCustom ? 1 : 0);
+  }
+
+  if (added !== undefined) {
+    if (typeof added !== 'string' || !added.trim()) {
+      return res.status(400).json({ error: 'added must be a non-empty string in YYYY-MM-DD HH:MM:SS format' });
+    }
+    const trimmedAdded = added.trim();
+    if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(trimmedAdded)) {
+      return res.status(400).json({ error: 'added must be formatted as YYYY-MM-DD HH:MM:SS' });
+    }
+    const date = new Date(trimmedAdded.replace(' ', 'T') + 'Z');
+    if (Number.isNaN(date.getTime())) {
+      return res.status(400).json({ error: 'added timestamp is invalid' });
+    }
+    updates.push('added = ?');
+    params.push(trimmedAdded);
+  }
+
+  if (updates.length === 0) {
+    return res.status(400).json({ error: 'No changes supplied' });
+  }
+
+  try {
+    const pool = await getPool();
+    const [existingRows] = await pool.execute(
+      'SELECT id FROM Record WHERE id = ? LIMIT 1',
+      [recordId]
+    );
+    if (!existingRows || existingRows.length === 0) {
+      return res.status(404).json({ error: 'Record not found' });
+    }
+
+    params.push(recordId);
+    await pool.execute(`UPDATE Record SET ${updates.join(', ')} WHERE id = ?`, params);
+
+    const [rows] = await pool.query(
+      `SELECT r.id,
+              r.name,
+              r.artist,
+              r.cover,
+              r.rating,
+              r.review,
+              r.added,
+              r.isCustom,
+              r.masterId,
+              r.release_year,
+              u.username,
+              u.displayName,
+              rt.name AS tableName
+         FROM Record r
+         JOIN User u ON r.userUuid = u.uuid
+         LEFT JOIN RecTable rt ON r.tableId = rt.id
+         WHERE r.id = ?
+         LIMIT 1`,
+      [recordId]
+    );
+    if (!rows || rows.length === 0) {
+      return res.status(404).json({ error: 'Record not found after update' });
+    }
+    const row = rows[0];
+    res.json({
+      record: {
+        id: row.id,
+        record: row.name,
+        artist: row.artist ?? null,
+        cover: row.cover ?? null,
+        rating: row.rating !== null && row.rating !== undefined ? Number(row.rating) : null,
+        review: row.review ?? null,
+        added: row.added ? formatUtcDateTime(row.added) : null,
+        isCustom: Boolean(row.isCustom),
+        masterId: row.masterId !== null && row.masterId !== undefined ? Number(row.masterId) : null,
+        releaseYear: row.release_year !== null && row.release_year !== undefined ? Number(row.release_year) : null,
+        owner: {
+          username: row.username,
+          displayName: row.displayName ?? null,
+        },
+        tableName: row.tableName ?? null,
+      },
+    });
+  } catch (error) {
+    console.error('Failed to update record as admin', error);
+    res.status(500).json({ error: 'Failed to update record' });
+  }
+});
+
+app.delete('/api/admin/records/:recordId', requireAuth, requireAdmin, async (req, res) => {
+  console.log('Admin deleting record...');
+  const recordId = Number(req.params.recordId);
+  if (!Number.isInteger(recordId) || recordId <= 0) {
+    return res.status(400).json({ error: 'recordId must be a positive integer' });
+  }
+
+  try {
+    const pool = await getPool();
+    const [result] = await pool.execute('DELETE FROM Record WHERE id = ?', [recordId]);
+    if (!result || result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Record not found' });
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Failed to delete record as admin', error);
+    res.status(500).json({ error: 'Failed to delete record' });
+  }
+});
+
+app.get('/api/admin/masters', requireAuth, requireAdmin, async (req, res) => {
+  console.log('Admin listing masters...');
+  const rawSearch = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+  const limitRaw = Number(req.query.limit);
+  const offsetRaw = Number(req.query.offset);
+  const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.trunc(limitRaw), 100) : 25;
+  const offset = Number.isFinite(offsetRaw) && offsetRaw >= 0 ? Math.trunc(offsetRaw) : 0;
+  const searchTerm = rawSearch.slice(0, 64);
+  const params = [];
+  let whereClause = '';
+  if (searchTerm) {
+    const like = `%${escapeForLike(searchTerm)}%`;
+    whereClause = 'WHERE (m.name LIKE ? OR m.artist LIKE ? OR m.cover LIKE ?)' ;
+    params.push(like, like, like);
+  }
+
+  try {
+    const pool = await getPool();
+    const [rows] = await pool.query(
+      `SELECT m.id,
+              m.name,
+              m.artist,
+              m.cover,
+              m.release_year,
+              m.ratingAve
+         FROM Master m
+         ${whereClause}
+         ORDER BY m.id DESC
+         LIMIT ? OFFSET ?`,
+      [...params, limit, offset]
+    );
+    const [countRows] = await pool.query(
+      `SELECT COUNT(*) AS total FROM Master m ${whereClause}`,
+      params
+    );
+    const total = Number(countRows?.[0]?.total) || 0;
+    const masters = rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      artist: row.artist ?? null,
+      cover: row.cover ?? null,
+      releaseYear: row.release_year !== null && row.release_year !== undefined ? Number(row.release_year) : null,
+      ratingAverage: row.ratingAve !== null && row.ratingAve !== undefined ? Number(row.ratingAve) : null,
+    }));
+    res.json({ masters, total, limit, offset });
+  } catch (error) {
+    console.error('Failed to list masters for admin', error);
+    res.status(500).json({ error: 'Failed to list masters' });
+  }
+});
+
+app.patch('/api/admin/masters/:masterId', requireAuth, requireAdmin, async (req, res) => {
+  console.log('Admin updating master...');
+  const masterId = Number(req.params.masterId);
+  if (!Number.isInteger(masterId) || masterId <= 0) {
+    return res.status(400).json({ error: 'masterId must be a positive integer' });
+  }
+
+  const { name, artist, cover, releaseYear } = req.body || {};
+  const updates = [];
+  const params = [];
+
+  if (name !== undefined) {
+    if (typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json({ error: 'name must be a non-empty string' });
+    }
+    updates.push('name = ?');
+    params.push(name.trim().slice(0, 255));
+  }
+
+  if (artist !== undefined) {
+    if (artist === null) {
+      updates.push('artist = ?');
+      params.push(null);
+    } else if (typeof artist !== 'string') {
+      return res.status(400).json({ error: 'artist must be a string or null' });
+    } else {
+      updates.push('artist = ?');
+      params.push(artist.trim().slice(0, 255));
+    }
+  }
+
+  if (cover !== undefined) {
+    if (cover === null) {
+      updates.push('cover = ?');
+      params.push(null);
+    } else if (typeof cover !== 'string') {
+      return res.status(400).json({ error: 'cover must be a string or null' });
+    } else {
+      updates.push('cover = ?');
+      params.push(cover.trim().slice(0, 255));
+    }
+  }
+
+  if (releaseYear !== undefined) {
+    if (releaseYear === null) {
+      updates.push('release_year = ?');
+      params.push(null);
+    } else {
+      const releaseValue = Number(releaseYear);
+      if (!Number.isInteger(releaseValue) || releaseValue < 1800 || releaseValue > 2100) {
+        return res.status(400).json({ error: 'releaseYear must be between 1800 and 2100' });
+      }
+      updates.push('release_year = ?');
+      params.push(releaseValue);
+    }
+  }
+
+  if (updates.length === 0) {
+    return res.status(400).json({ error: 'No changes supplied' });
+  }
+
+  try {
+    const pool = await getPool();
+    const [existingRows] = await pool.execute(
+      'SELECT id FROM Master WHERE id = ? LIMIT 1',
+      [masterId]
+    );
+    if (!existingRows || existingRows.length === 0) {
+      return res.status(404).json({ error: 'Master not found' });
+    }
+
+    params.push(masterId);
+    await pool.execute(`UPDATE Master SET ${updates.join(', ')} WHERE id = ?`, params);
+
+    const [rows] = await pool.query(
+      `SELECT m.id,
+              m.name,
+              m.artist,
+              m.cover,
+              m.release_year,
+              m.ratingAve
+         FROM Master m
+         WHERE m.id = ?
+         LIMIT 1`,
+      [masterId]
+    );
+    if (!rows || rows.length === 0) {
+      return res.status(404).json({ error: 'Master not found after update' });
+    }
+    const row = rows[0];
+    res.json({
+      master: {
+        id: row.id,
+        name: row.name,
+        artist: row.artist ?? null,
+        cover: row.cover ?? null,
+        releaseYear: row.release_year !== null && row.release_year !== undefined ? Number(row.release_year) : null,
+        ratingAverage: row.ratingAve !== null && row.ratingAve !== undefined ? Number(row.ratingAve) : null,
+      },
+    });
+  } catch (error) {
+    console.error('Failed to update master as admin', error);
+    res.status(500).json({ error: 'Failed to update master' });
+  }
+});
+
+app.delete('/api/admin/masters/:masterId', requireAuth, requireAdmin, async (req, res) => {
+  console.log('Admin deleting master...');
+  const masterId = Number(req.params.masterId);
+  if (!Number.isInteger(masterId) || masterId <= 0) {
+    return res.status(400).json({ error: 'masterId must be a positive integer' });
+  }
+
+  try {
+    const pool = await getPool();
+    const [result] = await pool.execute('DELETE FROM Master WHERE id = ?', [masterId]);
+    if (!result || result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Master not found' });
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Failed to delete master as admin', error);
+    res.status(500).json({ error: 'Failed to delete master' });
+  }
+});
+
+app.get('/api/admin/tags', requireAuth, requireAdmin, async (req, res) => {
+  console.log('Admin listing tags...');
+  const rawSearch = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+  const rawOwner = typeof req.query.user === 'string' ? req.query.user.trim() : '';
+  const limitRaw = Number(req.query.limit);
+  const offsetRaw = Number(req.query.offset);
+  const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.trunc(limitRaw), 100) : 25;
+  const offset = Number.isFinite(offsetRaw) && offsetRaw >= 0 ? Math.trunc(offsetRaw) : 0;
+  const searchTerm = rawSearch.slice(0, 64);
+  const conditions = [];
+  const params = [];
+
+  if (searchTerm) {
+    const like = `%${escapeForLike(searchTerm)}%`;
+    conditions.push('t.name LIKE ?');
+    params.push(like);
+  }
+
+  if (rawOwner) {
+    conditions.push('u.username = ?');
+    params.push(rawOwner);
+  }
+
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  try {
+    const pool = await getPool();
+    const [rows] = await pool.query(
+      `SELECT t.id,
+              t.name,
+              u.username,
+              u.displayName,
+              (SELECT COUNT(*) FROM Tagged WHERE tagId = t.id) AS usageCount
+         FROM Tag t
+         LEFT JOIN User u ON t.userUuid = u.uuid
+         ${whereClause}
+         ORDER BY t.id DESC
+         LIMIT ? OFFSET ?`,
+      [...params, limit, offset]
+    );
+    const [countRows] = await pool.query(
+      `SELECT COUNT(*) AS total
+         FROM Tag t
+         LEFT JOIN User u ON t.userUuid = u.uuid
+         ${whereClause}`,
+      params
+    );
+    const total = Number(countRows?.[0]?.total) || 0;
+    const tags = rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      owner: row.username
+        ? {
+            username: row.username,
+            displayName: row.displayName ?? null,
+          }
+        : null,
+      usageCount: Number.isFinite(Number(row.usageCount)) ? Number(row.usageCount) : 0,
+    }));
+    res.json({ tags, total, limit, offset });
+  } catch (error) {
+    console.error('Failed to list tags for admin', error);
+    res.status(500).json({ error: 'Failed to list tags' });
+  }
+});
+
+app.patch('/api/admin/tags/:tagId', requireAuth, requireAdmin, async (req, res) => {
+  console.log('Admin updating tag...');
+  const tagId = Number(req.params.tagId);
+  if (!Number.isInteger(tagId) || tagId <= 0) {
+    return res.status(400).json({ error: 'tagId must be a positive integer' });
+  }
+
+  const { name } = req.body || {};
+  if (name === undefined) {
+    return res.status(400).json({ error: 'name is required' });
+  }
+  if (typeof name !== 'string' || !name.trim()) {
+    return res.status(400).json({ error: 'name must be a non-empty string' });
+  }
+  const trimmedName = name.trim();
+  if (trimmedName.length > 50) {
+    return res.status(400).json({ error: 'name must be 50 characters or fewer' });
+  }
+
+  try {
+    const pool = await getPool();
+    const [existingRows] = await pool.execute(
+      'SELECT id FROM Tag WHERE id = ? LIMIT 1',
+      [tagId]
+    );
+    if (!existingRows || existingRows.length === 0) {
+      return res.status(404).json({ error: 'Tag not found' });
+    }
+
+    await pool.execute('UPDATE Tag SET name = ? WHERE id = ?', [trimmedName, tagId]);
+
+    const [rows] = await pool.query(
+      `SELECT t.id,
+              t.name,
+              u.username,
+              u.displayName,
+              (SELECT COUNT(*) FROM Tagged WHERE tagId = t.id) AS usageCount
+         FROM Tag t
+         LEFT JOIN User u ON t.userUuid = u.uuid
+         WHERE t.id = ?
+         LIMIT 1`,
+      [tagId]
+    );
+    if (!rows || rows.length === 0) {
+      return res.status(404).json({ error: 'Tag not found after update' });
+    }
+    const row = rows[0];
+    res.json({
+      tag: {
+        id: row.id,
+        name: row.name,
+        owner: row.username
+          ? {
+              username: row.username,
+              displayName: row.displayName ?? null,
+            }
+          : null,
+        usageCount: Number.isFinite(Number(row.usageCount)) ? Number(row.usageCount) : 0,
+      },
+    });
+  } catch (error) {
+    console.error('Failed to update tag as admin', error);
+    res.status(500).json({ error: 'Failed to update tag' });
+  }
+});
+
+app.delete('/api/admin/tags/:tagId', requireAuth, requireAdmin, async (req, res) => {
+  console.log('Admin deleting tag...');
+  const tagId = Number(req.params.tagId);
+  if (!Number.isInteger(tagId) || tagId <= 0) {
+    return res.status(400).json({ error: 'tagId must be a positive integer' });
+  }
+
+  try {
+    const pool = await getPool();
+    const [result] = await pool.execute('DELETE FROM Tag WHERE id = ?', [tagId]);
+    if (!result || result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Tag not found' });
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Failed to delete tag as admin', error);
+    res.status(500).json({ error: 'Failed to delete tag' });
   }
 });
 

@@ -13,6 +13,8 @@ export interface Record {
   collectionName?: string | null;
   masterId?: number | null;
   review?: string | null;
+  reviewLikes?: number;
+  viewerHasLikedReview?: boolean;
 }
 
 export interface RecordOwnerInfo {
@@ -99,6 +101,11 @@ export function createDefaultRecordTablePreferences(): RecordTablePreferences {
   };
 }
 
+export interface AdminPermissions {
+  canManageAdmins: boolean;
+  canDeleteUsers: boolean;
+}
+
 export interface UserInfo {
   username: string;
   displayName: string | null;
@@ -108,6 +115,8 @@ export interface UserInfo {
   followersCount: number;
   followingCount: number;
   joinedDate: string | null;
+  isAdmin: boolean;
+  adminPermissions: AdminPermissions;
 }
 
 export interface ProfileHighlights {
@@ -143,6 +152,9 @@ export interface MasterReviewEntry {
   review: string;
   added: string;
   owner: CommunityFeedOwner;
+  reviewLikes: number;
+  likedByViewer: boolean;
+  isFriend: boolean;
 }
 
 export interface PublicUserProfile {

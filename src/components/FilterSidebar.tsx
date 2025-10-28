@@ -26,6 +26,8 @@ interface FilterSidebarProps {
   onOpenManageTags?: () => void;
   // When true, show a small spinner next to the Tags header
   tagsLoading?: boolean;
+  // The records currently displayed in the table - used to compute tag counts
+  displayedRecords?: Array<{ tags: string[] }>;
 }
 
 export default function FilterSidebar({
@@ -35,6 +37,7 @@ export default function FilterSidebar({
   onResetFilters,
   onOpenManageTags,
   tagsLoading = false,
+  displayedRecords = [],
 }: FilterSidebarProps) {
   // --- All internal state has been removed ---
 
@@ -107,7 +110,12 @@ export default function FilterSidebar({
                       disableRipple
                     />
                   </ListItemIcon>
-                  <ListItemText primary={tag} />
+                  <ListItemText
+                    primary={`${tag} (${
+                      displayedRecords.filter((r) => r.tags.includes(tag))
+                        .length
+                    })`}
+                  />
                 </ListItemButton>
               </ListItem>
             ))}

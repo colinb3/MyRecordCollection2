@@ -14,6 +14,7 @@ import {
   Tooltip,
 } from "@mui/material";
 import AccountCircle from "@mui/icons-material/AccountCircle";
+import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import LogoutIcon from "@mui/icons-material/Logout";
 import FavoriteIcon from "@mui/icons-material/Favorite";
 import LibraryMusicIcon from "@mui/icons-material/LibraryMusic";
@@ -24,6 +25,7 @@ import LoginIcon from "@mui/icons-material/Login";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import QrCodeScannerIcon from "@mui/icons-material/QrCodeScanner";
 import { useNavigate } from "react-router-dom";
+import { getCachedUserInfo } from "../userInfo";
 
 interface TopBarProps {
   onLogout?: () => void;
@@ -39,6 +41,8 @@ interface TopBarProps {
   onSearchChange?: (value: string) => void;
   /** Optional callback when user presses enter in the search textbox */
   onSearchSubmit?: (value: string) => void;
+  /** Explicit admin flag; falls back to cached user info when omitted */
+  isAdmin?: boolean;
 }
 
 export default function TopBar({
@@ -51,6 +55,7 @@ export default function TopBar({
   searchValue,
   onSearchChange,
   onSearchSubmit,
+  isAdmin,
 }: TopBarProps) {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
@@ -104,6 +109,9 @@ export default function TopBar({
     }
     handleMenuClose();
   };
+
+  const cachedInfo = getCachedUserInfo();
+  const canAdmin = Boolean(isAdmin ?? cachedInfo?.isAdmin);
 
   return (
     <Grid>
@@ -267,6 +275,19 @@ export default function TopBar({
                   </ListItemIcon>
                   <ListItemText>Settings</ListItemText>
                 </MenuItem>
+                {canAdmin && (
+                  <MenuItem
+                    onClick={() => {
+                      navigate("/admin");
+                      handleMenuClose();
+                    }}
+                  >
+                    <ListItemIcon>
+                      <AdminPanelSettingsIcon />
+                    </ListItemIcon>
+                    <ListItemText>Admin Panel</ListItemText>
+                  </MenuItem>
+                )}
                 {onLogout && (
                   <MenuItem onClick={handleLogoutClick}>
                     <ListItemIcon>

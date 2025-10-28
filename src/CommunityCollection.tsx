@@ -454,6 +454,7 @@ export default function CommunityCollection() {
                   onFiltersChange={handleFilterChange}
                   onResetFilters={resetFilters}
                   tagsLoading={loading}
+                  displayedRecords={filteredRecords}
                 />
               </Grid>
             )}
@@ -496,6 +497,7 @@ export default function CommunityCollection() {
                   onFiltersChange={handleFilterChange}
                   onResetFilters={resetFilters}
                   tagsLoading={loading}
+                  displayedRecords={filteredRecords}
                 />
                 <Box sx={{ textAlign: "right" }}>
                   <IconButton onClick={() => setSidebarOpen(false)}>

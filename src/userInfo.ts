@@ -6,7 +6,10 @@ let inFlight: Promise<UserInfo | null> | null = null;
 
 function clone(info: UserInfo | null): UserInfo | null {
   if (!info) return null;
-  return { ...info };
+  return {
+    ...info,
+    adminPermissions: { ...info.adminPermissions },
+  };
 }
 
 export function getCachedUserInfo(): UserInfo | null {
@@ -14,7 +17,12 @@ export function getCachedUserInfo(): UserInfo | null {
 }
 
 export function setCachedUserInfo(info: UserInfo | null): void {
-  cachedUserInfo = info ? { ...info } : null;
+  cachedUserInfo = info
+    ? {
+        ...info,
+        adminPermissions: { ...info.adminPermissions },
+      }
+    : null;
 }
 
 export async function loadUserInfo(
@@ -74,6 +82,18 @@ export async function loadUserInfo(
       const followingCount = Number.isFinite(followingCountRaw)
         ? Math.max(0, Math.trunc(followingCountRaw))
         : 0;
+      const isAdmin = Boolean((data as Record<string, unknown>).isAdmin);
+      const adminPayloadRaw = (data as Record<string, unknown>).adminPermissions;
+      const adminPermissions = {
+        canManageAdmins:
+          typeof adminPayloadRaw === "object" && adminPayloadRaw !== null
+            ? Boolean((adminPayloadRaw as Record<string, unknown>).canManageAdmins)
+            : false,
+        canDeleteUsers:
+          typeof adminPayloadRaw === "object" && adminPayloadRaw !== null
+            ? Boolean((adminPayloadRaw as Record<string, unknown>).canDeleteUsers)
+            : false,
+      };
       if (!username || !userUuid) {
         throw new Error("Invalid user info payload");
       }
@@ -86,6 +106,8 @@ export async function loadUserInfo(
         followersCount,
         followingCount,
         joinedDate,
+        isAdmin,
+        adminPermissions,
       };
       cachedUserInfo = normalized;
       return { ...normalized };

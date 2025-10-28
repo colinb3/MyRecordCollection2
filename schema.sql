@@ -8,7 +8,14 @@ CREATE TABLE User (
     password VARCHAR(255) NOT NULL,
     bio TINYTEXT DEFAULT NULL,
     profilePic VARCHAR(255) DEFAULT NULL,
-    created DATE NOT NULL DEFAULT (CURRENT_DATE),
+    created DATE NOT NULL DEFAULT (CURRENT_DATE)
+);
+
+CREATE TABLE Admin (
+    userUuid CHAR(36) PRIMARY KEY,
+    canManageAdmins BOOLEAN NOT NULL DEFAULT FALSE,
+    canDeleteUsers BOOLEAN NOT NULL DEFAULT FALSE,
+    FOREIGN KEY (userUuid) REFERENCES User(uuid) ON DELETE CASCADE
 );
 
 CREATE TABLE RecTable (
@@ -32,9 +39,18 @@ CREATE TABLE Record (
     tableId INT,
     review TEXT,
     masterId INT,
+    reviewLikes INT DEFAULT 0,
     FOREIGN KEY (masterId) REFERENCES Master(id) ON DELETE SET NULL,
     FOREIGN KEY (userUuid) REFERENCES User(uuid) ON DELETE CASCADE,
     FOREIGN KEY (tableId) REFERENCES RecTable(id) ON DELETE CASCADE
+);
+
+CREATE TABLE LikedReview (
+    userUuid CHAR(36) NOT NULL,
+    recordId INT NOT NULL,
+    PRIMARY KEY (userUuid, recordId),
+    FOREIGN KEY (userUuid) REFERENCES User(uuid) ON DELETE CASCADE,
+    FOREIGN KEY (recordId) REFERENCES Record(id) ON DELETE CASCADE
 );
 
 CREATE TABLE Tag (
@@ -86,7 +102,7 @@ CREATE TABLE Master (
     rating8 INT DEFAULT 0,
     rating9 INT DEFAULT 0,
     rating10 INT DEFAULT 0,
-    ratingAve DECIMAL(3,1) NULL COMMENT 'Average of ratings 1-10 (weighted)',
+    ratingAve DECIMAL(3,1) NULL COMMENT 'Average of ratings 1-10 (weighted)'
 );
 
 -- Keep Master rating tallies (rating1..rating10) and ratingAve in sync with Record changes
@@ -140,7 +156,7 @@ BEGIN
         rating8 = COALESCE(c8, 0),
         rating9 = COALESCE(c9, 0),
         rating10 = COALESCE(c10, 0),
-    ratingAve = CASE WHEN total > 0 THEN ROUND(weighted / total, 1) ELSE NULL END
+        ratingAve = CASE WHEN total > 0 THEN ROUND(weighted / total, 1) ELSE NULL END
     WHERE id = p_master_id;
 END $$
 
@@ -175,6 +191,29 @@ BEGIN
     IF OLD.masterId IS NOT NULL THEN
         CALL update_master_ratings(OLD.masterId);
     END IF;
+END $$
+
+DROP TRIGGER IF EXISTS trg_likedreview_after_insert $$
+CREATE TRIGGER trg_likedreview_after_insert
+AFTER INSERT ON LikedReview
+FOR EACH ROW
+BEGIN
+    UPDATE Record
+    SET reviewLikes = COALESCE(reviewLikes, 0) + 1
+    WHERE id = NEW.recordId;
+END $$
+
+DROP TRIGGER IF EXISTS trg_likedreview_after_delete $$
+CREATE TRIGGER trg_likedreview_after_delete
+AFTER DELETE ON LikedReview
+FOR EACH ROW
+BEGIN
+    UPDATE Record
+    SET reviewLikes = CASE
+        WHEN COALESCE(reviewLikes, 0) > 0 THEN COALESCE(reviewLikes, 0) - 1
+        ELSE 0
+    END
+    WHERE id = OLD.recordId;
 END $$
 
 DELIMITER ;
