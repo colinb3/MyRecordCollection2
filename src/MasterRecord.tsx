@@ -369,7 +369,7 @@ export default function MasterRecord() {
           const first = genres[0];
           const yearNum = first && /^\d{4}$/.test(first) ? Number(first) : null;
           const withinRange =
-            yearNum && yearNum >= 1800 && yearNum <= 2100 ? yearNum : null;
+            yearNum && yearNum >= 1901 && yearNum <= 2100 ? yearNum : null;
           if (withinRange && !releaseYearTouchedRef.current) {
             setReleaseYear(withinRange);
           }
@@ -634,7 +634,7 @@ export default function MasterRecord() {
         if (
           !preserveReleaseYear &&
           normalized.releaseYear &&
-          normalized.releaseYear >= 1800 &&
+          normalized.releaseYear >= 1901 &&
           normalized.releaseYear <= 2100
         ) {
           setReleaseYear(normalized.releaseYear);

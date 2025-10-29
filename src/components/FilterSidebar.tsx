@@ -17,6 +17,9 @@ import { type Filters } from "../types";
 import ReplayOutlinedIcon from "@mui/icons-material/ReplayOutlined";
 import SettingsIcon from "@mui/icons-material/Settings";
 
+const MIN_RELEASE_YEAR = 1901;
+const MAX_RELEASE_YEAR = 2100;
+
 interface FilterSidebarProps {
   tags?: string[];
   // Receive the complete, current filter state from the parent
@@ -176,7 +179,11 @@ export default function FilterSidebar({
               type="number"
               fullWidth
               size="small"
-              slotProps={{ input: { inputProps: { min: 1877, max: 2100 } } }}
+              slotProps={{
+                input: {
+                  inputProps: { min: MIN_RELEASE_YEAR, max: MAX_RELEASE_YEAR },
+                },
+              }}
               // Read value from props
               value={release.min}
               onChange={(e) => {
@@ -190,7 +197,11 @@ export default function FilterSidebar({
               type="number"
               fullWidth
               size="small"
-              slotProps={{ input: { inputProps: { min: 1877, max: 2100 } } }}
+              slotProps={{
+                input: {
+                  inputProps: { min: MIN_RELEASE_YEAR, max: MAX_RELEASE_YEAR },
+                },
+              }}
               // Read value from props
               value={release.max}
               onChange={(e) => {

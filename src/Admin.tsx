@@ -949,10 +949,10 @@ function RecordsTab() {
       const releaseValue = Number(releaseYearInput);
       if (
         !Number.isInteger(releaseValue) ||
-        releaseValue < 1800 ||
+        releaseValue < 1901 ||
         releaseValue > 2100
       ) {
-        setError("Release year must be between 1800 and 2100.");
+        setError("Release year must be between 1901 and 2100.");
         setSaving(false);
         return;
       }
@@ -1421,10 +1421,10 @@ function MastersTab() {
       const releaseValue = Number(releaseYearInput);
       if (
         !Number.isInteger(releaseValue) ||
-        releaseValue < 1800 ||
+        releaseValue < 1901 ||
         releaseValue > 2100
       ) {
-        setError("Release year must be between 1800 and 2100.");
+        setError("Release year must be between 1901 and 2100.");
         setSaving(false);
         return;
       }

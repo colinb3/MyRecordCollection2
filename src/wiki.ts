@@ -144,11 +144,11 @@ function wikiRelease(content: string): number | null {
   if (m && m[1]) {
     const snippet = m[1];
     // try to find a 4-digit year
-    const yearMatch = snippet.match(/(19\d{2}|20\d{2}|2100)/);
+    const yearMatch = snippet.match(/(19(0[1-9]|[1-9]\d)|20\d{2}|2100)/);
     if (yearMatch) return parseInt(yearMatch[0], 10);
   }
   // fallback: first 4-digit number in page between reasonable years
-  const anyYear = content.match(/(18\d{2}|19\d{2}|20\d{2}|2100)/);
+  const anyYear = content.match(/(19(0[1-9]|[1-9]\d)|20\d{2}|2100)/);
   if (anyYear) return parseInt(anyYear[0], 10);
   return null;
 }

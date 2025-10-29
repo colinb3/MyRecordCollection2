@@ -38,7 +38,7 @@ import {
   getCachedUserInfo,
   loadUserInfo,
 } from "./userInfo";
-import { loadUserTags, clearTagsCache } from "./userTags";
+import { loadUserTags, clearTagsCache, updateTagsCache } from "./userTags";
 import { setUserId } from "./analytics";
 import { clearRecordTablePreferencesCache } from "./preferences";
 import { clearCollectionRecordsCache } from "./collectionRecords";
@@ -372,9 +372,17 @@ export default function RecordDetails() {
         };
         addTags(prev);
         addTags(saved.tags);
-        return Array.from(seen.values()).sort((a, b) =>
+        const merged = Array.from(seen.values()).sort((a, b) =>
           a.localeCompare(b, undefined, { sensitivity: "base" })
         );
+        try {
+          // update the shared cache so other components (e.g. FilterSidebar)
+          // that read the cached tag list will see the newly-created tag
+          updateTagsCache(merged);
+        } catch {
+          // ignore cache update errors
+        }
+        return merged;
       });
 
       setEditDialogOpen(false);

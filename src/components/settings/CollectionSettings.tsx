@@ -69,7 +69,7 @@ import {
 const DEFAULT_COLLECTION = "My Collection";
 const WISHLIST_COLLECTION = "Wishlist";
 const LISTENED_COLLECTION = "Listened";
-const MIN_RELEASE_YEAR = 1877;
+const MIN_RELEASE_YEAR = 1901;
 const MAX_RELEASE_YEAR = 2100;
 
 interface DiscogsCsvRow {

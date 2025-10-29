@@ -265,3 +265,26 @@ export function clearCollectionRecordsCache(): void {
   cachedAllRecords = null;
   allInFlight = null;
 }
+
+// Remove a tag from all cached records. This mutates the in-memory cache so callers
+// that read from the cache (or that have previously loaded records) can stay in sync.
+export function removeTagFromCache(tag: string): void {
+  if (!tag || typeof tag !== "string") return;
+  const normalized = tag;
+  for (const [key, records] of collectionCache.entries()) {
+    const mutated = records.map((r) => {
+      if (!Array.isArray(r.tags) || r.tags.length === 0) return r;
+      const filtered = r.tags.filter((t) => t !== normalized);
+      if (filtered.length === r.tags.length) return r;
+      return { ...r, tags: filtered };
+    });
+    collectionCache.set(key, mutated);
+  }
+
+  if (Array.isArray(cachedAllRecords) && cachedAllRecords.length > 0) {
+    cachedAllRecords = cachedAllRecords.map((r) => ({
+      ...r,
+      tags: Array.isArray(r.tags) ? r.tags.filter((t) => t !== normalized) : [],
+    }));
+  }
+}

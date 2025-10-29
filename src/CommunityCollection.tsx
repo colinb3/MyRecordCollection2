@@ -35,10 +35,13 @@ import {
 import apiUrl from "./api";
 import FilterSidebar from "./components/FilterSidebar";
 
+const MIN_RELEASE_YEAR = 1901;
+const MAX_RELEASE_YEAR = 2100;
+
 const createInitialFilters = (): Filters => ({
   tags: [],
   rating: { min: 0, max: 10 },
-  release: { min: 1877, max: 2100 },
+  release: { min: MIN_RELEASE_YEAR, max: MAX_RELEASE_YEAR },
 });
 
 const DEFAULT_COLLECTION_NAME = "My Collection";
@@ -226,11 +229,17 @@ export default function CommunityCollection() {
         record.rating <= filters.rating.max
     );
 
-    next = next.filter(
-      (record) =>
-        record.release >= filters.release.min &&
-        record.release <= filters.release.max
-    );
+    const releaseMin = filters.release.min ?? MIN_RELEASE_YEAR;
+    const releaseMax = filters.release.max ?? MAX_RELEASE_YEAR;
+    next = next.filter((record) => {
+      const releaseValue = Number.isFinite(record.release)
+        ? record.release
+        : null;
+      if (releaseValue === null || releaseValue <= 0) {
+        return true;
+      }
+      return releaseValue >= releaseMin && releaseValue <= releaseMax;
+    });
 
     return next;
   }, [records, searchTerm, filters]);

@@ -74,8 +74,9 @@ export default function LandingPage() {
           "Create, find, and edit records with ease. Suggested tags make it easy to stay organized.",
         bullets: [
           "Search the Last.FM database of millions of records",
+          "Scan your record's barcode to find it in a blink",
           "Create a custom record if you can't find that hidden gem of yours",
-          "Just enter an album and artist name to get suggested genre tags like magic",
+          "Get suggested genre tags for any record.",
         ],
         image: editViewImg,
         imageAlt:
@@ -209,14 +210,20 @@ export default function LandingPage() {
     {
       title: "Built for collectors",
       description:
-        "Rate and tag every pressing in your collection, keep a wishlist, and see how your friends' collections compare.",
+        "Rate, review, and tag every pressing in your collection, keep a wishlist, and see how your friends' collections compare.",
       Icon: LibraryMusicIcon,
     },
     {
-      title: "Create your profile",
+      title: "Customize your profile",
       description:
-        "Show off your favorite records, follow friends, and see recent additions to their collections.",
+        "Show off your favorite records, follow friends, and see what new music they are listening to.",
       Icon: PeopleAltIcon,
+    },
+    {
+      title: "See reviews and ratings",
+      description:
+        "Review any record, see the average ratings and reviews for your favourite records, and like your favourite reviews.",
+      Icon: FavoriteIcon,
     },
     {
       title: "Powerful filters & search",
@@ -227,14 +234,8 @@ export default function LandingPage() {
     {
       title: "Smart tagging tools",
       description:
-        "Automatic tag suggestions from the record's genres to easily import and organize your collection.",
+        "Automatic tag suggestions from the record's genres let you easily import and organize your collection.",
       Icon: LocalOfferIcon,
-    },
-    {
-      title: "Organize your wishes",
-      description:
-        "Always know what to look for at the record store next with a dedicated wishlist.",
-      Icon: FavoriteIcon,
     },
     {
       title: "Discogs import in seconds",
@@ -306,7 +307,7 @@ export default function LandingPage() {
                     fontWeight={700}
                     textAlign={{ xs: "center", md: "left" }}
                   >
-                    The smarter way to manage your vinyl obsession
+                    The better way to manage your music obsession
                   </Typography>
                   <Typography
                     variant="h6"
@@ -314,8 +315,9 @@ export default function LandingPage() {
                     maxWidth={600}
                     textAlign={{ xs: "center", md: "left" }}
                   >
-                    My Record Collection keeps every pressing beautifully
-                    organized—whether you have 50 records or 5,000.
+                    My Record Collection helps you keep all your music
+                    beautifully organized—whether you've listened to 50 records
+                    or 5,000.
                   </Typography>
                   <Stack
                     direction={{ xs: "column", sm: "row" }}

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import apiUrl from "../api";
 import { updateTagsCache } from "../userTags";
+import { removeTagFromCache } from "../collectionRecords";
 import {
   Dialog,
   DialogTitle,
@@ -27,6 +28,7 @@ interface ManageTagsDialogProps {
   tags: string[];
   onTagsUpdated: (tags: string[]) => void;
   onTagRenamed?: (oldName: string, newName: string) => void;
+  onTagDeleted?: (deletedName: string) => void;
 }
 
 export default function ManageTagsDialog({
@@ -35,6 +37,7 @@ export default function ManageTagsDialog({
   tags,
   onTagsUpdated,
   onTagRenamed,
+  onTagDeleted,
 }: ManageTagsDialogProps) {
   const [newTag, setNewTag] = useState("");
   const [renaming, setRenaming] = useState<string | null>(null);
@@ -185,6 +188,19 @@ export default function ManageTagsDialog({
         onTagsUpdated(data.tags);
         updateTagsCache(data.tags);
         if (renaming === confirmDeleteTag) setRenaming(null);
+        if (onTagDeleted) {
+          try {
+            onTagDeleted(confirmDeleteTag!);
+          } catch {
+            /* ignore handler errors */
+          }
+        }
+        try {
+          // keep cached collection records in sync
+          removeTagFromCache(confirmDeleteTag!);
+        } catch {
+          /* ignore errors */
+        }
         openSnack("Tag deleted");
       } else {
         openSnack(data.error || "Failed to delete tag", "error");

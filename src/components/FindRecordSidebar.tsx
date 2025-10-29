@@ -246,7 +246,11 @@ export default function FindRecordSidebar({
           size="small"
           onChange={(e) => onReleaseYearChange(Number(e.target.value))}
           sx={{ mb: 1, width: "50%" }}
-          slotProps={{ input: { inputProps: { min: 1877, max: 2100 } } }}
+          slotProps={{
+            input: {
+              inputProps: { min: 1901, max: 2100 },
+            },
+          }}
         />
         <Typography variant="subtitle1">Review (optional)</Typography>
         <TextField

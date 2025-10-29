@@ -460,7 +460,7 @@ function buildDiscogsSearchUrl(artist, record) {
 
 function normalizeDiscogsReleaseYear(raw) {
   const year = Number(raw);
-  if (Number.isInteger(year) && year >= 1800 && year <= 2100) {
+  if (Number.isInteger(year) && year >= 1901 && year <= 2100) {
     return year;
   }
   return null;
@@ -2470,7 +2470,7 @@ app.post('/api/records/update', requireAuth, async (req, res) => {
   if (!id || !record) return res.status(400).json({ error: 'Missing id or record name' });
 
   const releaseNum = Number(release);
-  if (!Number.isInteger(releaseNum) || releaseNum < 1877 || releaseNum > 2100) {
+  if (!Number.isInteger(releaseNum) || releaseNum < 1901 || releaseNum > 2100) {
     return res.status(400).json({ error: 'Invalid release year' });
   }
 
@@ -2559,20 +2559,38 @@ app.post('/api/records/update', requireAuth, async (req, res) => {
 app.post('/api/records/create', requireAuth, async (req, res) => {
   console.log("Creating record...");
   const { record, artist, cover, rating, tags, release, tableName } = req.body;
-  if (!record) return res.status(400).json({ error: 'Missing record name' });
+  // Allow clients to omit the record name and provide a sensible default
+  const DEFAULT_NEW_RECORD_NAME = 'New Record';
   if (!tableName || typeof tableName !== 'string') {
     return res.status(400).json({ error: 'tableName is required' });
   }
-  const recordName = typeof record === "string" ? record.trim() : "";
-  const artistName = typeof artist === "string" ? artist.trim() : "";
+  const recordName = typeof record === 'string' ? record.trim() : '';
+  const artistName = typeof artist === 'string' ? artist.trim() : '';
 
-  const releaseNum = Number(release);
-  if (!Number.isInteger(releaseNum) || releaseNum < 1877 || releaseNum > 2100) {
-    return res.status(400).json({ error: 'invalid release year' });
+  // Validate release only if provided (allow null/default)
+  let releaseNum = null;
+  if (release !== undefined && release !== null && String(release).trim() !== '') {
+    const parsed = Number(release);
+    if (!Number.isInteger(parsed) || parsed < 1901 || parsed > 2100) {
+      return res.status(400).json({ error: 'invalid release year' });
+    }
+    releaseNum = parsed;
+    // MySQL YEAR type only accepts 1901-2155 (and 0000 in some modes).
+    // If the provided year is outside the YEAR column supported range, prefer to store NULL
+    // rather than attempt to insert an out-of-range value which causes SQL errors.
+    if (releaseNum < 1901 || releaseNum > 2155) {
+      releaseNum = null;
+    }
   }
-  const ratingNum = Number(rating);
-  if (!Number.isInteger(ratingNum) || ratingNum < 0 || ratingNum > 10) {
-    return res.status(400).json({ error: 'invalid rating' });
+
+  // Validate rating only if provided
+  let ratingNum = null;
+  if (rating !== undefined && rating !== null && String(rating).trim() !== '') {
+    const parsedRating = Number(rating);
+    if (!Number.isInteger(parsedRating) || parsedRating < 0 || parsedRating > 10) {
+      return res.status(400).json({ error: 'invalid rating' });
+    }
+    ratingNum = parsedRating;
   }
 
   let reviewText = null;
@@ -2594,7 +2612,7 @@ app.post('/api/records/create', requireAuth, async (req, res) => {
   if (hasMaster) {
     const masterReleaseRaw = req.body?.masterReleaseYear;
     const masterReleaseNum = Number(masterReleaseRaw);
-    if (Number.isInteger(masterReleaseNum) && masterReleaseNum >= 1800 && masterReleaseNum <= 2100) {
+    if (Number.isInteger(masterReleaseNum) && masterReleaseNum >= 1901 && masterReleaseNum <= 2100) {
       masterReleaseYear = masterReleaseNum;
     }
   }
@@ -2645,11 +2663,12 @@ app.post('/api/records/create', requireAuth, async (req, res) => {
       );
     }
 
+  const nameToInsert = recordName || DEFAULT_NEW_RECORD_NAME;
     const [result] = await pool.execute(
       `INSERT INTO Record (name, artist, cover, rating, release_year, tableId, userUuid, added, isCustom, masterId, review)
        VALUES (?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), ?, ?, ?)`,
       [
-        recordName,
+        nameToInsert,
         artistName,
         cleanCover,
         ratingNum,
@@ -2829,9 +2848,9 @@ app.post('/api/import/discogs', requireAuth, async (req, res) => {
       }
 
       const releaseNum = Number.parseInt(raw.release, 10);
-      let release = Number.isInteger(releaseNum) ? releaseNum : 1900;
-      if (release < 1877 || release > 2100) {
-        release = 1900;
+      let release = Number.isInteger(releaseNum) ? releaseNum : 1901;
+      if (release < 1901 || release > 2100) {
+        release = 1901;
       }
 
       const ratingNum = Number(raw.rating);
@@ -3795,8 +3814,8 @@ app.patch('/api/admin/records/:recordId', requireAuth, requireAdmin, async (req,
       params.push(null);
     } else {
       const releaseValue = Number(releaseYear);
-      if (!Number.isInteger(releaseValue) || releaseValue < 1800 || releaseValue > 2100) {
-        return res.status(400).json({ error: 'releaseYear must be between 1800 and 2100' });
+      if (!Number.isInteger(releaseValue) || releaseValue < 1901 || releaseValue > 2100) {
+        return res.status(400).json({ error: 'releaseYear must be between 1901 and 2100' });
       }
       updates.push('release_year = ?');
       params.push(releaseValue);
@@ -4014,8 +4033,8 @@ app.patch('/api/admin/masters/:masterId', requireAuth, requireAdmin, async (req,
       params.push(null);
     } else {
       const releaseValue = Number(releaseYear);
-      if (!Number.isInteger(releaseValue) || releaseValue < 1800 || releaseValue > 2100) {
-        return res.status(400).json({ error: 'releaseYear must be between 1800 and 2100' });
+      if (!Number.isInteger(releaseValue) || releaseValue < 1901 || releaseValue > 2100) {
+        return res.status(400).json({ error: 'releaseYear must be between 1901 and 2100' });
       }
       updates.push('release_year = ?');
       params.push(releaseValue);

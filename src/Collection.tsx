@@ -10,9 +10,11 @@ import {
   TextField,
   Snackbar,
   Alert,
+  Button,
 } from "@mui/material";
 import Grid from "@mui/material/Grid";
 import FilterListAltIcon from "@mui/icons-material/FilterListAlt";
+import AddIcon from "@mui/icons-material/Add";
 import { darkTheme } from "./theme";
 import {
   type Record,
@@ -49,10 +51,13 @@ interface CollectionProps {
   title?: string;
 }
 
+const MIN_RELEASE_YEAR = 1901;
+const MAX_RELEASE_YEAR = 2100;
+
 const initialFilters: Filters = {
   tags: [],
   rating: { min: 0, max: 10 },
-  release: { min: 1877, max: 2100 },
+  release: { min: MIN_RELEASE_YEAR, max: MAX_RELEASE_YEAR },
 };
 
 export default function Collection({ tableName, title }: CollectionProps) {
@@ -62,6 +67,7 @@ export default function Collection({ tableName, title }: CollectionProps) {
   const [filteredRecords, setFilteredRecords] = useState<Record[]>([]);
   const [allTags, setAllTags] = useState<string[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [creating, setCreating] = useState<boolean>(false);
 
   // State for controlling the UI
   const [searchTerm, setSearchTerm] = useState("");
@@ -145,11 +151,15 @@ export default function Collection({ tableName, title }: CollectionProps) {
     );
 
     // 4. Filter by release
-    processedRecords = processedRecords.filter(
-      (r) =>
-        r.release >= (filters.release?.min ?? 1877) &&
-        r.release <= (filters.release?.max ?? 2100)
-    );
+    const releaseMin = filters.release?.min ?? MIN_RELEASE_YEAR;
+    const releaseMax = filters.release?.max ?? MAX_RELEASE_YEAR;
+    processedRecords = processedRecords.filter((r) => {
+      const releaseValue = Number.isFinite(r.release) ? r.release : null;
+      if (releaseValue === null || releaseValue <= 0) {
+        return true;
+      }
+      return releaseValue >= releaseMin && releaseValue <= releaseMax;
+    });
 
     // 5. Sort
 
@@ -318,6 +328,81 @@ export default function Collection({ tableName, title }: CollectionProps) {
               width: { xs: "100%", sm: 350 },
             }}
           />
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<AddIcon />}
+            sx={{ ml: 1, whiteSpace: "nowrap" }}
+            onClick={async () => {
+              if (creating) return;
+              setCreating(true);
+              try {
+                // Minimal payload for a custom record
+                const payload = {
+                  id: -1,
+                  record: "New Record",
+                  artist: "",
+                  cover: null,
+                  rating: 0,
+                  isCustom: true,
+                  tags: [],
+                  tableName,
+                } as any;
+
+                const res = await fetch(apiUrl("/api/records/create"), {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  credentials: "include",
+                  body: JSON.stringify(payload),
+                });
+
+                if (res.status === 401) {
+                  // Not authenticated — send to login with next
+                  const next = encodeURIComponent(
+                    `${location.pathname}${location.search || ""}${
+                      location.hash || ""
+                    }`
+                  );
+                  navigate(`/login?next=${next}`);
+                  return;
+                }
+
+                if (!res.ok) {
+                  const problem = await res.json().catch(() => ({}));
+                  setSnackbar({
+                    open: true,
+                    message:
+                      problem.error ||
+                      `Failed to create record (${res.status})`,
+                    severity: "error",
+                  });
+                  return;
+                }
+
+                const created = (await res.json()) as Record;
+                // Update local caches and state so the new record appears
+                setRecords((prev) => [created, ...prev]);
+                setFilteredRecords((prev) => [created, ...prev]);
+                setSelectedRecord(created);
+                // Navigate to the record details page
+                const originPath = `${location.pathname}${location.search}${location.hash}`;
+                navigate(`/record/${created.id}`, {
+                  state: { fromPath: originPath },
+                });
+              } catch (err) {
+                console.error("Failed to create record", err);
+                setSnackbar({
+                  open: true,
+                  message: "Network error creating record",
+                  severity: "error",
+                });
+              } finally {
+                setCreating(false);
+              }
+            }}
+          >
+            Custom
+          </Button>
         </Box>
         <Grid
           container
@@ -483,6 +568,33 @@ export default function Collection({ tableName, title }: CollectionProps) {
                   }
                 : prev
             );
+          }}
+          onTagDeleted={(deleted) => {
+            // Remove the deleted tag from all records in memory so the table updates
+            setRecords((prev) =>
+              prev.map((r) =>
+                r.tags.includes(deleted)
+                  ? { ...r, tags: r.tags.filter((t) => t !== deleted) }
+                  : r
+              )
+            );
+            setFilteredRecords((prev) =>
+              prev.map((r) =>
+                r.tags.includes(deleted)
+                  ? { ...r, tags: r.tags.filter((t) => t !== deleted) }
+                  : r
+              )
+            );
+            setSelectedRecord((prev) =>
+              prev && prev.tags.includes(deleted)
+                ? { ...prev, tags: prev.tags.filter((t) => t !== deleted) }
+                : prev
+            );
+            // Also remove from currently applied filters
+            setFilters((prev) => ({
+              ...prev,
+              tags: prev.tags.filter((t) => t !== deleted),
+            }));
           }}
         />
       </Box>

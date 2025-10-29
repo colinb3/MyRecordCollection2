@@ -94,8 +94,10 @@ const columns: GridColDef[] = [
     filterable: false,
     renderCell: (params) => {
       const val = params.value;
-      if (typeof val === "number") return val.toString();
-      return val;
+      if (typeof val === "number") {
+        return val > 0 ? val.toString() : "";
+      }
+      return val ?? "";
     },
   },
   {
