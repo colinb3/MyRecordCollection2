@@ -1752,6 +1752,20 @@ app.get("/api/tags", requireAuth, async (req, res) => {
   }
 });
 
+// Full tag list including ids for clients that need stable identifiers
+app.get("/api/tags/full", requireAuth, async (req, res) => {
+  console.log("Fetching full tag list...");
+  try {
+    const pool = await getPool();
+    const [rows] = await pool.query(`SELECT id, name FROM Tag WHERE userUuid = ? ORDER BY name`, [req.userUuid]);
+    // return array of { id, name }
+    res.json(rows.map((r) => ({ id: r.id, name: r.name })));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "DB error" });
+  }
+});
+
 app.post(
   "/api/community/users/:username/follow",
   requireAuth,
@@ -2701,19 +2715,42 @@ app.post('/api/tags/create', requireAuth, async (req, res) => {
 
 app.post('/api/tags/rename', requireAuth, async (req, res) => {
   console.log('Renaming tag...');
-  const { oldName, newName } = req.body;
-  if (!oldName || !newName) return res.status(400).json({ error: 'oldName and newName required' });
+  const { oldName, newName, tagId } = req.body;
+  if (!newName) return res.status(400).json({ error: 'newName required' });
   try {
     const pool = await getPool();
-    const trimmedNew = newName.trim();
+    const trimmedNew = String(newName).trim();
     if (!trimmedNew) return res.status(400).json({ error: 'New name cannot be empty' });
-    const [dup] = await pool.execute(`SELECT id FROM Tag WHERE name = ? AND userUuid = ?`, [trimmedNew, req.userUuid]);
-    if (dup.length > 0) return res.status(409).json({ error: 'A tag with that name already exists' });
-    const [result] = await pool.execute(`UPDATE Tag SET name = ? WHERE name = ? AND userUuid = ?`, [trimmedNew, oldName, req.userUuid]);
-    if (result.affectedRows === 0) return res.status(404).json({ error: 'Tag not found' });
+
+    let targetId = null;
+
+    if (tagId) {
+      // Rename by id: ensure tag belongs to the user
+      const [rows] = await pool.execute(`SELECT id FROM Tag WHERE id = ? AND userUuid = ? LIMIT 1`, [tagId, req.userUuid]);
+      if (!rows || rows.length === 0) return res.status(404).json({ error: 'Tag not found' });
+      targetId = rows[0].id;
+    } else if (oldName) {
+      // Back-compat: find the row by oldName
+      const [oldRows] = await pool.execute(`SELECT id FROM Tag WHERE name = ? AND userUuid = ? LIMIT 1`, [oldName, req.userUuid]);
+      if (!oldRows || oldRows.length === 0) return res.status(404).json({ error: 'Tag not found' });
+      targetId = oldRows[0].id;
+    } else {
+      return res.status(400).json({ error: 'tagId or oldName required' });
+    }
+
+    // Check for a different tag with the desired new name. If the only match is the same row (same id), allow the rename
+    const [dup] = await pool.execute(`SELECT id FROM Tag WHERE name = ? AND userUuid = ? LIMIT 1`, [trimmedNew, req.userUuid]);
+    if (dup.length > 0 && dup[0].id !== targetId) {
+      return res.status(409).json({ error: 'A tag with that name already exists' });
+    }
+
+    // Perform update by id to avoid ambiguity when name comparisons are case-insensitive
+    const [result] = await pool.execute(`UPDATE Tag SET name = ? WHERE id = ? AND userUuid = ?`, [trimmedNew, targetId, req.userUuid]);
+    if (result.affectedRows === 0) return res.status(500).json({ error: 'Failed to rename tag' });
     const [rows] = await pool.execute(`SELECT name FROM Tag WHERE userUuid = ? ORDER BY name`, [req.userUuid]);
     res.json({ tags: rows.map(r => r.name) });
   } catch (err) {
+    console.error('Failed to rename tag', err);
     res.status(500).json({ error: 'Failed to rename tag' });
   }
 });

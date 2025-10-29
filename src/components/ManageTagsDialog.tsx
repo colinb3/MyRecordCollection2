@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import apiUrl from "../api";
 import { updateTagsCache } from "../userTags";
 import {
@@ -39,7 +39,6 @@ export default function ManageTagsDialog({
   const [newTag, setNewTag] = useState("");
   const [renaming, setRenaming] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
@@ -47,6 +46,8 @@ export default function ManageTagsDialog({
     severity: "success" | "error";
   }>({ open: false, message: "", severity: "success" });
   const [confirmDeleteTag, setConfirmDeleteTag] = useState<string | null>(null);
+  // map of tag name -> id for id-based operations
+  const [tagMap, setTagMap] = useState<Record<string, number> | null>(null);
 
   const openSnack = (
     message: string,
@@ -59,13 +60,11 @@ export default function ManageTagsDialog({
     setNewTag("");
     setRenaming(null);
     setRenameValue("");
-    setError(null);
   };
 
   const handleCreate = async () => {
     if (!newTag.trim()) return;
     setLoading(true);
-    setError(null);
     try {
       const res = await fetch(apiUrl("/api/tags/create"), {
         method: "POST",
@@ -80,11 +79,9 @@ export default function ManageTagsDialog({
         setNewTag("");
         openSnack("Tag added");
       } else {
-        setError(data.error || "Failed to add tag");
         openSnack(data.error || "Failed to add tag", "error");
       }
     } catch {
-      setError("Network error");
       openSnack("Network error while adding tag", "error");
     } finally {
       setLoading(false);
@@ -98,19 +95,26 @@ export default function ManageTagsDialog({
 
   const handleRename = async () => {
     if (!renaming) return;
-    if (!renameValue.trim()) return setError("New name required");
+    if (!renameValue.trim()) return openSnack("New name required");
     if (renameValue.trim() === renaming) {
       setRenaming(null);
       return;
     }
     setLoading(true);
-    setError(null);
     try {
+      // Prefer sending tagId when available to avoid ambiguity with case-insensitive DB collations
+      const payload: any = { newName: renameValue };
+      if (tagMap && Object.prototype.hasOwnProperty.call(tagMap, renaming)) {
+        payload.tagId = tagMap[renaming];
+      } else {
+        payload.oldName = renaming;
+      }
+
       const res = await fetch(apiUrl("/api/tags/rename"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ oldName: renaming, newName: renameValue }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (res.ok) {
@@ -122,16 +126,45 @@ export default function ManageTagsDialog({
         }
         openSnack("Tag renamed");
       } else {
-        setError(data.error || "Failed to rename tag");
         openSnack(data.error || "Failed to rename tag", "error");
       }
     } catch {
-      setError("Network error");
       openSnack("Network error while renaming tag", "error");
     } finally {
       setLoading(false);
     }
   };
+
+  // Fetch full tag list (id + name) when dialog opens so we can use tag ids for renames
+  useEffect(() => {
+    let mounted = true;
+    if (!open) return;
+    (async () => {
+      try {
+        const res = await fetch(apiUrl("/api/tags/full"), {
+          credentials: "include",
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!mounted) return;
+        const map: Record<string, number> = {};
+        if (Array.isArray(data)) {
+          for (const item of data) {
+            if (item && typeof item.name === "string" && item.id) {
+              map[item.name] = Number(item.id);
+            }
+          }
+        }
+        setTagMap(map);
+      } catch (err) {
+        // ignore errors - fallback to name-based rename
+        setTagMap(null);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [open]);
 
   const triggerDelete = (tag: string) => {
     setConfirmDeleteTag(tag);
@@ -140,7 +173,6 @@ export default function ManageTagsDialog({
   const confirmDelete = async () => {
     if (!confirmDeleteTag) return;
     setLoading(true);
-    setError(null);
     try {
       const res = await fetch(apiUrl("/api/tags/delete"), {
         method: "POST",
@@ -155,11 +187,9 @@ export default function ManageTagsDialog({
         if (renaming === confirmDeleteTag) setRenaming(null);
         openSnack("Tag deleted");
       } else {
-        setError(data.error || "Failed to delete tag");
         openSnack(data.error || "Failed to delete tag", "error");
       }
     } catch {
-      setError("Network error");
       openSnack("Network error while deleting tag", "error");
     } finally {
       setLoading(false);
@@ -293,11 +323,6 @@ export default function ManageTagsDialog({
               </ListItem>
             )}
           </List>
-          {error && (
-            <Alert severity="error" sx={{ mt: 2 }}>
-              {error}
-            </Alert>
-          )}
         </DialogContent>
         <DialogActions sx={{ bgcolor: "background.paper" }}>
           <Button
