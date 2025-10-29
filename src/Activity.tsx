@@ -218,8 +218,6 @@ export default function Activity() {
     [navigate]
   );
 
-  const location = useLocation();
-
   const handleRecordNavigate = useCallback(
     (entry: CommunityFeedEntry) => {
       if (!entry.record || entry.record.id <= 0) {

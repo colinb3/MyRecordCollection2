@@ -307,7 +307,9 @@ export default function TopBar({
                       navigate("/login");
                     } else {
                       const next = encodeURIComponent(
-                        `${location.pathname}${location.search || ""}${location.hash || ""}`
+                        `${location.pathname}${location.search || ""}${
+                          location.hash || ""
+                        }`
                       );
                       navigate(`/login?next=${next}`);
                     }

@@ -252,7 +252,9 @@ export default function MasterReviews() {
           });
           if (location.pathname !== "/login") {
             const next = encodeURIComponent(
-              `${location.pathname}${location.search || ""}${location.hash || ""}`
+              `${location.pathname}${location.search || ""}${
+                location.hash || ""
+              }`
             );
             navigate(`/login?next=${next}`);
           }

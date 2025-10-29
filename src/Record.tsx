@@ -533,7 +533,7 @@ export default function RecordDetails() {
         }
       );
 
-        if (response.status === 401) {
+      if (response.status === 401) {
         setSnackbar({
           open: true,
           severity: "error",
