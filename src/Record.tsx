@@ -97,7 +97,12 @@ export default function RecordDetails() {
       if (cancelled) return;
       if (!info && !ownerUsername) {
         // Only require login if viewing own records, not community records
-        navigate("/login");
+        if (location.pathname !== "/login") {
+          const next = encodeURIComponent(
+            `${location.pathname}${location.search || ""}${location.hash || ""}`
+          );
+          navigate(`/login?next=${next}`);
+        }
         return;
       }
       if (info) {
@@ -528,17 +533,18 @@ export default function RecordDetails() {
         }
       );
 
-      if (response.status === 401) {
+        if (response.status === 401) {
         setSnackbar({
           open: true,
           severity: "error",
           message: "Log in to like reviews.",
         });
-        navigate("/login", {
-          state: {
-            fromPath: `${location.pathname}${location.search}${location.hash}`,
-          },
-        });
+        if (location.pathname !== "/login") {
+          const next = encodeURIComponent(
+            `${location.pathname}${location.search || ""}${location.hash || ""}`
+          );
+          navigate(`/login?next=${next}`);
+        }
         return;
       }
 

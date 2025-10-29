@@ -11,7 +11,7 @@ import {
   CircularProgress,
   TextField,
 } from "@mui/material";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import TopBar from "./components/TopBar";
 import { darkTheme } from "./theme";
 import apiUrl from "./api";
@@ -66,6 +66,7 @@ const SCANNER_ORIGIN_QUERY = "origin=scanner";
 
 export default function BarcodeScanner() {
   const navigate = useNavigate();
+  const location = useLocation();
   const cachedUser = getCachedUserInfo();
   const [username, setUsername] = useState<string>(cachedUser?.username ?? "");
   const [displayName, setDisplayName] = useState<string>(
@@ -133,7 +134,12 @@ export default function BarcodeScanner() {
         });
 
         if (response.status === 401) {
-          navigate("/login", { replace: true });
+          if (location.pathname !== "/login") {
+            const next = encodeURIComponent(
+              `${location.pathname}${location.search || ""}${location.hash || ""}`
+            );
+            navigate(`/login?next=${next}`, { replace: true });
+          }
           return;
         }
 

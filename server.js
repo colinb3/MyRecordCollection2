@@ -3270,6 +3270,8 @@ app.patch('/api/admin/users/:userUuid', requireAuth, requireAdmin, async (req, r
     bio: rawBio,
     isAdmin,
     adminPermissions: rawAdminPermissions,
+    joinedDate: rawJoinedDate,
+    removeProfilePic: rawRemoveProfilePic,
   } = req.body || {};
 
   if (isAdmin !== undefined && typeof isAdmin !== 'boolean') {
@@ -3336,6 +3338,31 @@ app.patch('/api/admin/users/:userUuid', requireAuth, requireAdmin, async (req, r
   const updates = [];
   const params = [];
 
+  // Handle joinedDate and profile picture removal
+  let joinedDateUpdateValue = undefined;
+  let shouldRemoveProfilePic = false;
+    if (rawJoinedDate !== undefined) {
+      if (rawJoinedDate === null || rawJoinedDate === "") {
+        joinedDateUpdateValue = null;
+      } else if (typeof rawJoinedDate === 'string') {
+        const trimmed = rawJoinedDate.trim();
+        // Accept YYYY-MM-DD or parseable date
+        const iso = /^\d{4}-\d{2}-\d{2}$/.test(trimmed)
+          ? trimmed
+          : new Date(trimmed).toISOString().slice(0, 10);
+        if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
+          return res.status(400).json({ error: 'joinedDate must be YYYY-MM-DD' });
+        }
+        joinedDateUpdateValue = iso;
+      } else {
+        return res.status(400).json({ error: 'joinedDate must be a date string' });
+      }
+    }
+
+  if (rawRemoveProfilePic !== undefined) {
+    shouldRemoveProfilePic = Boolean(rawRemoveProfilePic);
+  }
+
   try {
     const pool = await getPool();
     const [existingRows] = await pool.execute(
@@ -3363,6 +3390,16 @@ app.patch('/api/admin/users/:userUuid', requireAuth, requireAdmin, async (req, r
       params.push(normalizedDisplayName);
     }
 
+    if (joinedDateUpdateValue !== undefined) {
+      // stored as DATETIME; set to midnight of the date
+      if (joinedDateUpdateValue === null) {
+        updates.push('created = NULL');
+      } else {
+        updates.push('created = ?');
+        params.push(`${joinedDateUpdateValue} 00:00:00`);
+      }
+    }
+
     if (normalizedBio !== undefined) {
       updates.push('bio = ?');
       params.push(normalizedBio);
@@ -3371,6 +3408,22 @@ app.patch('/api/admin/users/:userUuid', requireAuth, requireAdmin, async (req, r
     if (updates.length > 0) {
       params.push(targetUuid);
       await pool.execute(`UPDATE User SET ${updates.join(', ')} WHERE uuid = ?`, params);
+    }
+
+    if (shouldRemoveProfilePic) {
+      // remove profile picture file and clear DB column
+      try {
+        const [userRows] = await pool.execute('SELECT profilePic FROM User WHERE uuid = ? LIMIT 1', [targetUuid]);
+        if (Array.isArray(userRows) && userRows.length > 0) {
+          const currentPath = userRows[0].profilePic;
+          if (currentPath) {
+            await deleteProfilePicFile(currentPath);
+          }
+        }
+        await pool.execute('UPDATE User SET profilePic = NULL WHERE uuid = ?', [targetUuid]);
+      } catch (err) {
+        console.warn('Failed removing profile pic during admin update', err);
+      }
     }
 
     const [adminRows] = await pool.execute(

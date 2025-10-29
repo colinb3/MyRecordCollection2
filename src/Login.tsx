@@ -13,12 +13,13 @@ import {
 } from "@mui/material";
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import { darkTheme } from "./theme";
 import { loadUserInfo } from "./userInfo";
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -48,7 +49,24 @@ export default function Login() {
         } catch {
           // ignore analytics errors
         }
-        navigate("/mycollection");
+        // If a next parameter was provided, go there. Validate it to avoid open redirect.
+        try {
+          const params = new URLSearchParams(location.search);
+          const next = params.get("next");
+          if (next) {
+            const decoded = decodeURIComponent(next);
+            // only allow internal redirects
+            if (decoded.startsWith("/")) {
+              navigate(decoded);
+            } else {
+              navigate("/mycollection");
+            }
+          } else {
+            navigate("/mycollection");
+          }
+        } catch {
+          navigate("/mycollection");
+        }
       } else {
         setError(data.error || "Login failed");
       }

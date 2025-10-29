@@ -250,11 +250,12 @@ export default function MasterReviews() {
             message: "Log in to like reviews.",
             severity: "error",
           });
-          navigate("/login", {
-            state: {
-              fromPath: `${location.pathname}${location.search}${location.hash}`,
-            },
-          });
+          if (location.pathname !== "/login") {
+            const next = encodeURIComponent(
+              `${location.pathname}${location.search || ""}${location.hash || ""}`
+            );
+            navigate(`/login?next=${next}`);
+          }
           return;
         }
 
@@ -271,9 +272,7 @@ export default function MasterReviews() {
         }
         const normalizedLikes = Number.isFinite(nextLikes) ? nextLikes : 0;
         const nextLiked =
-          typeof body?.liked === "boolean"
-            ? body.liked
-            : !target.likedByViewer;
+          typeof body?.liked === "boolean" ? body.liked : !target.likedByViewer;
 
         setReviews((prev) => {
           const updated = prev.map((entry) =>
@@ -305,12 +304,15 @@ export default function MasterReviews() {
     [likeBusy, reviews, username, navigate, location, setSnackbar, sortOption]
   );
 
-  const handleSnackbarClose = useCallback((_: unknown, reason?: string) => {
-    if (reason === "clickaway") {
-      return;
-    }
-    setSnackbar((prev) => ({ ...prev, open: false }));
-  }, [setSnackbar]);
+  const handleSnackbarClose = useCallback(
+    (_: unknown, reason?: string) => {
+      if (reason === "clickaway") {
+        return;
+      }
+      setSnackbar((prev) => ({ ...prev, open: false }));
+    },
+    [setSnackbar]
+  );
 
   useEffect(() => {
     if (!safeMasterId) {
@@ -446,7 +448,7 @@ export default function MasterReviews() {
                   entry !== null
               )
           : [];
-  setReviews(sortMasterReviews(normalized, sortOption));
+        setReviews(sortMasterReviews(normalized, sortOption));
         setFetchStatus(normalized.length > 0 ? "ready" : "empty");
       } catch (error) {
         if (cancelled) return;
@@ -673,8 +675,7 @@ export default function MasterReviews() {
                         .charAt(0)
                         .toUpperCase();
                       const isOwnReview =
-                        Boolean(username) &&
-                        entry.owner.username === username;
+                        Boolean(username) && entry.owner.username === username;
                       const likeButtonDisabled =
                         isOwnReview || Boolean(likeBusy[entry.recordId]);
                       return (

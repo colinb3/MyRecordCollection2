@@ -847,7 +847,12 @@ export default function MasterRecord() {
 
   const handleAddRecord = useCallback(() => {
     if (!username) {
-      navigate("/login");
+      if (location.pathname !== "/login") {
+        const next = encodeURIComponent(
+          `${location.pathname}${location.search || ""}${location.hash || ""}`
+        );
+        navigate(`/login?next=${next}`);
+      }
       return;
     }
     void submitRecord(DEFAULT_COLLECTION_NAME, "Record added to collection");
@@ -855,7 +860,12 @@ export default function MasterRecord() {
 
   const handleAddWishlistRecord = useCallback(() => {
     if (!username) {
-      navigate("/login");
+      if (location.pathname !== "/login") {
+        const next = encodeURIComponent(
+          `${location.pathname}${location.search || ""}${location.hash || ""}`
+        );
+        navigate(`/login?next=${next}`);
+      }
       return;
     }
     void submitRecord(WISHLIST_COLLECTION_NAME, "Record added to wishlist");
@@ -863,7 +873,12 @@ export default function MasterRecord() {
 
   const handleAddListenedRecord = useCallback(() => {
     if (!username) {
-      navigate("/login");
+      if (location.pathname !== "/login") {
+        const next = encodeURIComponent(
+          `${location.pathname}${location.search || ""}${location.hash || ""}`
+        );
+        navigate(`/login?next=${next}`);
+      }
       return;
     }
     void submitRecord(LISTENED_COLLECTION_NAME, "Record added to listened");

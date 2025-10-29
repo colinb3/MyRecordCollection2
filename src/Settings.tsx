@@ -19,7 +19,7 @@ import {
 } from "./userInfo";
 import { clearRecordTablePreferencesCache } from "./preferences";
 import { clearCommunityCaches } from "./communityUsers";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { darkTheme } from "./theme";
 import { useMediaQuery } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
@@ -39,6 +39,7 @@ const MENU_OPTIONS: SettingsMenuOption[] = [
 
 export default function Settings() {
   const navigate = useNavigate();
+  const location = useLocation();
   const cachedUser = getCachedUserInfo();
   const [username, setUsername] = useState<string>(cachedUser?.username ?? "");
   const [displayName, setDisplayName] = useState<string>(
@@ -62,7 +63,12 @@ export default function Settings() {
       const info = await loadUserInfo();
       if (cancelled) return;
       if (!info) {
-        navigate("/login");
+        if (location.pathname !== "/login") {
+          const next = encodeURIComponent(
+            `${location.pathname}${location.search || ""}${location.hash || ""}`
+          );
+          navigate(`/login?next=${next}`);
+        }
         return;
       }
       setUsername(info.username);

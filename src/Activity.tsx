@@ -91,6 +91,8 @@ export default function Activity() {
     error: null,
   });
 
+  const location = useLocation();
+
   useEffect(() => {
     let cancelled = false;
 
@@ -98,7 +100,12 @@ export default function Activity() {
       const info = await loadUserInfo();
       if (cancelled) return;
       if (!info) {
-        navigate("/login");
+        if (location.pathname !== "/login") {
+          const next = encodeURIComponent(
+            `${location.pathname}${location.search || ""}${location.hash || ""}`
+          );
+          navigate(`/login?next=${next}`);
+        }
         return;
       }
       setUsername(info.username);

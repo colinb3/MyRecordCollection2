@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { loadUserInfo } from "./userInfo";
 
 export default function RequireAuth({
@@ -8,16 +8,24 @@ export default function RequireAuth({
   children: React.ReactNode;
 }) {
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     const checkAuth = async () => {
       const info = await loadUserInfo();
       if (!info) {
-        navigate("/login");
+        // preserve the current location (path + search + hash) so we can return there after login
+        // avoid redirect loops when already on /login
+        if (location.pathname !== "/login") {
+          const next = encodeURIComponent(
+            `${location.pathname}${location.search || ""}${location.hash || ""}`
+          );
+          navigate(`/login?next=${next}`);
+        }
       }
     };
     checkAuth();
-  }, [navigate]);
+  }, [navigate, location.pathname, location.search, location.hash]);
 
   return <>{children}</>;
 }

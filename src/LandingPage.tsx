@@ -15,7 +15,17 @@ import { useNavigate } from "react-router-dom";
 import "./LandingPage.css";
 import { darkTheme } from "./theme";
 import TopBar from "./components/TopBar";
-import { loadUserInfo, getCachedUserInfo } from "./userInfo";
+import {
+  loadUserInfo,
+  getCachedUserInfo,
+  clearUserInfoCache,
+} from "./userInfo";
+import { clearRecordTablePreferencesCache } from "./preferences";
+import { clearCollectionRecordsCache } from "./collectionRecords";
+import { clearCommunityCaches } from "./communityUsers";
+import { clearProfileHighlightsCache } from "./profileHighlights";
+import { clearTagsCache } from "./userTags";
+import { setUserId } from "./analytics";
 import icon from "./assets/icon.png";
 import collectionViewImg from "./assets/collectionview.png";
 import editViewImg from "./assets/editview.png";
@@ -29,6 +39,7 @@ import FavoriteIcon from "@mui/icons-material/Favorite";
 import LocalOfferIcon from "@mui/icons-material/LocalOffer";
 import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
 import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
+import apiUrl from "./api";
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -119,6 +130,30 @@ export default function LandingPage() {
       cancelled = true;
     };
   }, []);
+
+  const handleLogout = async () => {
+    try {
+      await fetch(apiUrl("/api/logout"), {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch {
+      /* ignore network errors on logout */
+    }
+    // Clear caches and analytics similar to other pages
+    clearRecordTablePreferencesCache();
+    clearCollectionRecordsCache();
+    clearProfileHighlightsCache();
+    clearCommunityCaches();
+    clearUserInfoCache();
+    clearTagsCache();
+    try {
+      setUserId(undefined);
+    } catch {
+      /* ignore analytics cleanup errors */
+    }
+    navigate("/login");
+  };
 
   useEffect(() => {
     if (carouselSlides.length <= 1) return undefined;
@@ -245,6 +280,7 @@ export default function LandingPage() {
             <Box sx={{ mb: 4, mr: { xs: -1, sm: -2 }, pt: { xs: 1, md: 1.5 } }}>
               <TopBar
                 title=""
+                onLogout={handleLogout}
                 username={username}
                 displayName={displayName}
                 profilePicUrl={profilePicUrl ?? undefined}

@@ -24,7 +24,7 @@ import PeopleAltIcon from "@mui/icons-material/PeopleAlt";
 import LoginIcon from "@mui/icons-material/Login";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import QrCodeScannerIcon from "@mui/icons-material/QrCodeScanner";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { getCachedUserInfo } from "../userInfo";
 
 interface TopBarProps {
@@ -64,6 +64,7 @@ export default function TopBar({
   const value = isControlled ? searchValue : internalValue;
 
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key !== "Enter") return;
@@ -301,7 +302,15 @@ export default function TopBar({
               <>
                 <MenuItem
                   onClick={() => {
-                    navigate("/login");
+                    // preserve current location so we can return after sign-in
+                    if (location.pathname === "/login") {
+                      navigate("/login");
+                    } else {
+                      const next = encodeURIComponent(
+                        `${location.pathname}${location.search || ""}${location.hash || ""}`
+                      );
+                      navigate(`/login?next=${next}`);
+                    }
                     handleMenuClose();
                   }}
                 >

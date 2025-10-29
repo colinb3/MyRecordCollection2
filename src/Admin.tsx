@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { KeyboardEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   ThemeProvider,
   CssBaseline,
@@ -155,6 +155,7 @@ interface UsersTabProps {
 }
 
 function UsersTab({ permissions, currentUserUuid }: UsersTabProps) {
+  const navigate = useNavigate();
   const [searchInput, setSearchInput] = useState("");
   const [filters, setFilters] = useState({ search: "" });
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -167,6 +168,13 @@ function UsersTab({ permissions, currentUserUuid }: UsersTabProps) {
   const [accessDialogUser, setAccessDialogUser] = useState<AdminUser | null>(
     null
   );
+  const [editUserDialog, setEditUserDialog] = useState<AdminUser | null>(null);
+  const [displayNameInput, setDisplayNameInput] = useState<string | null>(null);
+  const [bioInput, setBioInput] = useState<string | null>(null);
+  const [joinedDateInput, setJoinedDateInput] = useState<string | null>(null);
+  const [removeProfilePicInput, setRemoveProfilePicInput] = useState(false);
+  const [savingUserEdit, setSavingUserEdit] = useState(false);
+  const [userEditError, setUserEditError] = useState<string | null>(null);
   const [isAdminInput, setIsAdminInput] = useState(false);
   const [canManageAdminsInput, setCanManageAdminsInput] = useState(false);
   const [canDeleteUsersInput, setCanDeleteUsersInput] = useState(false);
@@ -469,15 +477,44 @@ function UsersTab({ permissions, currentUserUuid }: UsersTabProps) {
                   <Stack direction="row" spacing={1} justifyContent="flex-end">
                     <Tooltip title="Edit access">
                       <span>
-                        <Button
+                        <IconButton
                           size="small"
-                          variant="outlined"
-                          startIcon={<SecurityIcon fontSize="small" />}
                           onClick={() => openAccessDialog(user)}
                           disabled={!permissions.canManageAdmins}
                         >
-                          Access
+                          <SecurityIcon fontSize="small" />
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                    <Tooltip title="View profile">
+                      <span>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() =>
+                            navigate(
+                              `/community/${encodeURIComponent(user.username)}`
+                            )
+                          }
+                        >
+                          View
                         </Button>
+                      </span>
+                    </Tooltip>
+                    <Tooltip title="Edit user info">
+                      <span>
+                        <IconButton
+                          size="small"
+                          onClick={() => {
+                            setEditUserDialog(user);
+                            setDisplayNameInput(user.displayName ?? null);
+                            setBioInput(user.bio ?? null);
+                            setJoinedDateInput(user.joinedDate ?? null);
+                            setRemoveProfilePicInput(false);
+                          }}
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
                       </span>
                     </Tooltip>
                     <Tooltip title="Delete user">
@@ -583,11 +620,135 @@ function UsersTab({ permissions, currentUserUuid }: UsersTabProps) {
           </Button>
         </DialogActions>
       </Dialog>
+      <Dialog
+        open={Boolean(editUserDialog)}
+        onClose={() => (savingUserEdit ? undefined : setEditUserDialog(null))}
+      >
+        <DialogTitle>Edit user</DialogTitle>
+        <DialogContent
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 2,
+            mt: 1,
+            minWidth: 360,
+          }}
+        >
+          {userEditError && <Alert severity="error">{userEditError}</Alert>}
+          <TextField
+            label="Display name"
+            value={displayNameInput ?? ""}
+            onChange={(e) => setDisplayNameInput(e.target.value || null)}
+            size="small"
+          />
+          <TextField
+            label="Bio"
+            value={bioInput ?? ""}
+            onChange={(e) => setBioInput(e.target.value || null)}
+            multiline
+            minRows={2}
+            maxRows={4}
+            size="small"
+            sx={{
+              "& .MuiInputBase-root": {
+                height: "auto",
+              },
+            }}
+          />
+          <TextField
+            label="Joined date"
+            type="date"
+            value={joinedDateInput ?? ""}
+            onChange={(e) => setJoinedDateInput(e.target.value || null)}
+            size="small"
+            InputLabelProps={{ shrink: true }}
+          />
+          <FormControlLabel
+            control={
+              <Switch
+                checked={removeProfilePicInput}
+                onChange={(e) => setRemoveProfilePicInput(e.target.checked)}
+              />
+            }
+            label="Remove profile picture"
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setEditUserDialog(null)}
+            disabled={savingUserEdit}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={async () => {
+              if (!editUserDialog) return;
+              setSavingUserEdit(true);
+              setUserEditError(null);
+              try {
+                const payload: Record<string, unknown> = {};
+                // allow nulls
+                payload.displayName =
+                  displayNameInput === null
+                    ? null
+                    : String(displayNameInput).trim() || null;
+                payload.bio =
+                  bioInput === null ? null : String(bioInput).trim() || null;
+                payload.joinedDate =
+                  joinedDateInput === null ? null : String(joinedDateInput);
+                if (removeProfilePicInput) payload.removeProfilePic = true;
+
+                const res = await fetch(
+                  apiUrl(
+                    `/api/admin/users/${encodeURIComponent(
+                      editUserDialog.userUuid
+                    )}`
+                  ),
+                  {
+                    method: "PATCH",
+                    credentials: "include",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                  }
+                );
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                  throw new Error(
+                    data?.error || `Failed to save user (${res.status})`
+                  );
+                }
+                const updated = data && data.user ? data.user : null;
+                if (updated) {
+                  setUsers((prev) =>
+                    prev.map((u) =>
+                      u.userUuid === updated.userUuid ? updated : u
+                    )
+                  );
+                } else {
+                  await fetchUsers(0, false);
+                }
+                setEditUserDialog(null);
+              } catch (err) {
+                setUserEditError(
+                  err instanceof Error ? err.message : "Failed to save user"
+                );
+              } finally {
+                setSavingUserEdit(false);
+              }
+            }}
+            variant="contained"
+            disabled={savingUserEdit}
+          >
+            {savingUserEdit ? "Saving…" : "Save"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
 
 function RecordsTab() {
+  const navigate = useNavigate();
   const [searchInput, setSearchInput] = useState("");
   const [ownerInput, setOwnerInput] = useState("");
   const [masterIdInput, setMasterIdInput] = useState("");
@@ -973,6 +1134,21 @@ function RecordsTab() {
                 <TableCell>{record.added ?? "—"}</TableCell>
                 <TableCell align="right">
                   <Stack direction="row" spacing={1} justifyContent="flex-end">
+                    <Tooltip title="View record">
+                      <span>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() =>
+                            navigate(
+                              `/community/${record.owner.username}/record/${record.id}`
+                            )
+                          }
+                        >
+                          View
+                        </Button>
+                      </span>
+                    </Tooltip>
                     <IconButton size="small" onClick={() => setEditing(record)}>
                       <EditIcon fontSize="small" />
                     </IconButton>
@@ -1111,6 +1287,7 @@ function RecordsTab() {
 }
 
 function MastersTab() {
+  const navigate = useNavigate();
   const [searchInput, setSearchInput] = useState("");
   const [filters, setFilters] = useState({ search: "" });
   const [masters, setMasters] = useState<AdminMaster[]>([]);
@@ -1390,6 +1567,17 @@ function MastersTab() {
                 </TableCell>
                 <TableCell align="right">
                   <Stack direction="row" spacing={1} justifyContent="flex-end">
+                    <Tooltip title="View master">
+                      <span>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => navigate(`/master/${master.id}`)}
+                        >
+                          View
+                        </Button>
+                      </span>
+                    </Tooltip>
                     <IconButton size="small" onClick={() => setEditing(master)}>
                       <EditIcon fontSize="small" />
                     </IconButton>
@@ -1806,6 +1994,7 @@ function TagsTab() {
 
 export default function Admin() {
   const navigate = useNavigate();
+  const location = useLocation();
   const cached = getCachedUserInfo();
   const [username, setUsername] = useState(cached?.username ?? "");
   const [displayName, setDisplayName] = useState(cached?.displayName ?? "");
@@ -1827,7 +2016,12 @@ export default function Admin() {
       const info = await loadUserInfo();
       if (cancelled) return;
       if (!info) {
-        navigate("/login", { replace: true });
+        if (location.pathname !== "/login") {
+          const next = encodeURIComponent(
+            `${location.pathname}${location.search || ""}${location.hash || ""}`
+          );
+          navigate(`/login?next=${next}`, { replace: true });
+        }
         return;
       }
       if (!info.isAdmin) {
