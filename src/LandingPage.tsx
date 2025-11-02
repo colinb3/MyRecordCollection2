@@ -387,8 +387,15 @@ export default function LandingPage() {
             >
               <IconButton
                 aria-label="Previous highlight"
-                onClick={handlePrevSlide}
                 id="prevButton"
+                onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                  handlePrevSlide();
+                  if (e.detail && e.detail > 0) {
+                    try {
+                      (e.currentTarget as HTMLElement).blur();
+                    } catch {}
+                  }
+                }}
                 sx={{
                   position: "absolute",
                   top: "50%",
@@ -404,8 +411,15 @@ export default function LandingPage() {
               </IconButton>
               <IconButton
                 aria-label="Next highlight"
-                onClick={handleNextSlide}
                 id="nextButton"
+                onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                  handleNextSlide();
+                  if (e.detail && e.detail > 0) {
+                    try {
+                      (e.currentTarget as HTMLElement).blur();
+                    } catch {}
+                  }
+                }}
                 sx={{
                   position: "absolute",
                   top: "50%",

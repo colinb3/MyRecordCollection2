@@ -24,6 +24,7 @@ import PeopleAltIcon from "@mui/icons-material/PeopleAlt";
 import LoginIcon from "@mui/icons-material/Login";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import QrCodeScannerIcon from "@mui/icons-material/QrCodeScanner";
+import ListAltIcon from "@mui/icons-material/ListAlt";
 import { useNavigate, useLocation } from "react-router-dom";
 import { getCachedUserInfo } from "../userInfo";
 
@@ -244,6 +245,12 @@ export default function TopBar({
                     <PeopleAltIcon />
                   </ListItemIcon>
                   <ListItemText>Activity</ListItemText>
+                </MenuItem>
+                <MenuItem onClick={() => navigate("/lists")}>
+                  <ListItemIcon>
+                    <ListAltIcon />
+                  </ListItemIcon>
+                  <ListItemText>Lists</ListItemText>
                 </MenuItem>
                 <Divider sx={{ my: 0.5 }} />
                 <MenuItem onClick={() => navigate("/mycollection")}>

@@ -83,6 +83,45 @@ CREATE TABLE Follows (
     FOREIGN KEY (followsUuid) REFERENCES User(uuid) ON DELETE CASCADE
 );
 
+CREATE TABLE List (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(50) NOT NULL,
+    userUuid CHAR(36),
+    isPrivate BOOLEAN NOT NULL DEFAULT FALSE,
+    likes INT DEFAULT 0,
+    picture VARCHAR(255) DEFAULT NULL,
+    description TEXT DEFAULT NULL,
+    created DATETIME NOT NULL,
+    FOREIGN KEY (userUuid) REFERENCES User(uuid) ON DELETE CASCADE
+);
+
+CREATE TABLE ListRecord (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    added DATETIME NOT NULL,
+    artist VARCHAR(255),
+    cover VARCHAR(255),
+    name VARCHAR(255) NOT NULL,
+    rating TINYINT,
+    release_year YEAR,
+    isCustom BOOLEAN NOT NULL DEFAULT FALSE,
+    userUuid CHAR(36),
+    listId INT,
+    review TEXT,
+    masterId INT,
+    reviewLikes INT DEFAULT 0,
+    FOREIGN KEY (masterId) REFERENCES Master(id) ON DELETE SET NULL,
+    FOREIGN KEY (userUuid) REFERENCES User(uuid) ON DELETE CASCADE,
+    FOREIGN KEY (listId) REFERENCES List(id) ON DELETE CASCADE
+);
+
+CREATE TABLE ListLike (
+    userUuid CHAR(36) NOT NULL,
+    listId INT NOT NULL,
+    PRIMARY KEY (userUuid, listId),
+    FOREIGN KEY (userUuid) REFERENCES User(uuid) ON DELETE CASCADE,
+    FOREIGN KEY (listId) REFERENCES List(id) ON DELETE CASCADE
+);
+
 CREATE INDEX idx_follows_followed ON Follows (followsUuid);
 
 CREATE TABLE Master (

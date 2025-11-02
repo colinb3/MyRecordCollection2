@@ -70,11 +70,19 @@ interface MasterInfo {
   cover: string | null;
   ratingCounts: number[] | null;
   userCollections: UserCollectionEntry[];
+  userLists: UserListEntry[];
 }
 
 interface UserCollectionEntry {
   tableName: string;
   recordId: number;
+}
+
+interface UserListEntry {
+  listId: number;
+  name: string;
+  isPrivate: boolean;
+  listRecordId: number | null;
 }
 
 const DEFAULT_COLLECTION_NAME = "My Collection";
@@ -219,6 +227,7 @@ export default function MasterRecord() {
   );
   const [reviewText, setReviewText] = useState("");
   const [adding, setAdding] = useState(false);
+  const [listActionLoading, setListActionLoading] = useState(false);
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
@@ -559,6 +568,52 @@ export default function MasterRecord() {
               )
           : [];
 
+        const userListsValue = Array.isArray(data?.userLists)
+          ? data.userLists
+              .map((entry: unknown): UserListEntry | null => {
+                if (!entry || typeof entry !== "object") {
+                  return null;
+                }
+                const typed = entry as {
+                  listId?: unknown;
+                  name?: unknown;
+                  isPrivate?: unknown;
+                  listRecordId?: unknown;
+                };
+                const listIdNumber = Number(typed.listId);
+                if (!Number.isInteger(listIdNumber) || listIdNumber <= 0) {
+                  return null;
+                }
+                const name =
+                  typeof typed.name === "string" && typed.name.trim()
+                    ? typed.name.trim()
+                    : null;
+                if (!name) {
+                  return null;
+                }
+                const isPrivateValue = typed.isPrivate;
+                const isPrivate =
+                  isPrivateValue === true ||
+                  isPrivateValue === "true" ||
+                  Number(isPrivateValue) === 1;
+                const recordIdNumber = Number(typed.listRecordId);
+                const listRecordId =
+                  Number.isInteger(recordIdNumber) && recordIdNumber > 0
+                    ? recordIdNumber
+                    : null;
+                return {
+                  listId: listIdNumber,
+                  name,
+                  isPrivate,
+                  listRecordId,
+                };
+              })
+              .filter(
+                (value: UserListEntry | null): value is UserListEntry =>
+                  value !== null
+              )
+          : [];
+
         const normalized: MasterInfo = {
           masterId:
             Number.isInteger(masterIdValue) && masterIdValue > 0
@@ -578,6 +633,7 @@ export default function MasterRecord() {
               ? ratingCountsValue
               : null,
           userCollections: userCollectionsValue,
+          userLists: userListsValue,
         };
 
         if (!album) {
@@ -912,6 +968,123 @@ export default function MasterRecord() {
     }
     return next;
   }, [masterInfo?.userCollections]);
+
+  const listOptions = useMemo(() => {
+    if (!Array.isArray(masterInfo?.userLists)) {
+      return [] as UserListEntry[];
+    }
+    return [...masterInfo.userLists].sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+    );
+  }, [masterInfo?.userLists]);
+
+  const handleToggleList = useCallback(
+    async (option: UserListEntry) => {
+      if (!username) {
+        if (location.pathname !== "/login") {
+          const next = encodeURIComponent(
+            `${location.pathname}${location.search || ""}${location.hash || ""}`
+          );
+          navigate(`/login?next=${next}`);
+        }
+        return;
+      }
+
+      const resolvedMasterId = masterInfo?.masterId ?? masterIdOverride;
+      const recordNameForList =
+        (album?.record && album.record.trim()) || "Untitled";
+      const artistForList =
+        typeof album?.artist === "string" ? album.artist : "";
+      const coverForList = masterInfo?.cover ?? album?.cover ?? null;
+      const releaseYearForList = Number.isFinite(releaseYear)
+        ? releaseYear
+        : masterInfo?.releaseYear ?? null;
+
+      setListActionLoading(true);
+      try {
+        if (option.listRecordId) {
+          const response = await fetch(
+            apiUrl(
+              `/api/lists/${option.listId}/records/${option.listRecordId}`
+            ),
+            {
+              method: "DELETE",
+              credentials: "include",
+            }
+          );
+          if (!response.ok) {
+            const problem = await response.json().catch(() => ({}));
+            throw new Error(
+              typeof problem.error === "string"
+                ? problem.error
+                : "Failed to remove record from list"
+            );
+          }
+          setSnackbar({
+            open: true,
+            message: `Removed from ${option.name}`,
+            severity: "success",
+          });
+        } else {
+          const response = await fetch(
+            apiUrl(`/api/lists/${option.listId}/records`),
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({
+                masterId: resolvedMasterId ?? null,
+                recordName: recordNameForList,
+                artist: artistForList,
+                cover: coverForList,
+                releaseYear: releaseYearForList,
+              }),
+            }
+          );
+          if (!response.ok) {
+            const problem = await response.json().catch(() => ({}));
+            throw new Error(
+              typeof problem.error === "string"
+                ? problem.error
+                : "Failed to add record to list"
+            );
+          }
+          setSnackbar({
+            open: true,
+            message: `Added to ${option.name}`,
+            severity: "success",
+          });
+        }
+        await loadMasterInfo({ preserveReleaseYear: true, force: true });
+      } catch (error) {
+        console.error(error);
+        setSnackbar({
+          open: true,
+          message:
+            error instanceof Error ? error.message : "List update failed",
+          severity: "error",
+        });
+      } finally {
+        setListActionLoading(false);
+      }
+    },
+    [
+      album,
+      loadMasterInfo,
+      masterIdOverride,
+      masterInfo,
+      navigate,
+      releaseYear,
+      username,
+      location.pathname,
+      location.search,
+      location.hash,
+    ]
+  );
+
+  const handleManageLists = useCallback(() => {
+    navigate("/lists");
+  }, [navigate]);
 
   const handleOpenMasterReviews = useCallback(() => {
     const resolvedMasterId = masterInfo?.masterId ?? masterIdOverride;
@@ -1263,6 +1436,10 @@ export default function MasterRecord() {
                   wishlistButton={wishlistButtonConfig}
                   listenedButton={listenedButtonConfig}
                   collectionButton={collectionButtonConfig}
+                  listOptions={listOptions}
+                  onToggleList={handleToggleList}
+                  onManageLists={handleManageLists}
+                  listActionDisabled={listActionLoading}
                 />
               </Box>
             </Paper>

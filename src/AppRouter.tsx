@@ -26,6 +26,8 @@ const RecordDetails = lazy(() => import("./Record"));
 const MasterReviews = lazy(() => import("./MasterReviews"));
 const BarcodeScanner = lazy(() => import("./BarcodeScanner"));
 const AdminPanel = lazy(() => import("./Admin"));
+const Lists = lazy(() => import("./Lists"));
+const ListDetail = lazy(() => import("./ListDetail"));
 
 // Component that prevents authenticated users from seeing auth pages
 function RedirectIfAuthed({ children }: { children: React.ReactNode }) {
@@ -93,6 +95,24 @@ export default function AppRouter() {
           element={
             <Suspense fallback={<div />}>
               <Search />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/lists"
+          element={
+            <RequireAuth>
+              <Suspense fallback={<div />}>
+                <Lists />
+              </Suspense>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/lists/:listId"
+          element={
+            <Suspense fallback={<div />}>
+              <ListDetail />
             </Suspense>
           }
         />

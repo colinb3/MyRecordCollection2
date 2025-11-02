@@ -18,7 +18,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const uploadsRoot = path.join(__dirname, "uploads");
 const profileUploadsDir = path.join(uploadsRoot, "profile");
+const listUploadsDir = path.join(uploadsRoot, "list");
 const PROFILE_PIC_SIZE_LIMIT = Number(process.env.PROFILE_PIC_MAX_BYTES || 5 * 1024 * 1024);
+const LIST_PIC_SIZE_LIMIT = PROFILE_PIC_SIZE_LIMIT;
 const ALLOWED_PROFILE_MIME_TYPES = new Set([
   "image/jpeg",
   "image/png",
@@ -90,6 +92,30 @@ const profilePicUpload = multer({
   limits: { fileSize: PROFILE_PIC_SIZE_LIMIT },
 });
 
+const listPicStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    fsPromises
+      .mkdir(listUploadsDir, { recursive: true })
+      .then(() => cb(null, listUploadsDir))
+      .catch((err) => cb(err));
+  },
+  filename: (req, file, cb) => {
+    const fallbackExt = path.extname(file.originalname) || ".jpg";
+    const ext = MIME_EXTENSION_MAP.get(file.mimetype) || fallbackExt;
+    const safeExt = ext.startsWith(".") ? ext : `.${ext}`;
+    const rawListId = typeof req.params?.listId === "string" ? req.params.listId : "list";
+    const listIdFragment = rawListId.replace(/[^0-9A-Za-z_-]/g, "").slice(0, 24) || "list";
+    const uniqueName = `${listIdFragment}-${Date.now()}-${uuidv4()}${safeExt}`;
+    cb(null, uniqueName);
+  },
+});
+
+const listPicUpload = multer({
+  storage: listPicStorage,
+  fileFilter: profilePicFileFilter,
+  limits: { fileSize: LIST_PIC_SIZE_LIMIT },
+});
+
 function buildProfilePicRelativePath(filename) {
   return `profile/${filename}`;
 }
@@ -112,7 +138,37 @@ async function deleteProfilePicFile(relativePath) {
   }
 }
 
+function buildListPicRelativePath(filename) {
+  return `list/${filename}`;
+}
+
+function buildListPicPublicPath(relativePath) {
+  if (!relativePath) return null;
+  const normalized = relativePath.replace(/\\/g, "/");
+  return `/uploads/${normalized}`;
+}
+
+async function deleteListPicFile(relativePath) {
+  if (!relativePath) return;
+  const absolutePath = path.join(uploadsRoot, relativePath);
+  try {
+    await fsPromises.unlink(absolutePath);
+  } catch (error) {
+    if (error && error.code !== "ENOENT") {
+      console.warn("Failed to delete list picture", error);
+    }
+  }
+}
+
 function normalizeFollowCount(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num) || num < 0) {
+    return 0;
+  }
+  return Math.trunc(num);
+}
+
+function normalizeNonNegativeInt(value) {
   const num = Number(value);
   if (!Number.isFinite(num) || num < 0) {
     return 0;
@@ -376,6 +432,73 @@ function mapCommunityUserSummary(row) {
     profilePicUrl: buildProfilePicPublicPath(row.profilePic),
     followersCount,
     followingCount,
+  };
+}
+
+function mapListSummaryRow(row) {
+  const id = Number(row?.id);
+  return {
+    id: Number.isInteger(id) && id > 0 ? id : 0,
+    name: typeof row?.name === "string" ? row.name : "",
+    description:
+      typeof row?.description === "string" && row.description.trim()
+        ? row.description.trim()
+        : null,
+    isPrivate: Number(row?.isPrivate) === 1,
+    likes: normalizeNonNegativeInt(row?.likes),
+    recordCount: normalizeNonNegativeInt(row?.recordCount),
+    pictureUrl: buildListPicPublicPath(row?.picture ?? null),
+    created: row?.created ? formatUtcDateTime(row.created) : null,
+  };
+}
+
+function mapListSummaryWithOwner(row) {
+  const base = mapListSummaryRow(row);
+  const username = typeof row?.username === "string" ? row.username : null;
+  return {
+    ...base,
+    owner: username
+      ? {
+          username,
+          displayName:
+            typeof row?.displayName === "string" && row.displayName.trim()
+              ? row.displayName.trim()
+              : null,
+          profilePicUrl: buildProfilePicPublicPath(row?.profilePic ?? null),
+        }
+      : null,
+    likedByCurrentUser: Number(row?.likedByCurrentUser) === 1,
+  };
+}
+
+function mapListRecordRow(row) {
+  const id = Number(row?.id);
+  const ratingValue = Number(row?.rating);
+  const releaseYearValue = Number(row?.releaseYear);
+  const masterIdValue = Number(row?.masterId);
+  return {
+    id: Number.isInteger(id) && id > 0 ? id : 0,
+    name: typeof row?.name === "string" ? row.name : "",
+    artist:
+      typeof row?.artist === "string" && row.artist.trim()
+        ? row.artist.trim()
+        : null,
+    cover:
+      typeof row?.cover === "string" && row.cover.trim()
+        ? row.cover.trim()
+        : null,
+    rating:
+      Number.isFinite(ratingValue) && ratingValue >= 0 && ratingValue <= 10
+        ? Math.trunc(ratingValue)
+        : null,
+    releaseYear: Number.isInteger(releaseYearValue) ? releaseYearValue : null,
+    review:
+      typeof row?.review === "string" && row.review.trim()
+        ? row.review.trim()
+        : null,
+    masterId: Number.isInteger(masterIdValue) && masterIdValue > 0 ? masterIdValue : null,
+    added: row?.added ? formatUtcDateTime(row.added) : null,
+    isCustom: Number(row?.isCustom) === 1,
   };
 }
 
@@ -664,6 +787,22 @@ function getPool() {
   return _pool;
 }
 
+function extractUserUuidFromRequest(req) {
+  const token = req.cookies?.token;
+  if (!token) {
+    return null;
+  }
+  try {
+    const payload = jwt.verify(token, JWT_SECRET);
+    if (payload && typeof payload.userUuid === "string") {
+      return payload.userUuid;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 async function getUserTableRow(pool, userUuid, tableName) {
   if (!tableName) return null;
   const [rows] = await pool.execute(
@@ -746,6 +885,116 @@ async function getUserCollectionsForRecord(pool, userUuid, { masterId, artist, r
   }
 
   return results;
+}
+
+async function getUserListsSummary(pool, userUuid) {
+  if (!userUuid) {
+    return [];
+  }
+  const [rows] = await pool.query(
+    `SELECT id, name, isPrivate FROM List WHERE userUuid = ? ORDER BY name`,
+    [userUuid]
+  );
+  if (!Array.isArray(rows)) {
+    return [];
+  }
+  return rows;
+}
+
+async function getUserListMembershipForRecord(pool, userUuid, { masterId, artist, recordName }) {
+  if (!userUuid) {
+    return new Map();
+  }
+
+  const normalizedArtist = typeof artist === "string" ? artist.trim() : "";
+  const normalizedRecord = typeof recordName === "string" ? recordName.trim() : "";
+
+  const params = [userUuid];
+  let whereClause = "";
+  if (Number.isInteger(masterId) && masterId > 0) {
+    whereClause = "lr.masterId = ?";
+    params.push(masterId);
+  } else if (normalizedArtist && normalizedRecord) {
+    whereClause = "lr.masterId IS NULL AND lr.artist = ? AND lr.name = ?";
+    params.push(normalizedArtist, normalizedRecord);
+  } else {
+    return new Map();
+  }
+
+  const [rows] = await pool.query(
+    `SELECT lr.listId, lr.id AS listRecordId
+       FROM ListRecord lr
+       JOIN List l ON l.id = lr.listId
+      WHERE l.userUuid = ? AND ${whereClause}`,
+    params
+  );
+
+  const membership = new Map();
+  if (Array.isArray(rows)) {
+    for (const row of rows) {
+      const listId = Number(row?.listId);
+      const listRecordId = Number(row?.listRecordId);
+      if (Number.isInteger(listId) && Number.isInteger(listRecordId)) {
+        membership.set(listId, listRecordId);
+      }
+    }
+  }
+
+  return membership;
+}
+
+async function getUserListsForRecord(pool, userUuid, info) {
+  const summaries = await getUserListsSummary(pool, userUuid);
+  if (summaries.length === 0) {
+    return [];
+  }
+  const membership = await getUserListMembershipForRecord(pool, userUuid, info);
+  return summaries.map((row) => {
+    const listId = Number(row?.id);
+    const isPrivate = Number(row?.isPrivate) === 1;
+    return {
+      listId,
+      name: typeof row?.name === "string" ? row.name : "",
+      isPrivate,
+      listRecordId: membership.get(listId) ?? null,
+    };
+  });
+}
+
+async function getListById(pool, listId) {
+  if (!Number.isInteger(listId) || listId <= 0) {
+    return null;
+  }
+  const [rows] = await pool.query(
+    `SELECT l.id, l.name, l.description, l.isPrivate, l.likes, l.picture, l.created, l.userUuid,
+            u.username, u.displayName, u.profilePic
+       FROM List l
+       JOIN User u ON u.uuid = l.userUuid
+      WHERE l.id = ?
+      LIMIT 1`,
+    [listId]
+  );
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return null;
+  }
+  return rows[0];
+}
+
+async function getOwnedListById(pool, listId, userUuid) {
+  if (!Number.isInteger(listId) || listId <= 0 || !userUuid) {
+    return null;
+  }
+  const [rows] = await pool.query(
+    `SELECT id, name, description, isPrivate, likes, picture, created, userUuid
+       FROM List
+      WHERE id = ? AND userUuid = ?
+      LIMIT 1`,
+    [listId, userUuid]
+  );
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return null;
+  }
+  return rows[0];
 }
 
 async function fetchLastFmCover(artist, record) {
@@ -933,10 +1182,17 @@ app.get("/api/records/master-info", async (req, res) => {
         [masterIdParam]
       );
       const row = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+      const recordArtist = row?.artist ?? null;
+      const recordName = row?.name ?? null;
       const userCollections = await getUserCollectionsForRecord(pool, authenticatedUserUuid, {
         masterId: masterIdParam,
-        artist: row?.artist ?? null,
-        recordName: row?.name ?? null,
+        artist: recordArtist,
+        recordName,
+      });
+      const userLists = await getUserListsForRecord(pool, authenticatedUserUuid, {
+        masterId: masterIdParam,
+        artist: recordArtist,
+        recordName,
       });
 
       if (!row) {
@@ -949,6 +1205,7 @@ app.get("/api/records/master-info", async (req, res) => {
           record: null,
           artist: null,
           userCollections,
+          userLists,
         });
       }
 
@@ -972,6 +1229,7 @@ app.get("/api/records/master-info", async (req, res) => {
         record: typeof row.name === "string" ? row.name : null,
         artist: typeof row.artist === "string" ? row.artist : null,
         userCollections,
+        userLists,
       });
     } catch (error) {
       console.error("Failed to load master info", error);
@@ -998,6 +1256,11 @@ app.get("/api/records/master-info", async (req, res) => {
         artist,
         recordName,
       });
+      const userLists = await getUserListsForRecord(pool, authenticatedUserUuid, {
+        masterId: null,
+        artist,
+        recordName,
+      });
       return res.json({
         masterId: null,
         releaseYear: null,
@@ -1007,6 +1270,7 @@ app.get("/api/records/master-info", async (req, res) => {
         record: recordName,
         artist,
         userCollections,
+        userLists,
       });
     }
 
@@ -1033,6 +1297,11 @@ app.get("/api/records/master-info", async (req, res) => {
       artist,
       recordName,
     });
+    const userLists = await getUserListsForRecord(pool, authenticatedUserUuid, {
+      masterId: result.masterId,
+      artist,
+      recordName,
+    });
 
     res.json({
       masterId: result.masterId,
@@ -1043,6 +1312,7 @@ app.get("/api/records/master-info", async (req, res) => {
       record: recordName,
       artist,
       userCollections,
+      userLists,
     });
   } catch (error) {
     console.error("Failed to load master info", error);
@@ -3247,6 +3517,638 @@ app.post('/api/records/move', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('Failed to move record', err);
     res.status(500).json({ error: 'Failed to move record' });
+  }
+});
+
+// List management endpoints
+app.get('/api/lists/mine', requireAuth, async (req, res) => {
+  console.log('Fetching user lists...');
+  try {
+    const pool = await getPool();
+    const [rows] = await pool.query(
+      `SELECT l.id, l.name, l.description, l.isPrivate, l.likes, l.picture, l.created,
+              COALESCE(stats.recordCount, 0) AS recordCount
+         FROM List l
+         LEFT JOIN (
+           SELECT listId, COUNT(*) AS recordCount FROM ListRecord GROUP BY listId
+         ) stats ON stats.listId = l.id
+        WHERE l.userUuid = ?
+        ORDER BY l.created DESC`,
+      [req.userUuid]
+    );
+    const lists = Array.isArray(rows) ? rows.map(mapListSummaryRow) : [];
+    res.json({ lists });
+  } catch (err) {
+    console.error('Failed to fetch lists', err);
+    res.status(500).json({ error: 'Failed to fetch lists' });
+  }
+});
+
+app.post('/api/lists', requireAuth, listPicUpload.single('picture'), async (req, res) => {
+  console.log('Creating list...');
+  const uploadedFilename = req.file?.filename ?? null;
+  const uploadedRelativePath = uploadedFilename ? buildListPicRelativePath(uploadedFilename) : null;
+  const cleanupUploadedPicture = async () => {
+    if (!uploadedRelativePath) return;
+    try {
+      await deleteListPicFile(uploadedRelativePath);
+    } catch (cleanupErr) {
+      console.warn('Failed to clean up uploaded list picture', cleanupErr);
+    }
+  };
+  const rawName = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+  if (!rawName) {
+    await cleanupUploadedPicture();
+    return res.status(400).json({ error: 'name is required' });
+  }
+  if (rawName.length > 50) {
+    await cleanupUploadedPicture();
+    return res.status(400).json({ error: 'name must be 50 characters or fewer' });
+  }
+  const rawDescription = typeof req.body?.description === 'string' ? req.body.description.trim() : '';
+  const description = rawDescription ? rawDescription.slice(0, 1000) : null;
+  const isPrivateInput = req.body?.isPrivate;
+  const isPrivate =
+    isPrivateInput === true ||
+    isPrivateInput === 'true' ||
+    isPrivateInput === '1' ||
+    Number(isPrivateInput) === 1;
+
+  let listCreated = false;
+
+  try {
+    const pool = await getPool();
+    const [result] = await pool.execute(
+      `INSERT INTO List (name, userUuid, isPrivate, likes, picture, description, created)
+       VALUES (?, ?, ?, 0, ?, ?, UTC_TIMESTAMP())`,
+      [rawName, req.userUuid, isPrivate ? 1 : 0, uploadedRelativePath, description]
+    );
+    const listId = Number(result?.insertId);
+    if (Number.isInteger(listId) && listId > 0) {
+      listCreated = true;
+    }
+    const [rows] = await pool.query(
+      `SELECT l.id, l.name, l.description, l.isPrivate, l.likes, l.picture, l.created,
+              COALESCE(stats.recordCount, 0) AS recordCount
+         FROM List l
+         LEFT JOIN (
+           SELECT listId, COUNT(*) AS recordCount FROM ListRecord GROUP BY listId
+         ) stats ON stats.listId = l.id
+        WHERE l.id = ? AND l.userUuid = ?
+        LIMIT 1`,
+      [listId, req.userUuid]
+    );
+    const listRow = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+    if (!listRow) {
+      return res.status(201).json({ list: null });
+    }
+    res.status(201).json({ list: mapListSummaryRow(listRow) });
+  } catch (err) {
+    console.error('Failed to create list', err);
+    if (!listCreated) {
+      await cleanupUploadedPicture();
+    }
+    res.status(500).json({ error: 'Failed to create list' });
+  }
+});
+
+app.patch('/api/lists/:listId', requireAuth, async (req, res) => {
+  console.log('Updating list...');
+  const listId = Number(req.params.listId);
+  if (!Number.isInteger(listId) || listId <= 0) {
+    return res.status(400).json({ error: 'Invalid list id' });
+  }
+
+  const updates = [];
+  const params = [];
+
+  if (Object.prototype.hasOwnProperty.call(req.body ?? {}, 'name')) {
+    const rawName = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+    if (!rawName) {
+      return res.status(400).json({ error: 'name cannot be empty' });
+    }
+    if (rawName.length > 50) {
+      return res.status(400).json({ error: 'name must be 50 characters or fewer' });
+    }
+    updates.push('name = ?');
+    params.push(rawName);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(req.body ?? {}, 'description')) {
+    if (req.body?.description === null) {
+      updates.push('description = NULL');
+    } else {
+      const rawDescription =
+        typeof req.body?.description === 'string' ? req.body.description.trim() : '';
+      updates.push('description = ?');
+      params.push(rawDescription ? rawDescription.slice(0, 1000) : null);
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(req.body ?? {}, 'isPrivate')) {
+    const nextPrivate = req.body?.isPrivate === true ? 1 : 0;
+    updates.push('isPrivate = ?');
+    params.push(nextPrivate);
+  }
+
+  if (updates.length === 0) {
+    return res.status(400).json({ error: 'No updates specified' });
+  }
+
+  try {
+    const pool = await getPool();
+    const [result] = await pool.execute(
+      `UPDATE List SET ${updates.join(', ')} WHERE id = ? AND userUuid = ?`,
+      [...params, listId, req.userUuid]
+    );
+    if (!result || result.affectedRows === 0) {
+      return res.status(404).json({ error: 'List not found' });
+    }
+    const [rows] = await pool.query(
+      `SELECT l.id, l.name, l.description, l.isPrivate, l.likes, l.picture, l.created,
+              COALESCE(stats.recordCount, 0) AS recordCount
+         FROM List l
+         LEFT JOIN (
+           SELECT listId, COUNT(*) AS recordCount FROM ListRecord GROUP BY listId
+         ) stats ON stats.listId = l.id
+        WHERE l.id = ? AND l.userUuid = ?
+        LIMIT 1`,
+      [listId, req.userUuid]
+    );
+    const listRow = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+    res.json({ list: listRow ? mapListSummaryRow(listRow) : null });
+  } catch (err) {
+    console.error('Failed to update list', err);
+    res.status(500).json({ error: 'Failed to update list' });
+  }
+});
+
+app.delete('/api/lists/:listId', requireAuth, async (req, res) => {
+  console.log('Deleting list...');
+  const listId = Number(req.params.listId);
+  if (!Number.isInteger(listId) || listId <= 0) {
+    return res.status(400).json({ error: 'Invalid list id' });
+  }
+  try {
+    const pool = await getPool();
+    const listRow = await getOwnedListById(pool, listId, req.userUuid);
+    if (!listRow) {
+      return res.status(404).json({ error: 'List not found' });
+    }
+    const picturePath = typeof listRow.picture === 'string' ? listRow.picture : null;
+    const [result] = await pool.execute(
+      `DELETE FROM List WHERE id = ? AND userUuid = ?`,
+      [listId, req.userUuid]
+    );
+    if (!result || result.affectedRows === 0) {
+      return res.status(404).json({ error: 'List not found' });
+    }
+    await deleteListPicFile(picturePath);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Failed to delete list', err);
+    res.status(500).json({ error: 'Failed to delete list' });
+  }
+});
+
+app.post('/api/lists/:listId/picture', requireAuth, listPicUpload.single('picture'), async (req, res) => {
+  console.log('Updating list picture...');
+  const listId = Number(req.params.listId);
+  if (!Number.isInteger(listId) || listId <= 0) {
+    return res.status(400).json({ error: 'Invalid list id' });
+  }
+  if (!req.file) {
+    return res.status(400).json({ error: 'picture file is required' });
+  }
+  try {
+    const pool = await getPool();
+    const listRow = await getOwnedListById(pool, listId, req.userUuid);
+    if (!listRow) {
+      await deleteListPicFile(buildListPicRelativePath(req.file.filename));
+      return res.status(404).json({ error: 'List not found' });
+    }
+    const newRelativePath = buildListPicRelativePath(req.file.filename);
+    const previousPath = typeof listRow.picture === 'string' ? listRow.picture : null;
+    await pool.execute(
+      `UPDATE List SET picture = ? WHERE id = ? AND userUuid = ?`,
+      [newRelativePath, listId, req.userUuid]
+    );
+    if (previousPath) {
+      await deleteListPicFile(previousPath);
+    }
+    const [rows] = await pool.query(
+      `SELECT l.id, l.name, l.description, l.isPrivate, l.likes, l.picture, l.created,
+              COALESCE(stats.recordCount, 0) AS recordCount
+         FROM List l
+         LEFT JOIN (
+           SELECT listId, COUNT(*) AS recordCount FROM ListRecord GROUP BY listId
+         ) stats ON stats.listId = l.id
+        WHERE l.id = ? AND l.userUuid = ?
+        LIMIT 1`,
+      [listId, req.userUuid]
+    );
+    const updatedRow = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+    res.json({ list: updatedRow ? mapListSummaryRow(updatedRow) : null });
+  } catch (err) {
+    console.error('Failed to update list picture', err);
+    res.status(500).json({ error: 'Failed to update list picture' });
+  }
+});
+
+app.delete('/api/lists/:listId/picture', requireAuth, async (req, res) => {
+  console.log('Removing list picture...');
+  const listId = Number(req.params.listId);
+  if (!Number.isInteger(listId) || listId <= 0) {
+    return res.status(400).json({ error: 'Invalid list id' });
+  }
+  try {
+    const pool = await getPool();
+    const listRow = await getOwnedListById(pool, listId, req.userUuid);
+    if (!listRow) {
+      return res.status(404).json({ error: 'List not found' });
+    }
+    const picturePath = typeof listRow.picture === 'string' ? listRow.picture : null;
+    if (!picturePath) {
+      return res.json({ success: true });
+    }
+    await pool.execute(
+      `UPDATE List SET picture = NULL WHERE id = ? AND userUuid = ?`,
+      [listId, req.userUuid]
+    );
+    await deleteListPicFile(picturePath);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Failed to remove list picture', err);
+    res.status(500).json({ error: 'Failed to remove list picture' });
+  }
+});
+
+app.get('/api/lists/popular', async (req, res) => {
+  console.log('Fetching popular lists...');
+  try {
+    const currentUserUuid = extractUserUuidFromRequest(req);
+    const limitRaw = Number(req.query.limit);
+    const limit = Number.isInteger(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 50) : 12;
+    const pool = await getPool();
+    const [rows] = await pool.query(
+      `SELECT l.id, l.name, l.description, l.isPrivate, l.likes, l.picture, l.created,
+              COALESCE(stats.recordCount, 0) AS recordCount,
+              u.username, u.displayName, u.profilePic,
+              CASE WHEN ll.userUuid IS NULL THEN 0 ELSE 1 END AS likedByCurrentUser
+         FROM List l
+         JOIN User u ON u.uuid = l.userUuid
+         LEFT JOIN (
+           SELECT listId, COUNT(*) AS recordCount FROM ListRecord GROUP BY listId
+         ) stats ON stats.listId = l.id
+         LEFT JOIN ListLike ll ON ll.listId = l.id AND ll.userUuid = ?
+        WHERE l.isPrivate = 0
+        ORDER BY l.likes DESC, l.created DESC
+        LIMIT ?`,
+      [currentUserUuid, limit]
+    );
+    const lists = Array.isArray(rows) ? rows.map(mapListSummaryWithOwner) : [];
+    res.json({ lists, limit });
+  } catch (err) {
+    console.error('Failed to fetch popular lists', err);
+    res.status(500).json({ error: 'Failed to fetch popular lists' });
+  }
+});
+
+app.get('/api/lists/:listId', async (req, res) => {
+  console.log('Fetching list detail...');
+  const listId = Number(req.params.listId);
+  if (!Number.isInteger(listId) || listId <= 0) {
+    return res.status(400).json({ error: 'Invalid list id' });
+  }
+  try {
+    const currentUserUuid = extractUserUuidFromRequest(req);
+    const pool = await getPool();
+    const [rows] = await pool.query(
+      `SELECT l.id, l.name, l.description, l.isPrivate, l.likes, l.picture, l.created,
+              l.userUuid,
+              COALESCE(stats.recordCount, 0) AS recordCount,
+              u.username, u.displayName, u.profilePic,
+              CASE WHEN ll.userUuid IS NULL THEN 0 ELSE 1 END AS likedByCurrentUser
+         FROM List l
+         JOIN User u ON u.uuid = l.userUuid
+         LEFT JOIN (
+           SELECT listId, COUNT(*) AS recordCount FROM ListRecord GROUP BY listId
+         ) stats ON stats.listId = l.id
+         LEFT JOIN ListLike ll ON ll.listId = l.id AND ll.userUuid = ?
+        WHERE l.id = ?
+        LIMIT 1`,
+      [currentUserUuid, listId]
+    );
+    const listRow = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+    if (!listRow) {
+      return res.status(404).json({ error: 'List not found' });
+    }
+    const isOwner = currentUserUuid && listRow.userUuid === currentUserUuid;
+    if (Number(listRow.isPrivate) === 1 && !isOwner) {
+      return res.status(404).json({ error: 'List not found' });
+    }
+    const [recordRows] = await pool.query(
+      `SELECT id, added, artist, cover, name, rating, release_year AS releaseYear,
+              review, masterId, isCustom
+         FROM ListRecord
+        WHERE listId = ?
+        ORDER BY added DESC` ,
+      [listId]
+    );
+    const records = Array.isArray(recordRows) ? recordRows.map(mapListRecordRow) : [];
+    const summary = mapListSummaryWithOwner(listRow);
+    const responseList = {
+      ...summary,
+      isOwner: Boolean(isOwner),
+      recordCount: records.length,
+    };
+    res.json({ list: responseList, records });
+  } catch (err) {
+    console.error('Failed to fetch list detail', err);
+    res.status(500).json({ error: 'Failed to fetch list detail' });
+  }
+});
+
+app.post('/api/lists/:listId/records', requireAuth, async (req, res) => {
+  console.log('Adding record to list...');
+  const listId = Number(req.params.listId);
+  if (!Number.isInteger(listId) || listId <= 0) {
+    return res.status(400).json({ error: 'Invalid list id' });
+  }
+  const masterIdRaw = Number(req.body?.masterId);
+  const masterId = Number.isInteger(masterIdRaw) && masterIdRaw > 0 ? masterIdRaw : null;
+  const recordNameRaw = typeof req.body?.recordName === 'string' ? req.body.recordName.trim() : '';
+  const artistRaw = typeof req.body?.artist === 'string' ? req.body.artist.trim() : '';
+  let recordName = recordNameRaw;
+  let artist = artistRaw || null;
+  let cover =
+    typeof req.body?.cover === 'string' && req.body.cover.trim() ? req.body.cover.trim() : null;
+  let releaseYearValue = Number(req.body?.releaseYear);
+  let ratingValue = Number(req.body?.rating);
+  const review =
+    typeof req.body?.review === 'string' && req.body.review.trim()
+      ? req.body.review.trim()
+      : null;
+
+  if (!recordName && masterId === null) {
+    return res.status(400).json({ error: 'recordName is required when masterId is not provided' });
+  }
+
+  if (Number.isFinite(releaseYearValue)) {
+    releaseYearValue = Math.trunc(releaseYearValue);
+    if (releaseYearValue < 1000 || releaseYearValue > 9999) {
+      releaseYearValue = null;
+    }
+  } else {
+    releaseYearValue = null;
+  }
+
+  if (Number.isFinite(ratingValue)) {
+    ratingValue = Math.trunc(ratingValue);
+    if (ratingValue < 0 || ratingValue > 10) {
+      ratingValue = null;
+    }
+  } else {
+    ratingValue = null;
+  }
+
+  try {
+    const pool = await getPool();
+    const listRow = await getOwnedListById(pool, listId, req.userUuid);
+    if (!listRow) {
+      return res.status(404).json({ error: 'List not found' });
+    }
+
+    if (masterId) {
+      const [masterRows] = await pool.query(
+        `SELECT name, artist, cover, release_year FROM Master WHERE id = ? LIMIT 1`,
+        [masterId]
+      );
+      if (!Array.isArray(masterRows) || masterRows.length === 0) {
+        return res.status(404).json({ error: 'Master not found' });
+      }
+      const masterRow = masterRows[0];
+      if (!recordName) {
+        recordName = typeof masterRow.name === 'string' ? masterRow.name : '';
+      }
+      if (!artist) {
+        artist =
+          typeof masterRow.artist === 'string' && masterRow.artist.trim()
+            ? masterRow.artist.trim()
+            : null;
+      }
+      if (!cover) {
+        cover =
+          typeof masterRow.cover === 'string' && masterRow.cover.trim()
+            ? masterRow.cover.trim()
+            : null;
+      }
+      if (releaseYearValue === null && masterRow.release_year != null) {
+        const parsed = Number(masterRow.release_year);
+        if (Number.isInteger(parsed)) {
+          releaseYearValue = parsed;
+        }
+      }
+    }
+
+    recordName = recordName || 'Untitled';
+
+    let duplicateQuery;
+    let duplicateParams;
+    if (masterId) {
+      duplicateQuery =
+        'SELECT id FROM ListRecord WHERE listId = ? AND userUuid = ? AND masterId = ? LIMIT 1';
+      duplicateParams = [listId, req.userUuid, masterId];
+    } else {
+      duplicateQuery =
+        'SELECT id FROM ListRecord WHERE listId = ? AND userUuid = ? AND masterId IS NULL AND name = ? AND ((artist IS NULL AND ? IS NULL) OR artist = ?) LIMIT 1';
+      duplicateParams = [listId, req.userUuid, recordName, artist, artist];
+    }
+
+    const [existingRows] = await pool.query(duplicateQuery, duplicateParams);
+    if (Array.isArray(existingRows) && existingRows.length > 0) {
+      return res.status(409).json({ error: 'Record already exists in this list' });
+    }
+
+    const [result] = await pool.execute(
+      `INSERT INTO ListRecord (added, artist, cover, name, rating, release_year, isCustom, userUuid, listId, review, masterId, reviewLikes)
+       VALUES (UTC_TIMESTAMP(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+      [
+        artist,
+        cover,
+        recordName,
+        ratingValue,
+        releaseYearValue,
+        masterId ? 0 : 1,
+        req.userUuid,
+        listId,
+        review,
+        masterId,
+      ]
+    );
+
+    const newId = Number(result?.insertId);
+    const [rows] = await pool.query(
+      `SELECT id, added, artist, cover, name, rating, release_year AS releaseYear, review, masterId, isCustom
+         FROM ListRecord
+        WHERE id = ? AND listId = ? AND userUuid = ?
+        LIMIT 1`,
+      [newId, listId, req.userUuid]
+    );
+    const recordRow = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+    res.status(201).json({ record: recordRow ? mapListRecordRow(recordRow) : null });
+  } catch (err) {
+    console.error('Failed to add record to list', err);
+    res.status(500).json({ error: 'Failed to add record to list' });
+  }
+});
+
+app.delete('/api/lists/:listId/records/:recordId', requireAuth, async (req, res) => {
+  console.log('Removing record from list...');
+  const listId = Number(req.params.listId);
+  const recordId = Number(req.params.recordId);
+  if (!Number.isInteger(listId) || listId <= 0 || !Number.isInteger(recordId) || recordId <= 0) {
+    return res.status(400).json({ error: 'Invalid identifiers' });
+  }
+  try {
+    const pool = await getPool();
+    const listRow = await getOwnedListById(pool, listId, req.userUuid);
+    if (!listRow) {
+      return res.status(404).json({ error: 'List not found' });
+    }
+    const [result] = await pool.execute(
+      `DELETE FROM ListRecord WHERE id = ? AND listId = ? AND userUuid = ?`,
+      [recordId, listId, req.userUuid]
+    );
+    if (!result || result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Record not found in list' });
+    }
+    res.json({ success: true, recordId });
+  } catch (err) {
+    console.error('Failed to remove record from list', err);
+    res.status(500).json({ error: 'Failed to remove record from list' });
+  }
+});
+
+app.post('/api/lists/:listId/like', requireAuth, async (req, res) => {
+  console.log('Liking list...');
+  const listId = Number(req.params.listId);
+  if (!Number.isInteger(listId) || listId <= 0) {
+    return res.status(400).json({ error: 'Invalid list id' });
+  }
+  let connection;
+  try {
+    const pool = await getPool();
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    const [listRows] = await connection.query(
+      `SELECT id, userUuid, isPrivate FROM List WHERE id = ? FOR UPDATE`,
+      [listId]
+    );
+    if (!Array.isArray(listRows) || listRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ error: 'List not found' });
+    }
+    const listRow = listRows[0];
+    if (Number(listRow.isPrivate) === 1 && listRow.userUuid !== req.userUuid) {
+      await connection.rollback();
+      return res.status(403).json({ error: 'List is private' });
+    }
+
+    const [existingRows] = await connection.query(
+      `SELECT 1 FROM ListLike WHERE listId = ? AND userUuid = ? LIMIT 1`,
+      [listId, req.userUuid]
+    );
+    if (Array.isArray(existingRows) && existingRows.length > 0) {
+      await connection.commit();
+      return res.json({ success: true, liked: true });
+    }
+
+    await connection.query(
+      `INSERT INTO ListLike (listId, userUuid) VALUES (?, ?)`,
+      [listId, req.userUuid]
+    );
+    await connection.query(
+      `UPDATE List SET likes = likes + 1 WHERE id = ?`,
+      [listId]
+    );
+
+    await connection.commit();
+    res.json({ success: true, liked: true });
+  } catch (err) {
+    if (connection) {
+      try {
+        await connection.rollback();
+      } catch {
+        /* ignore */
+      }
+    }
+    console.error('Failed to like list', err);
+    res.status(500).json({ error: 'Failed to like list' });
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+});
+
+app.delete('/api/lists/:listId/like', requireAuth, async (req, res) => {
+  console.log('Unliking list...');
+  const listId = Number(req.params.listId);
+  if (!Number.isInteger(listId) || listId <= 0) {
+    return res.status(400).json({ error: 'Invalid list id' });
+  }
+  let connection;
+  try {
+    const pool = await getPool();
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    const [listRows] = await connection.query(
+      `SELECT id, userUuid, isPrivate FROM List WHERE id = ? FOR UPDATE`,
+      [listId]
+    );
+    if (!Array.isArray(listRows) || listRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ error: 'List not found' });
+    }
+    const listRow = listRows[0];
+    if (Number(listRow.isPrivate) === 1 && listRow.userUuid !== req.userUuid) {
+      await connection.rollback();
+      return res.status(403).json({ error: 'List is private' });
+    }
+
+    const [deleteResult] = await connection.query(
+      `DELETE FROM ListLike WHERE listId = ? AND userUuid = ?`,
+      [listId, req.userUuid]
+    );
+    if (!deleteResult || deleteResult.affectedRows === 0) {
+      await connection.commit();
+      return res.json({ success: true, liked: false });
+    }
+
+    await connection.query(
+      `UPDATE List SET likes = CASE WHEN likes > 0 THEN likes - 1 ELSE 0 END WHERE id = ?`,
+      [listId]
+    );
+
+    await connection.commit();
+    res.json({ success: true, liked: false });
+  } catch (err) {
+    if (connection) {
+      try {
+        await connection.rollback();
+      } catch {
+        /* ignore */
+      }
+    }
+    console.error('Failed to unlike list', err);
+    res.status(500).json({ error: 'Failed to unlike list' });
+  } finally {
+    if (connection) {
+      connection.release();
+    }
   }
 });
 
