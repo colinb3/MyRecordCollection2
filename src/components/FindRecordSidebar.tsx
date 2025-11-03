@@ -310,14 +310,12 @@ export default function FindRecordSidebar({
                 <MenuItem value="" disabled>
                   Select a list...
                 </MenuItem>
-                {listOptions
-                  .filter((option) => !option.listRecordId)
-                  .map((option) => (
-                    <MenuItem key={option.listId} value={option.listId}>
-                      {option.name}
-                      {option.isPrivate ? " (Private)" : ""}
-                    </MenuItem>
-                  ))}
+                {listOptions.map((option) => (
+                  <MenuItem key={option.listId} value={option.listId}>
+                    {option.name}
+                    {option.isPrivate ? " (Private)" : ""}
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
             <Tooltip title="Add to List">

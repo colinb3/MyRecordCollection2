@@ -1,16 +1,13 @@
 // User lists caching utility
-// Manages a client-side cache of user lists to reduce server calls
+// Manages a minimal cache of user list names for the MasterRecord page
 
-export interface UserListSummary {
+export interface UserListName {
   id: number;
   name: string;
-  isPrivate: boolean;
-  recordCount: number;
-  pictureUrl: string | null;
 }
 
 interface CacheEntry {
-  lists: UserListSummary[];
+  lists: UserListName[];
   timestamp: number;
 }
 
@@ -20,9 +17,9 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 let memoryCache: CacheEntry | null = null;
 
 /**
- * Get cached user lists from memory or localStorage
+ * Get cached user list names from memory or localStorage
  */
-export function getCachedUserLists(): UserListSummary[] | null {
+export function getCachedUserLists(): UserListName[] | null {
   // Check memory cache first
   if (memoryCache) {
     const age = Date.now() - memoryCache.timestamp;
@@ -54,9 +51,9 @@ export function getCachedUserLists(): UserListSummary[] | null {
 }
 
 /**
- * Store user lists in cache
+ * Store user list names in cache
  */
-export function setCachedUserLists(lists: UserListSummary[]): void {
+export function setCachedUserLists(lists: UserListName[]): void {
   const entry: CacheEntry = {
     lists,
     timestamp: Date.now(),
@@ -72,26 +69,9 @@ export function setCachedUserLists(lists: UserListSummary[]): void {
 }
 
 /**
- * Update a single list in the cache
- */
-export function updateCachedList(
-  listId: number,
-  updates: Partial<UserListSummary>
-): void {
-  const cached = getCachedUserLists();
-  if (!cached) return;
-
-  const index = cached.findIndex((list) => list.id === listId);
-  if (index !== -1) {
-    cached[index] = { ...cached[index], ...updates };
-    setCachedUserLists(cached);
-  }
-}
-
-/**
  * Add a new list to the cache
  */
-export function addCachedList(list: UserListSummary): void {
+export function addCachedList(list: UserListName): void {
   const cached = getCachedUserLists();
   if (cached) {
     setCachedUserLists([...cached, list]);
@@ -121,31 +101,5 @@ export function clearUserListsCache(): void {
     localStorage.removeItem(CACHE_KEY);
   } catch (error) {
     console.warn("Failed to clear user lists cache:", error);
-  }
-}
-
-/**
- * Fetch user lists from server and update cache
- */
-export async function loadUserLists(apiUrl: string): Promise<UserListSummary[]> {
-  try {
-    const response = await fetch(apiUrl, {
-      credentials: "include",
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to fetch user lists");
-    }
-
-    const data = await response.json();
-    const lists = Array.isArray(data?.lists) ? data.lists : [];
-    
-    // Cache the results
-    setCachedUserLists(lists);
-    
-    return lists;
-  } catch (error) {
-    console.error("Failed to load user lists:", error);
-    throw error;
   }
 }

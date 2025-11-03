@@ -42,7 +42,11 @@ import { clearRecordTablePreferencesCache } from "./preferences";
 import { clearCommunityCaches } from "./communityUsers";
 import { wikiGenres } from "./wiki";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { clearUserListsCache } from "./userLists";
+import {
+  clearUserListsCache,
+  getCachedUserLists,
+  setCachedUserLists,
+} from "./userLists";
 
 interface RecordListItem {
   id: string;
@@ -239,6 +243,19 @@ export default function MasterRecord() {
   const [masterLoading, setMasterLoading] = useState(false);
   const [masterError, setMasterError] = useState<string | null>(null);
   const [releaseYearTouched, setReleaseYearTouched] = useState(false);
+  const [cachedListNames] = useState<UserListEntry[]>(() => {
+    // Initialize with cached list names on mount
+    const cached = getCachedUserLists();
+    if (cached) {
+      return cached.map((list) => ({
+        listId: list.id,
+        name: list.name,
+        isPrivate: false, // Unknown from cache, will be updated when full data loads
+        listRecordId: null, // Unknown from cache, will be updated when full data loads
+      }));
+    }
+    return [];
+  });
   const isMountedRef = useRef(true);
   const releaseYearTouchedRef = useRef(false);
   const skipNextMasterFetchRef = useRef<number | null>(null);
@@ -638,6 +655,15 @@ export default function MasterRecord() {
           userLists: userListsValue,
         };
 
+        // Update cache with list names (minimal cache for fast loading)
+        if (userListsValue.length > 0) {
+          const listNames = userListsValue.map((list: UserListEntry) => ({
+            id: list.listId,
+            name: list.name,
+          }));
+          setCachedUserLists(listNames);
+        }
+
         if (!album) {
           const nameFromResponse =
             typeof data?.record === "string" && data.record.trim()
@@ -972,13 +998,15 @@ export default function MasterRecord() {
   }, [masterInfo?.userCollections]);
 
   const listOptions = useMemo(() => {
-    if (!Array.isArray(masterInfo?.userLists)) {
-      return [] as UserListEntry[];
-    }
-    return [...masterInfo.userLists].sort((a, b) =>
+    // Use full data from masterInfo if available, otherwise use cached names
+    const lists = Array.isArray(masterInfo?.userLists)
+      ? masterInfo.userLists
+      : cachedListNames;
+    
+    return [...lists].sort((a, b) =>
       a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
     );
-  }, [masterInfo?.userLists]);
+  }, [masterInfo?.userLists, cachedListNames]);
 
   const handleAddToList = useCallback(
     async (listId: number) => {

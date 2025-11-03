@@ -3953,24 +3953,8 @@ app.post('/api/lists/:listId/records', requireAuth, async (req, res) => {
 
     recordName = recordName || 'Untitled';
 
-    let duplicateQuery;
-    let duplicateParams;
-    if (masterId) {
-      duplicateQuery =
-        'SELECT id FROM ListRecord WHERE listId = ? AND userUuid = ? AND masterId = ? LIMIT 1';
-      duplicateParams = [listId, req.userUuid, masterId];
-    } else {
-      duplicateQuery =
-        'SELECT id FROM ListRecord WHERE listId = ? AND userUuid = ? AND masterId IS NULL AND name = ? AND ((artist IS NULL AND ? IS NULL) OR artist = ?) LIMIT 1';
-      duplicateParams = [listId, req.userUuid, recordName, artist, artist];
-    }
-
-    const [existingRows] = await pool.query(duplicateQuery, duplicateParams);
-    if (Array.isArray(existingRows) && existingRows.length > 0) {
-      return res.status(409).json({ error: 'Record already exists in this list' });
-    }
-
     // Get the next sortOrder value (max + 1, or 1 if list is empty)
+    // Note: Duplicates are allowed - same record can be added multiple times
     const [sortOrderRows] = await pool.query(
       'SELECT COALESCE(MAX(sortOrder), 0) + 1 AS nextOrder FROM ListRecord WHERE listId = ?',
       [listId]

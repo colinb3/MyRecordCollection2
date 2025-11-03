@@ -44,7 +44,6 @@ import { clearRecordTablePreferencesCache } from "./preferences";
 import { clearCommunityCaches } from "./communityUsers";
 import { setUserId } from "./analytics";
 import {
-  getCachedUserLists,
   setCachedUserLists,
   removeCachedList,
   clearUserListsCache,
@@ -226,28 +225,8 @@ export default function Lists() {
   }, []);
 
   const loadMine = useCallback(
-    async (force = false) => {
-      // Try cache first if not forcing refresh
-      if (!force) {
-        const cached = getCachedUserLists();
-        if (cached) {
-          const lists: ListSummary[] = cached.map((entry) => ({
-            id: entry.id,
-            name: entry.name,
-            description: null, // Cache doesn't store description
-            isPrivate: entry.isPrivate,
-            likes: 0, // Cache doesn't store likes
-            pictureUrl: entry.pictureUrl,
-            created: null, // Cache doesn't store created date
-            recordCount: entry.recordCount,
-            owner: null,
-          }));
-          setMyLists(lists);
-          setLoadingMine(false);
-          return;
-        }
-      }
-
+    async () => {
+      // Always fetch from server (no cache on Lists page)
       setLoadingMine(true);
       try {
         const response = await fetch(apiUrl("/api/lists/mine"), {
@@ -286,13 +265,10 @@ export default function Lists() {
           : [];
         setMyLists(lists);
 
-        // Update cache
+        // Update cache with just names and IDs for MasterRecord page
         const cacheEntries = lists.map((list) => ({
           id: list.id,
           name: list.name,
-          isPrivate: list.isPrivate,
-          recordCount: list.recordCount,
-          pictureUrl: list.pictureUrl,
         }));
         setCachedUserLists(cacheEntries);
       } catch (error) {
@@ -417,7 +393,7 @@ export default function Lists() {
       showMessage("List created", "success");
       setCreateForm({ name: "", description: "", isPrivate: false });
       handleCreatePictureChange(null);
-      await loadMine(true); // Force refresh to get newly created list
+      await loadMine(); // Refresh to get newly created list
       if (!wasPrivate) {
         await loadPopular();
       }
@@ -527,7 +503,7 @@ export default function Lists() {
       }
 
       // Reload lists to get updated data
-      await loadMine(true); // Force refresh to get updated list data
+      await loadMine(); // Refresh to get updated list data
       await loadPopular();
       showMessage("List updated", "success");
       handleCloseEdit();
