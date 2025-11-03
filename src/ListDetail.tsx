@@ -658,7 +658,11 @@ export default function ListDetail() {
                           <Box>
                             {list.pictureUrl ? (
                               <Avatar
-                                src={list.pictureUrl}
+                                src={
+                                  list.pictureUrl.startsWith("http")
+                                    ? list.pictureUrl
+                                    : apiUrl(list.pictureUrl)
+                                }
                                 alt={list.name}
                                 variant="rounded"
                                 sx={{

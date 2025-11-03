@@ -417,7 +417,7 @@ export default function Lists() {
       showMessage("List created", "success");
       setCreateForm({ name: "", description: "", isPrivate: false });
       handleCreatePictureChange(null);
-      await loadMine();
+      await loadMine(true); // Force refresh to get newly created list
       if (!wasPrivate) {
         await loadPopular();
       }
@@ -527,7 +527,7 @@ export default function Lists() {
       }
 
       // Reload lists to get updated data
-      await loadMine();
+      await loadMine(true); // Force refresh to get updated list data
       await loadPopular();
       showMessage("List updated", "success");
       handleCloseEdit();
@@ -656,9 +656,13 @@ export default function Lists() {
   const renderListPicture = useCallback(
     (pictureUrl: string | null, name: string) => {
       if (pictureUrl) {
+        // Use apiUrl to ensure proper domain when deployed
+        const imageUrl = pictureUrl.startsWith("http")
+          ? pictureUrl
+          : apiUrl(pictureUrl);
         return (
           <Avatar
-            src={pictureUrl}
+            src={imageUrl}
             variant="rounded"
             alt={name}
             sx={{ width: 96, height: 96, borderRadius: 2 }}
@@ -903,7 +907,6 @@ export default function Lists() {
                       <Stack
                         direction={{ xs: "column", sm: "row" }}
                         spacing={2}
-                        alignItems="center"
                         mb={2}
                       >
                         {createPicturePreview ? (
@@ -1177,7 +1180,11 @@ export default function Lists() {
                 />
               ) : editState.pictureUrl && !removePictureFlag ? (
                 <Avatar
-                  src={editState.pictureUrl}
+                  src={
+                    editState.pictureUrl.startsWith("http")
+                      ? editState.pictureUrl
+                      : apiUrl(editState.pictureUrl)
+                  }
                   variant="rounded"
                   alt={editState.name}
                   sx={{ width: 96, height: 96, borderRadius: 2 }}
