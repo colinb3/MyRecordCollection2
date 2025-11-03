@@ -42,11 +42,7 @@ import { clearRecordTablePreferencesCache } from "./preferences";
 import { clearCommunityCaches } from "./communityUsers";
 import { wikiGenres } from "./wiki";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import {
-  getCachedUserLists,
-  loadUserLists,
-  clearUserListsCache,
-} from "./userLists";
+import { clearUserListsCache } from "./userLists";
 
 interface RecordListItem {
   id: string;
