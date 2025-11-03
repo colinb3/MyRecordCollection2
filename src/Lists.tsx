@@ -32,7 +32,6 @@ import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
 import ImageNotSupportedIcon from "@mui/icons-material/ImageNotSupported";
 import LockIcon from "@mui/icons-material/Lock";
 import PublicIcon from "@mui/icons-material/Public";
-import RefreshIcon from "@mui/icons-material/Refresh";
 import { useNavigate } from "react-router-dom";
 import TopBar from "./components/TopBar";
 import apiUrl from "./api";
@@ -45,6 +44,12 @@ import {
 import { clearRecordTablePreferencesCache } from "./preferences";
 import { clearCommunityCaches } from "./communityUsers";
 import { setUserId } from "./analytics";
+import {
+  getCachedUserLists,
+  setCachedUserLists,
+  removeCachedList,
+  clearUserListsCache,
+} from "./userLists";
 
 interface OwnerInfo {
   username: string;
@@ -96,6 +101,7 @@ export default function Lists() {
     clearRecordTablePreferencesCache();
     clearUserInfoCache();
     clearCommunityCaches();
+    clearUserListsCache();
     try {
       setUserId(undefined);
     } catch {
@@ -128,10 +134,26 @@ export default function Lists() {
     description: string;
     isPrivate: boolean;
     open: boolean;
-  }>({ id: null, name: "", description: "", isPrivate: false, open: false });
+    pictureUrl: string | null;
+  }>({
+    id: null,
+    name: "",
+    description: "",
+    isPrivate: false,
+    open: false,
+    pictureUrl: null,
+  });
+  const [editPictureFile, setEditPictureFile] = useState<File | null>(null);
+  const [editPicturePreview, setEditPicturePreview] = useState<string | null>(
+    null
+  );
+  const [removePictureFlag, setRemovePictureFlag] = useState(false);
 
   const [likeBusyIds, setLikeBusyIds] = useState<Set<number>>(new Set());
-  const [pictureBusyIds, setPictureBusyIds] = useState<Set<number>>(new Set());
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{
+    open: boolean;
+    list: ListSummary | null;
+  }>({ open: false, list: null });
 
   useEffect(() => {
     return () => {
@@ -154,6 +176,28 @@ export default function Lists() {
   const handleClearCreatePicture = useCallback(() => {
     handleCreatePictureChange(null);
   }, [handleCreatePictureChange]);
+
+  const handleEditPictureChange = useCallback((file: File | null) => {
+    setEditPictureFile(file);
+    setEditPicturePreview((prev) => {
+      if (prev) {
+        URL.revokeObjectURL(prev);
+      }
+      return file ? URL.createObjectURL(file) : null;
+    });
+    if (file) {
+      setRemovePictureFlag(false);
+    }
+  }, []);
+
+  const handleRemoveEditPicture = useCallback(() => {
+    if (editPicturePreview) {
+      URL.revokeObjectURL(editPicturePreview);
+    }
+    setEditPictureFile(null);
+    setEditPicturePreview(null);
+    setRemovePictureFlag(true);
+  }, [editPicturePreview]);
 
   useEffect(() => {
     let cancelled = false;
@@ -182,53 +226,88 @@ export default function Lists() {
     setSnackbar((prev) => ({ ...prev, open: false }));
   }, []);
 
-  const loadMine = useCallback(async () => {
-    setLoadingMine(true);
-    try {
-      const response = await fetch(apiUrl("/api/lists/mine"), {
-        credentials: "include",
-      });
-      if (!response.ok) {
-        const problem = await response.json().catch(() => ({}));
-        throw new Error(problem.error || "Failed to load your lists");
+  const loadMine = useCallback(
+    async (force = false) => {
+      // Try cache first if not forcing refresh
+      if (!force) {
+        const cached = getCachedUserLists();
+        if (cached) {
+          const lists: ListSummary[] = cached.map((entry) => ({
+            id: entry.id,
+            name: entry.name,
+            description: null, // Cache doesn't store description
+            isPrivate: entry.isPrivate,
+            likes: 0, // Cache doesn't store likes
+            pictureUrl: entry.pictureUrl,
+            created: null, // Cache doesn't store created date
+            recordCount: entry.recordCount,
+            owner: null,
+          }));
+          setMyLists(lists);
+          setLoadingMine(false);
+          return;
+        }
       }
-      const data = await response.json();
-      const lists: ListSummary[] = Array.isArray(data?.lists)
-        ? data.lists.map((entry: any) => ({
-            id: Number(entry?.id) || 0,
-            name: typeof entry?.name === "string" ? entry.name : "",
-            description:
-              typeof entry?.description === "string" && entry.description.trim()
-                ? entry.description.trim()
-                : null,
-            isPrivate:
-              entry?.isPrivate === true || Number(entry?.isPrivate) === 1,
-            likes: Number(entry?.likes) >= 0 ? Math.trunc(entry.likes) : 0,
-            pictureUrl:
-              typeof entry?.pictureUrl === "string" && entry.pictureUrl.trim()
-                ? entry.pictureUrl
-                : null,
-            created:
-              typeof entry?.created === "string" && entry.created.trim()
-                ? entry.created.trim()
-                : null,
-            recordCount:
-              Number(entry?.recordCount) >= 0
-                ? Math.trunc(entry.recordCount)
-                : 0,
-          }))
-        : [];
-      setMyLists(lists);
-    } catch (error) {
-      console.error(error);
-      showMessage(
-        error instanceof Error ? error.message : "Failed to load your lists",
-        "error"
-      );
-    } finally {
-      setLoadingMine(false);
-    }
-  }, [showMessage]);
+
+      setLoadingMine(true);
+      try {
+        const response = await fetch(apiUrl("/api/lists/mine"), {
+          credentials: "include",
+        });
+        if (!response.ok) {
+          const problem = await response.json().catch(() => ({}));
+          throw new Error(problem.error || "Failed to load your lists");
+        }
+        const data = await response.json();
+        const lists: ListSummary[] = Array.isArray(data?.lists)
+          ? data.lists.map((entry: any) => ({
+              id: Number(entry?.id) || 0,
+              name: typeof entry?.name === "string" ? entry.name : "",
+              description:
+                typeof entry?.description === "string" &&
+                entry.description.trim()
+                  ? entry.description.trim()
+                  : null,
+              isPrivate:
+                entry?.isPrivate === true || Number(entry?.isPrivate) === 1,
+              likes: Number(entry?.likes) >= 0 ? Math.trunc(entry.likes) : 0,
+              pictureUrl:
+                typeof entry?.pictureUrl === "string" && entry.pictureUrl.trim()
+                  ? entry.pictureUrl
+                  : null,
+              created:
+                typeof entry?.created === "string" && entry.created.trim()
+                  ? entry.created.trim()
+                  : null,
+              recordCount:
+                Number(entry?.recordCount) >= 0
+                  ? Math.trunc(entry.recordCount)
+                  : 0,
+            }))
+          : [];
+        setMyLists(lists);
+
+        // Update cache
+        const cacheEntries = lists.map((list) => ({
+          id: list.id,
+          name: list.name,
+          isPrivate: list.isPrivate,
+          recordCount: list.recordCount,
+          pictureUrl: list.pictureUrl,
+        }));
+        setCachedUserLists(cacheEntries);
+      } catch (error) {
+        console.error(error);
+        showMessage(
+          error instanceof Error ? error.message : "Failed to load your lists",
+          "error"
+        );
+      } finally {
+        setLoadingMine(false);
+      }
+    },
+    [showMessage]
+  );
 
   const loadPopular = useCallback(async () => {
     setLoadingPopular(true);
@@ -368,7 +447,11 @@ export default function Lists() {
       description: list.description ?? "",
       isPrivate: list.isPrivate,
       open: true,
+      pictureUrl: list.pictureUrl,
     });
+    setEditPictureFile(null);
+    setEditPicturePreview(null);
+    setRemovePictureFlag(false);
   }, []);
 
   const handleCloseEdit = useCallback(() => {
@@ -378,8 +461,15 @@ export default function Lists() {
       description: "",
       isPrivate: false,
       open: false,
+      pictureUrl: null,
     });
-  }, []);
+    if (editPicturePreview) {
+      URL.revokeObjectURL(editPicturePreview);
+    }
+    setEditPictureFile(null);
+    setEditPicturePreview(null);
+    setRemovePictureFlag(false);
+  }, [editPicturePreview]);
 
   const handleSaveEdit = useCallback(async () => {
     if (!editState.id) return;
@@ -390,6 +480,7 @@ export default function Lists() {
     }
     setSaving(true);
     try {
+      // First update the list metadata
       const response = await fetch(apiUrl(`/api/lists/${editState.id}`), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -404,48 +495,41 @@ export default function Lists() {
         const problem = await response.json().catch(() => ({}));
         throw new Error(problem.error || "Failed to update list");
       }
-      const data = await response.json();
-      const updated: ListSummary | null = data?.list
-        ? {
-            id: Number(data.list.id) || editState.id,
-            name: typeof data.list.name === "string" ? data.list.name : name,
-            description:
-              typeof data.list.description === "string" &&
-              data.list.description.trim()
-                ? data.list.description.trim()
-                : null,
-            isPrivate:
-              data.list.isPrivate === true || Number(data.list.isPrivate) === 1,
-            likes:
-              Number(data.list.likes) >= 0 ? Math.trunc(data.list.likes) : 0,
-            pictureUrl:
-              typeof data.list.pictureUrl === "string" &&
-              data.list.pictureUrl.trim()
-                ? data.list.pictureUrl
-                : null,
-            created:
-              typeof data.list.created === "string" && data.list.created.trim()
-                ? data.list.created.trim()
-                : null,
-            recordCount:
-              Number(data.list.recordCount) >= 0
-                ? Math.trunc(data.list.recordCount)
-                : 0,
+
+      // Handle picture removal if flagged
+      if (removePictureFlag) {
+        const removeResponse = await fetch(
+          apiUrl(`/api/lists/${editState.id}/picture`),
+          {
+            method: "DELETE",
+            credentials: "include",
           }
-        : null;
-      if (updated) {
-        setMyLists((prev) =>
-          prev.map((item) => (item.id === updated.id ? updated : item))
         );
-        setPopularLists((prev) =>
-          prev.map((item) =>
-            item.id === updated.id ? { ...item, ...updated } : item
-          )
-        );
-      } else {
-        await loadMine();
-        await loadPopular();
+        if (!removeResponse.ok) {
+          console.error("Failed to remove picture");
+        }
       }
+
+      // Handle new picture upload
+      if (editPictureFile) {
+        const formData = new FormData();
+        formData.append("picture", editPictureFile);
+        const uploadResponse = await fetch(
+          apiUrl(`/api/lists/${editState.id}/picture`),
+          {
+            method: "POST",
+            credentials: "include",
+            body: formData,
+          }
+        );
+        if (!uploadResponse.ok) {
+          console.error("Failed to upload picture");
+        }
+      }
+
+      // Reload lists to get updated data
+      await loadMine();
+      await loadPopular();
       showMessage("List updated", "success");
       handleCloseEdit();
     } catch (error) {
@@ -457,80 +541,53 @@ export default function Lists() {
     } finally {
       setSaving(false);
     }
-  }, [editState, handleCloseEdit, loadMine, loadPopular, showMessage]);
+  }, [
+    editState,
+    editPictureFile,
+    removePictureFlag,
+    handleCloseEdit,
+    loadMine,
+    loadPopular,
+    showMessage,
+  ]);
 
-  const handleTogglePrivacy = useCallback(
-    async (list: ListSummary) => {
-      setSaving(true);
-      try {
-        const response = await fetch(apiUrl(`/api/lists/${list.id}`), {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ isPrivate: !list.isPrivate }),
-        });
-        if (!response.ok) {
-          const problem = await response.json().catch(() => ({}));
-          throw new Error(problem.error || "Failed to update privacy");
-        }
-        setMyLists((prev) =>
-          prev.map((item) =>
-            item.id === list.id ? { ...item, isPrivate: !list.isPrivate } : item
-          )
-        );
-        setPopularLists((prev) =>
-          prev.map((item) =>
-            item.id === list.id ? { ...item, isPrivate: !list.isPrivate } : item
-          )
-        );
-        showMessage(
-          !list.isPrivate ? "List set to private" : "List is now public",
-          "success"
-        );
-      } catch (error) {
-        console.error(error);
-        showMessage(
-          error instanceof Error ? error.message : "Failed to update privacy",
-          "error"
-        );
-      } finally {
-        setSaving(false);
+  const handleOpenDeleteConfirmation = useCallback((list: ListSummary) => {
+    setDeleteConfirmation({ open: true, list });
+  }, []);
+
+  const handleCloseDeleteConfirmation = useCallback(() => {
+    setDeleteConfirmation({ open: false, list: null });
+  }, []);
+
+  const handleDeleteList = useCallback(async () => {
+    const list = deleteConfirmation.list;
+    if (!list) return;
+
+    setSaving(true);
+    handleCloseDeleteConfirmation();
+    try {
+      const response = await fetch(apiUrl(`/api/lists/${list.id}`), {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!response.ok) {
+        const problem = await response.json().catch(() => ({}));
+        throw new Error(problem.error || "Failed to delete list");
       }
-    },
-    [showMessage]
-  );
-
-  const handleDeleteList = useCallback(
-    async (list: ListSummary) => {
-      const confirmed = window.confirm(
-        `Delete list "${list.name}"? This will remove all of its records.`
+      setMyLists((prev) => prev.filter((item) => item.id !== list.id));
+      setPopularLists((prev) => prev.filter((item) => item.id !== list.id));
+      removeCachedList(list.id);
+      showMessage("List deleted", "success");
+    } catch (error) {
+      console.error(error);
+      showMessage(
+        error instanceof Error ? error.message : "Failed to delete list",
+        "error"
       );
-      if (!confirmed) return;
-      setSaving(true);
-      try {
-        const response = await fetch(apiUrl(`/api/lists/${list.id}`), {
-          method: "DELETE",
-          credentials: "include",
-        });
-        if (!response.ok) {
-          const problem = await response.json().catch(() => ({}));
-          throw new Error(problem.error || "Failed to delete list");
-        }
-        setMyLists((prev) => prev.filter((item) => item.id !== list.id));
-        setPopularLists((prev) => prev.filter((item) => item.id !== list.id));
-        showMessage("List deleted", "success");
-      } catch (error) {
-        console.error(error);
-        showMessage(
-          error instanceof Error ? error.message : "Failed to delete list",
-          "error"
-        );
-      } finally {
-        setSaving(false);
-      }
-    },
-    [showMessage]
-  );
+    } finally {
+      setSaving(false);
+    }
+  }, [deleteConfirmation.list, handleCloseDeleteConfirmation, showMessage]);
 
   const withBusySet = useCallback(
     (
@@ -549,116 +606,6 @@ export default function Lists() {
       });
     },
     []
-  );
-
-  const handlePictureChange = useCallback(
-    async (list: ListSummary, file: File | null) => {
-      if (!file) return;
-      withBusySet(setPictureBusyIds, list.id, true);
-      try {
-        const formData = new FormData();
-        formData.append("picture", file);
-        const response = await fetch(apiUrl(`/api/lists/${list.id}/picture`), {
-          method: "POST",
-          credentials: "include",
-          body: formData,
-        });
-        if (!response.ok) {
-          const problem = await response.json().catch(() => ({}));
-          throw new Error(problem.error || "Failed to upload image");
-        }
-        const data = await response.json();
-        const updated = data?.list;
-        const nextUrl =
-          typeof updated?.pictureUrl === "string" && updated.pictureUrl.trim()
-            ? updated.pictureUrl
-            : null;
-        setMyLists((prev) =>
-          prev.map((item) =>
-            item.id === list.id
-              ? {
-                  ...item,
-                  pictureUrl: nextUrl,
-                  name:
-                    typeof updated?.name === "string" && updated.name.trim()
-                      ? updated.name.trim()
-                      : item.name,
-                  description:
-                    typeof updated?.description === "string" &&
-                    updated.description.trim()
-                      ? updated.description.trim()
-                      : item.description,
-                }
-              : item
-          )
-        );
-        setPopularLists((prev) =>
-          prev.map((item) =>
-            item.id === list.id
-              ? {
-                  ...item,
-                  pictureUrl: nextUrl,
-                  name:
-                    typeof updated?.name === "string" && updated.name.trim()
-                      ? updated.name.trim()
-                      : item.name,
-                  description:
-                    typeof updated?.description === "string" &&
-                    updated.description.trim()
-                      ? updated.description.trim()
-                      : item.description,
-                }
-              : item
-          )
-        );
-        showMessage("List picture updated", "success");
-      } catch (error) {
-        console.error(error);
-        showMessage(
-          error instanceof Error ? error.message : "Failed to upload image",
-          "error"
-        );
-      } finally {
-        withBusySet(setPictureBusyIds, list.id, false);
-      }
-    },
-    [showMessage, withBusySet]
-  );
-
-  const handleRemovePicture = useCallback(
-    async (list: ListSummary) => {
-      withBusySet(setPictureBusyIds, list.id, true);
-      try {
-        const response = await fetch(apiUrl(`/api/lists/${list.id}/picture`), {
-          method: "DELETE",
-          credentials: "include",
-        });
-        if (!response.ok) {
-          const problem = await response.json().catch(() => ({}));
-          throw new Error(problem.error || "Failed to remove image");
-        }
-        setMyLists((prev) =>
-          prev.map((item) =>
-            item.id === list.id ? { ...item, pictureUrl: null } : item
-          )
-        );
-        setPopularLists((prev) =>
-          prev.map((item) =>
-            item.id === list.id ? { ...item, pictureUrl: null } : item
-          )
-        );
-        showMessage("List picture removed", "success");
-      } catch (error) {
-        console.error(error);
-        showMessage(
-          error instanceof Error ? error.message : "Failed to remove image",
-          "error"
-        );
-      } finally {
-        withBusySet(setPictureBusyIds, list.id, false);
-      }
-    },
-    [showMessage, withBusySet]
   );
 
   const handleToggleLike = useCallback(
@@ -742,7 +689,7 @@ export default function Lists() {
       <Box
         sx={{
           p: { md: 1.5, xs: 1 },
-          minHeight: "100vh",
+          height: "100vh",
           display: "flex",
           flexDirection: "column",
         }}
@@ -753,10 +700,9 @@ export default function Lists() {
           username={username}
           displayName={displayName}
           profilePicUrl={profilePicUrl ?? undefined}
-          searchPlaceholder="Search records"
+          searchPlaceholder="Search..."
         />
         <Box
-          component="main"
           sx={{
             flex: 1,
             overflowY: { xs: "auto", md: "auto" },
@@ -765,402 +711,439 @@ export default function Lists() {
           }}
         >
           <Box
-            maxWidth={800}
+            maxWidth={860}
             mx="auto"
             sx={{ height: { md: "100%" }, pb: { xs: 4, sm: 0 } }}
           >
-            <Box
+            <Paper
+              variant="outlined"
               sx={{
-                display: "grid",
-                gap: 3,
-                alignItems: "stretch",
-                gridTemplateColumns: {
-                  xs: "1fr",
-                  md: "7fr 5fr",
-                  lg: "8fr 4fr",
-                },
+                borderRadius: 2,
+                height: { md: "100%" },
+                overflow: "hidden",
+                display: "flex",
+                flexDirection: "column",
               }}
             >
-              <Box>
-                <Paper sx={{ p: 3, mb: 3 }}>
-                  <Stack direction="row" alignItems="center" spacing={1} mb={2}>
-                    <Typography variant="h6" fontWeight={700}>
+              <Box
+                sx={{
+                  flex: 1,
+                  overflowY: "auto",
+                  p: { xs: 2, md: 3 },
+                }}
+              >
+                <Box
+                  sx={{
+                    display: "grid",
+                    gap: 2,
+                    alignItems: "start",
+                    gridTemplateColumns: {
+                      xs: "minmax(0, 1fr)",
+                      md: "minmax(0, 1fr) minmax(0, 1fr)",
+                    },
+                    gridAutoRows: "min-content",
+                  }}
+                >
+                  <Box
+                    sx={{
+                      display: "flex",
+                      flexDirection: "column",
+                      minWidth: 0,
+                    }}
+                  >
+                    <Paper
+                      sx={{
+                        p: 2,
+                        height: "100%",
+                        display: "flex",
+                        flexDirection: "column",
+                        minWidth: 0,
+                      }}
+                    >
+                      <Box>
+                        <Typography variant="h6" fontWeight={700} gutterBottom>
+                          Popular lists
+                        </Typography>
+                      </Box>
+                      <Box sx={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
+                        {loadingPopular ? (
+                          <Box display="flex" justifyContent="center" py={4}>
+                            <CircularProgress />
+                          </Box>
+                        ) : popularLists.length === 0 ? (
+                          <Typography color="text.secondary">
+                            No public lists yet.
+                          </Typography>
+                        ) : (
+                          <Stack spacing={2}>
+                            {popularLists.map((list) => {
+                              const liked = list.likedByCurrentUser === true;
+                              const likeBusy = likeBusyIds.has(list.id);
+                              const isOwner = list.owner?.username === username;
+                              return (
+                                <Paper
+                                  key={list.id}
+                                  variant="outlined"
+                                  sx={{ p: 2 }}
+                                >
+                                  <Stack direction="row" spacing={2}>
+                                    {renderListPicture(
+                                      list.pictureUrl,
+                                      list.name
+                                    )}
+                                    <Box
+                                      sx={{
+                                        ml: { xs: 2, md: 0 },
+                                        minWidth: 0,
+                                        flex: 1,
+                                      }}
+                                    >
+                                      <Typography
+                                        variant="subtitle1"
+                                        fontWeight={700}
+                                        noWrap
+                                      >
+                                        {list.name}
+                                      </Typography>
+                                      {list.owner && (
+                                        <Typography
+                                          variant="body2"
+                                          color="text.secondary"
+                                          noWrap
+                                        >
+                                          by{" "}
+                                          {list.owner.displayName ??
+                                            list.owner.username}
+                                        </Typography>
+                                      )}
+                                      <Stack
+                                        direction="row"
+                                        spacing={1}
+                                        alignItems="center"
+                                        mt={1}
+                                        flexWrap="wrap"
+                                      >
+                                        <Chip
+                                          size="small"
+                                          label={`${list.recordCount} records`}
+                                        />
+                                        <Chip
+                                          size="small"
+                                          label={
+                                            list.likes === 1
+                                              ? "1 like"
+                                              : `${list.likes} likes`
+                                          }
+                                        />
+                                      </Stack>
+                                      <Stack
+                                        direction="row"
+                                        spacing={1}
+                                        alignItems="center"
+                                        mt={1.5}
+                                      >
+                                        {!isOwner && (
+                                          <Tooltip
+                                            title={liked ? "Unlike" : "Like"}
+                                          >
+                                            <span>
+                                              <IconButton
+                                                color={
+                                                  liked ? "error" : "default"
+                                                }
+                                                size="small"
+                                                onClick={() =>
+                                                  void handleToggleLike(
+                                                    list.id,
+                                                    liked
+                                                  )
+                                                }
+                                                disabled={likeBusy}
+                                              >
+                                                {liked ? (
+                                                  <FavoriteIcon />
+                                                ) : (
+                                                  <FavoriteBorderIcon />
+                                                )}
+                                              </IconButton>
+                                            </span>
+                                          </Tooltip>
+                                        )}
+                                        <Button
+                                          variant="text"
+                                          size="small"
+                                          onClick={() =>
+                                            navigate(`/lists/${list.id}`)
+                                          }
+                                        >
+                                          View
+                                        </Button>
+                                      </Stack>
+                                    </Box>
+                                  </Stack>
+                                </Paper>
+                              );
+                            })}
+                          </Stack>
+                        )}
+                      </Box>
+                    </Paper>
+                  </Box>
+
+                  <Box
+                    sx={{
+                      display: "flex",
+                      flexDirection: "column",
+                      minWidth: 0,
+                    }}
+                  >
+                    <Typography variant="h6" sx={{ mb: 1, fontWeight: 700 }}>
                       Create a new list
                     </Typography>
-                    <Tooltip title="Refresh">
-                      <span>
-                        <IconButton
-                          onClick={() => {
-                            void loadMine();
-                            void loadPopular();
-                          }}
+                    <Paper sx={{ p: 2, mb: 2 }}>
+                      <Stack
+                        direction={{ xs: "column", sm: "row" }}
+                        spacing={2}
+                        alignItems="center"
+                        mb={2}
+                      >
+                        {createPicturePreview ? (
+                          <Avatar
+                            src={createPicturePreview}
+                            variant="rounded"
+                            sx={{ width: 96, height: 96, borderRadius: 2 }}
+                          />
+                        ) : (
+                          <Avatar
+                            variant="rounded"
+                            sx={{
+                              width: 96,
+                              height: 96,
+                              borderRadius: 2,
+                              bgcolor: "grey.800",
+                            }}
+                          >
+                            <ImageNotSupportedIcon />
+                          </Avatar>
+                        )}
+                        <Stack direction={"column"} spacing={1.5}>
+                          <Button
+                            variant="outlined"
+                            component="label"
+                            startIcon={<PhotoCameraIcon />}
+                            disabled={saving}
+                          >
+                            Choose Image
+                            <input
+                              type="file"
+                              hidden
+                              accept={ACCEPTED_IMAGE_TYPES}
+                              onChange={(event) => {
+                                const file = event.target.files?.[0] ?? null;
+                                handleCreatePictureChange(file);
+                                event.target.value = "";
+                              }}
+                            />
+                          </Button>
+                          {createPicturePreview && (
+                            <Button
+                              variant="text"
+                              onClick={() => handleClearCreatePicture()}
+                              disabled={saving}
+                            >
+                              Remove Image
+                            </Button>
+                          )}
+                          <Typography variant="body2" color="text.secondary">
+                            JPG, PNG, WEBP, or AVIF (3 MB)
+                          </Typography>
+                        </Stack>
+                      </Stack>
+                      <Stack spacing={2}>
+                        <TextField
+                          label="List name"
+                          value={createForm.name}
                           size="small"
-                          disabled={loadingMine || loadingPopular}
-                        >
-                          <RefreshIcon fontSize="small" />
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                  </Stack>
-                  <Stack spacing={2}>
-                    <TextField
-                      label="List name"
-                      value={createForm.name}
-                      size="small"
-                      onChange={(event) =>
-                        setCreateForm((prev) => ({
-                          ...prev,
-                          name: event.target.value,
-                        }))
-                      }
-                      required
-                    />
-                    <TextField
-                      label="Description"
-                      value={createForm.description}
-                      size="small"
-                      onChange={(event) =>
-                        setCreateForm((prev) => ({
-                          ...prev,
-                          description: event.target.value,
-                        }))
-                      }
-                      multiline
-                      minRows={2}
-                      maxRows={4}
-                      sx={{
-                        "& .MuiInputBase-root": {
-                          height: "auto",
-                        },
-                      }}
-                    />
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          checked={createForm.isPrivate}
                           onChange={(event) =>
                             setCreateForm((prev) => ({
                               ...prev,
-                              isPrivate: event.target.checked,
+                              name: event.target.value,
                             }))
                           }
+                          required
+                          sx={{ mb: 2 }}
                         />
-                      }
-                      label="Private"
-                    />
-                    <Stack
-                      direction={{ xs: "column", sm: "row" }}
-                      spacing={2}
-                      alignItems="center"
-                    >
-                      {createPicturePreview ? (
-                        <Avatar
-                          src={createPicturePreview}
-                          variant="rounded"
-                          sx={{ width: 96, height: 96, borderRadius: 2 }}
-                        />
-                      ) : (
-                        <Avatar
-                          variant="rounded"
+                        <TextField
+                          label="Description"
+                          value={createForm.description}
+                          size="small"
+                          onChange={(event) =>
+                            setCreateForm((prev) => ({
+                              ...prev,
+                              description: event.target.value,
+                            }))
+                          }
+                          multiline
+                          minRows={2}
+                          maxRows={4}
                           sx={{
-                            width: 96,
-                            height: 96,
-                            borderRadius: 2,
-                            bgcolor: "grey.800",
+                            "& .MuiInputBase-root": {
+                              height: "auto",
+                            },
+                            mb: 1,
                           }}
-                        >
-                          <ImageNotSupportedIcon />
-                        </Avatar>
-                      )}
-                      <Stack
-                        direction={{ xs: "column", sm: "row" }}
-                        spacing={1.5}
-                      >
+                        />
+                        <FormControlLabel
+                          control={
+                            <Switch
+                              checked={createForm.isPrivate}
+                              onChange={(event) =>
+                                setCreateForm((prev) => ({
+                                  ...prev,
+                                  isPrivate: event.target.checked,
+                                }))
+                              }
+                            />
+                          }
+                          label="Private"
+                          sx={{ mb: 1 }}
+                        />
+
                         <Button
-                          variant="outlined"
-                          component="label"
-                          startIcon={<PhotoCameraIcon />}
-                          disabled={saving}
+                          variant="contained"
+                          onClick={() => void handleCreateList()}
+                          disabled={saving || !createForm.name.trim()}
                         >
-                          Choose Image
-                          <input
-                            type="file"
-                            hidden
-                            accept={ACCEPTED_IMAGE_TYPES}
-                            onChange={(event) => {
-                              const file = event.target.files?.[0] ?? null;
-                              handleCreatePictureChange(file);
-                              event.target.value = "";
-                            }}
-                          />
+                          Create List
                         </Button>
-                        {createPicturePreview && (
-                          <Button
-                            variant="text"
-                            onClick={() => handleClearCreatePicture()}
-                            disabled={saving}
-                          >
-                            Remove Image
-                          </Button>
-                        )}
                       </Stack>
-                    </Stack>
-                    <Typography variant="body2" color="text.secondary">
-                      Optional image — JPG, PNG, WEBP, or AVIF
+                    </Paper>
+                    <Typography variant="h6" fontWeight={700} mb={1}>
+                      My lists
                     </Typography>
-                    <Button
-                      variant="contained"
-                      onClick={() => void handleCreateList()}
-                      disabled={saving || !createForm.name.trim()}
-                    >
-                      Create List
-                    </Button>
-                  </Stack>
-                </Paper>
-
-                <Typography variant="h6" sx={{ mb: 1, fontWeight: 700 }}>
-                  My lists
-                </Typography>
-                {loadingMine ? (
-                  <Box display="flex" justifyContent="center" py={4}>
-                    <CircularProgress />
-                  </Box>
-                ) : sortedMyLists.length === 0 ? (
-                  <Paper sx={{ p: 3 }}>
-                    <Typography color="text.secondary">
-                      You have not created any lists yet.
-                    </Typography>
-                  </Paper>
-                ) : (
-                  <Stack spacing={2.5}>
-                    {sortedMyLists.map((list) => {
-                      const pictureBusy = pictureBusyIds.has(list.id);
-                      return (
-                        <Paper key={list.id} sx={{ p: 3 }}>
-                          <Stack
-                            direction={{ xs: "column", sm: "row" }}
-                            spacing={2}
-                          >
-                            {renderListPicture(list.pictureUrl, list.name)}
-                            <Box flex={1}>
+                    {loadingMine ? (
+                      <Box display="flex" justifyContent="center" py={4}>
+                        <CircularProgress />
+                      </Box>
+                    ) : sortedMyLists.length === 0 ? (
+                      <Paper sx={{ p: 2 }}>
+                        <Typography color="text.secondary">
+                          You have not created any lists yet.
+                        </Typography>
+                      </Paper>
+                    ) : (
+                      <Stack spacing={2}>
+                        {sortedMyLists.map((list) => {
+                          return (
+                            <Paper key={list.id} sx={{ p: 2 }}>
                               <Stack
-                                direction={{ xs: "column", sm: "row" }}
-                                spacing={1}
-                                alignItems={{ xs: "flex-start", sm: "center" }}
+                                direction={{ xs: "row", sm: "row" }}
+                                spacing={2}
                               >
-                                <Typography variant="h6" fontWeight={700}>
-                                  {list.name}
-                                </Typography>
-                                <Chip
-                                  size="small"
-                                  color={list.isPrivate ? "default" : "primary"}
-                                  icon={
-                                    list.isPrivate ? (
-                                      <LockIcon fontSize="small" />
-                                    ) : (
-                                      <PublicIcon fontSize="small" />
-                                    )
-                                  }
-                                  label={list.isPrivate ? "Private" : "Public"}
-                                />
-                                <Chip
-                                  size="small"
-                                  icon={<FavoriteIcon fontSize="small" />}
-                                  label={`${list.likes} likes`}
-                                />
-                                <Chip
-                                  size="small"
-                                  label={`${list.recordCount} records`}
-                                />
-                              </Stack>
-                              {list.description && (
-                                <Typography
-                                  color="text.secondary"
-                                  sx={{ mt: 1 }}
-                                >
-                                  {list.description}
-                                </Typography>
-                              )}
-                              <Stack
-                                direction={{ xs: "column", md: "row" }}
-                                spacing={1}
-                                sx={{ mt: 2 }}
-                              >
-                                <Button
-                                  variant="contained"
-                                  size="small"
-                                  startIcon={<VisibilityIcon />}
-                                  onClick={() => navigate(`/lists/${list.id}`)}
-                                >
-                                  View
-                                </Button>
-                                <Button
-                                  variant="outlined"
-                                  size="small"
-                                  startIcon={<EditIcon />}
-                                  onClick={() => handleOpenEdit(list)}
-                                >
-                                  Edit
-                                </Button>
-                                <Button
-                                  variant="outlined"
-                                  size="small"
-                                  onClick={() => void handleTogglePrivacy(list)}
-                                  disabled={saving}
-                                >
-                                  {list.isPrivate
-                                    ? "Make Public"
-                                    : "Make Private"}
-                                </Button>
-                                <Button
-                                  variant="outlined"
-                                  size="small"
-                                  component="label"
-                                  startIcon={<PhotoCameraIcon />}
-                                  disabled={pictureBusy}
-                                >
-                                  Upload Image
-                                  <input
-                                    type="file"
-                                    hidden
-                                    accept={ACCEPTED_IMAGE_TYPES}
-                                    onChange={(event) => {
-                                      const file =
-                                        event.target.files?.[0] ?? null;
-                                      void handlePictureChange(list, file);
-                                      event.target.value = "";
-                                    }}
-                                  />
-                                </Button>
-                                {list.pictureUrl && (
-                                  <Button
-                                    variant="text"
-                                    size="small"
-                                    onClick={() =>
-                                      void handleRemovePicture(list)
-                                    }
-                                    disabled={pictureBusy}
-                                  >
-                                    Remove Image
-                                  </Button>
-                                )}
-                                <Button
-                                  variant="text"
-                                  size="small"
-                                  color="error"
-                                  startIcon={<DeleteIcon />}
-                                  onClick={() => void handleDeleteList(list)}
-                                  disabled={saving}
-                                >
-                                  Delete
-                                </Button>
-                              </Stack>
-                            </Box>
-                          </Stack>
-                        </Paper>
-                      );
-                    })}
-                  </Stack>
-                )}
-              </Box>
-
-              <Box>
-                <Paper sx={{ p: 3, height: "100%" }}>
-                  <Typography variant="h6" fontWeight={700} gutterBottom>
-                    Popular lists
-                  </Typography>
-                  <Divider sx={{ mb: 2 }} />
-                  {loadingPopular ? (
-                    <Box display="flex" justifyContent="center" py={4}>
-                      <CircularProgress />
-                    </Box>
-                  ) : popularLists.length === 0 ? (
-                    <Typography color="text.secondary">
-                      No public lists yet.
-                    </Typography>
-                  ) : (
-                    <Stack spacing={2}>
-                      {popularLists.map((list) => {
-                        const liked = list.likedByCurrentUser === true;
-                        const likeBusy = likeBusyIds.has(list.id);
-                        return (
-                          <Paper key={list.id} variant="outlined" sx={{ p: 2 }}>
-                            <Stack
-                              direction="row"
-                              spacing={2}
-                              alignItems="center"
-                            >
-                              {renderListPicture(list.pictureUrl, list.name)}
-                              <Box flex={1} minWidth={0}>
-                                <Typography
-                                  variant="subtitle1"
-                                  fontWeight={700}
-                                  noWrap
-                                >
-                                  {list.name}
-                                </Typography>
-                                {list.owner && (
-                                  <Typography
-                                    variant="body2"
-                                    color="text.secondary"
-                                    noWrap
-                                  >
-                                    by{" "}
-                                    {list.owner.displayName ??
-                                      list.owner.username}
-                                  </Typography>
-                                )}
-                                <Stack
-                                  direction="row"
-                                  spacing={1}
-                                  alignItems="center"
-                                  mt={1}
-                                >
-                                  <Chip
-                                    size="small"
-                                    label={`${list.recordCount} records`}
-                                  />
-                                  <Chip
-                                    size="small"
-                                    label={`${list.likes} likes`}
-                                  />
-                                </Stack>
-                              </Box>
-                              <Stack spacing={1} alignItems="center">
-                                <Tooltip title={liked ? "Unlike" : "Like"}>
-                                  <span>
-                                    <IconButton
-                                      color={liked ? "error" : "default"}
-                                      onClick={() =>
-                                        void handleToggleLike(list.id, liked)
-                                      }
-                                      disabled={likeBusy}
+                                {renderListPicture(list.pictureUrl, list.name)}
+                                <Box flex={1} minWidth={0}>
+                                  <Stack direction={"column"}>
+                                    <Typography variant="h6" fontWeight={700}>
+                                      {list.name}
+                                    </Typography>
+                                    {list.description && (
+                                      <Typography color="text.secondary">
+                                        {list.description}
+                                      </Typography>
+                                    )}
+                                    <Stack
+                                      direction="row"
+                                      spacing={0.01}
+                                      mt={1}
+                                      flexWrap="wrap"
+                                      sx={{ gap: 1 }}
                                     >
-                                      {liked ? (
-                                        <FavoriteIcon />
-                                      ) : (
-                                        <FavoriteBorderIcon />
-                                      )}
-                                    </IconButton>
-                                  </span>
-                                </Tooltip>
-                                <Button
-                                  variant="text"
-                                  size="small"
-                                  onClick={() => navigate(`/lists/${list.id}`)}
-                                >
-                                  View
-                                </Button>
+                                      <Chip
+                                        size="small"
+                                        color={
+                                          list.isPrivate ? "default" : "primary"
+                                        }
+                                        icon={
+                                          list.isPrivate ? (
+                                            <LockIcon fontSize="small" />
+                                          ) : (
+                                            <PublicIcon fontSize="small" />
+                                          )
+                                        }
+                                        label={
+                                          list.isPrivate ? "Private" : "Public"
+                                        }
+                                      />
+                                      <Chip
+                                        size="small"
+                                        icon={<FavoriteIcon fontSize="small" />}
+                                        label={
+                                          list.likes === 1
+                                            ? "1 like"
+                                            : `${list.likes} likes`
+                                        }
+                                      />
+                                      <Chip
+                                        size="small"
+                                        label={
+                                          list.recordCount === 0
+                                            ? "No records"
+                                            : list.recordCount === 1
+                                            ? `${list.recordCount} record`
+                                            : `${list.recordCount} records`
+                                        }
+                                        sx={{ mt: 3 }}
+                                      />
+                                    </Stack>
+                                  </Stack>
+                                  <Stack
+                                    direction={"row"}
+                                    spacing={0.01}
+                                    flexWrap="wrap"
+                                    sx={{ mt: 2, gap: 1 }}
+                                  >
+                                    <Button
+                                      variant="contained"
+                                      size="small"
+                                      startIcon={<VisibilityIcon />}
+                                      onClick={() =>
+                                        navigate(`/lists/${list.id}`)
+                                      }
+                                    >
+                                      View
+                                    </Button>
+                                    <Button
+                                      variant="outlined"
+                                      size="small"
+                                      startIcon={<EditIcon />}
+                                      onClick={() => handleOpenEdit(list)}
+                                    >
+                                      Edit
+                                    </Button>
+                                    <Button
+                                      variant="text"
+                                      size="small"
+                                      color="error"
+                                      startIcon={<DeleteIcon />}
+                                      onClick={() =>
+                                        handleOpenDeleteConfirmation(list)
+                                      }
+                                      disabled={saving}
+                                    >
+                                      Delete
+                                    </Button>
+                                  </Stack>
+                                </Box>
                               </Stack>
-                            </Stack>
-                          </Paper>
-                        );
-                      })}
-                    </Stack>
-                  )}
-                </Paper>
+                            </Paper>
+                          );
+                        })}
+                      </Stack>
+                    )}
+                  </Box>
+                </Box>
               </Box>
-            </Box>
+            </Paper>
           </Box>
         </Box>
         <Snackbar
@@ -1185,7 +1168,74 @@ export default function Lists() {
         >
           <DialogTitle>Edit list</DialogTitle>
           <DialogContent dividers>
-            <Stack spacing={2} sx={{ mt: 1 }}>
+            <Stack direction={"row"} spacing={2} alignItems="center" mb={1}>
+              {editPicturePreview ? (
+                <Avatar
+                  src={editPicturePreview}
+                  variant="rounded"
+                  alt={editState.name}
+                  sx={{ width: 96, height: 96, borderRadius: 2 }}
+                />
+              ) : editState.pictureUrl && !removePictureFlag ? (
+                <Avatar
+                  src={editState.pictureUrl}
+                  variant="rounded"
+                  alt={editState.name}
+                  sx={{ width: 96, height: 96, borderRadius: 2 }}
+                />
+              ) : (
+                <Avatar
+                  variant="rounded"
+                  sx={{
+                    width: 96,
+                    height: 96,
+                    borderRadius: 2,
+                    bgcolor: "grey.800",
+                  }}
+                >
+                  <ImageNotSupportedIcon />
+                </Avatar>
+              )}
+              <Stack spacing={1}>
+                <Button
+                  variant="outlined"
+                  component="label"
+                  startIcon={<PhotoCameraIcon />}
+                  disabled={saving}
+                  size="small"
+                >
+                  {editPicturePreview ||
+                  (editState.pictureUrl && !removePictureFlag)
+                    ? "Change Image"
+                    : "Upload Image"}
+                  <input
+                    type="file"
+                    hidden
+                    accept={ACCEPTED_IMAGE_TYPES}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0] ?? null;
+                      handleEditPictureChange(file);
+                      event.target.value = "";
+                    }}
+                  />
+                </Button>
+                {(editPicturePreview ||
+                  (editState.pictureUrl && !removePictureFlag)) && (
+                  <Button
+                    variant="text"
+                    size="small"
+                    onClick={handleRemoveEditPicture}
+                    disabled={saving}
+                  >
+                    Remove Image
+                  </Button>
+                )}
+                <Typography variant="caption" color="text.secondary">
+                  JPG, PNG, WEBP, or AVIF (3 MB)
+                </Typography>
+              </Stack>
+            </Stack>
+            <Stack sx={{ mt: 2 }}>
               <TextField
                 label="List name"
                 value={editState.name}
@@ -1196,10 +1246,12 @@ export default function Lists() {
                   }))
                 }
                 required
+                sx={{ mb: 2 }}
               />
               <TextField
                 label="Description"
                 value={editState.description}
+                size="small"
                 onChange={(event) =>
                   setEditState((prev) => ({
                     ...prev,
@@ -1209,6 +1261,12 @@ export default function Lists() {
                 multiline
                 minRows={2}
                 maxRows={4}
+                sx={{
+                  "& .MuiInputBase-root": {
+                    height: "auto",
+                  },
+                  mb: 1,
+                }}
               />
               <FormControlLabel
                 control={
@@ -1234,6 +1292,46 @@ export default function Lists() {
               disabled={saving}
             >
               Save
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog
+          open={deleteConfirmation.open}
+          onClose={handleCloseDeleteConfirmation}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>Delete List?</DialogTitle>
+          <DialogContent>
+            <Typography>
+              Are you sure you want to delete the list "
+              {deleteConfirmation.list?.name}"?
+              {deleteConfirmation.list &&
+                deleteConfirmation.list.recordCount > 0 && (
+                  <>
+                    {" "}
+                    This list contains {
+                      deleteConfirmation.list.recordCount
+                    }{" "}
+                    record{deleteConfirmation.list.recordCount !== 1 ? "s" : ""}
+                    .
+                  </>
+                )}
+            </Typography>
+            <Typography sx={{ mt: 2, color: "text.secondary" }}>
+              This action cannot be undone.
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseDeleteConfirmation}>Cancel</Button>
+            <Button
+              variant="contained"
+              color="error"
+              onClick={() => void handleDeleteList()}
+            >
+              Delete
             </Button>
           </DialogActions>
         </Dialog>

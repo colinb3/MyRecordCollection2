@@ -549,7 +549,7 @@ export default function MasterReviews() {
           }}
         >
           <Box
-            maxWidth={800}
+            maxWidth={860}
             mx="auto"
             sx={{ height: { md: "100%" }, pb: { xs: 4, sm: 0 } }}
           >

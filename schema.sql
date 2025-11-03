@@ -104,6 +104,7 @@ CREATE TABLE ListRecord (
     rating TINYINT,
     release_year YEAR,
     isCustom BOOLEAN NOT NULL DEFAULT FALSE,
+    sortOrder INT DEFAULT 0,
     userUuid CHAR(36),
     listId INT,
     review TEXT,
@@ -113,6 +114,8 @@ CREATE TABLE ListRecord (
     FOREIGN KEY (userUuid) REFERENCES User(uuid) ON DELETE CASCADE,
     FOREIGN KEY (listId) REFERENCES List(id) ON DELETE CASCADE
 );
+
+CREATE INDEX idx_listrecord_list_order ON ListRecord(listId, sortOrder);
 
 CREATE TABLE ListLike (
     userUuid CHAR(36) NOT NULL,

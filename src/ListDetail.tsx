@@ -20,7 +20,24 @@ import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import DeleteIcon from "@mui/icons-material/Delete";
 import ImageNotSupportedIcon from "@mui/icons-material/ImageNotSupported";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import RefreshIcon from "@mui/icons-material/Refresh";
+import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useNavigate, useParams, Link as RouterLink } from "react-router-dom";
 import TopBar from "./components/TopBar";
 import apiUrl from "./api";
@@ -64,12 +81,123 @@ interface ListRecordEntry {
   masterId: number | null;
   added: string | null;
   isCustom: boolean;
+  sortOrder?: number;
 }
 
 interface SnackbarState {
   open: boolean;
   message: string;
   severity: "success" | "error" | "info";
+}
+
+interface SortableRecordItemProps {
+  record: ListRecordEntry;
+  isOwner: boolean;
+  removing: boolean;
+  renderCover: (cover: string | null, name: string) => React.ReactElement;
+  onRemove: (record: ListRecordEntry) => void;
+  onViewMaster: (masterId: number) => void;
+}
+
+function SortableRecordItem({
+  record,
+  isOwner,
+  removing,
+  renderCover,
+  onRemove,
+  onViewMaster,
+}: SortableRecordItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: record.id, disabled: !isOwner });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <Paper ref={setNodeRef} style={style} variant="outlined" sx={{ p: 2 }}>
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        spacing={2}
+        alignItems={{
+          xs: "flex-start",
+          sm: "center",
+        }}
+      >
+        {isOwner && (
+          <Box
+            {...attributes}
+            {...listeners}
+            sx={{
+              cursor: isDragging ? "grabbing" : "grab",
+              display: "flex",
+              alignItems: "center",
+              color: "text.secondary",
+              touchAction: "none",
+            }}
+          >
+            <DragIndicatorIcon />
+          </Box>
+        )}
+        {renderCover(record.cover, record.name)}
+        <Box flex={1} minWidth={0}>
+          <Typography variant="subtitle1" fontWeight={700} noWrap>
+            {record.name}
+          </Typography>
+          {record.artist && (
+            <Typography color="text.secondary" noWrap>
+              {record.artist}
+            </Typography>
+          )}
+          <Stack direction="row" spacing={1} mt={1} flexWrap="wrap">
+            {record.rating !== null && (
+              <Chip size="small" label={`Rating ${record.rating}/10`} />
+            )}
+            {record.releaseYear !== null && (
+              <Chip size="small" label={`Released ${record.releaseYear}`} />
+            )}
+          </Stack>
+          {record.review && (
+            <Typography color="text.secondary" sx={{ mt: 1 }}>
+              {record.review}
+            </Typography>
+          )}
+        </Box>
+        <Stack spacing={1} alignItems="center">
+          {record.masterId && (
+            <Button
+              variant="text"
+              size="small"
+              onClick={() => onViewMaster(record.masterId!)}
+            >
+              View master
+            </Button>
+          )}
+          {isOwner && (
+            <Tooltip title="Remove from list">
+              <span>
+                <IconButton
+                  color="error"
+                  onClick={() => onRemove(record)}
+                  disabled={removing}
+                >
+                  <DeleteIcon />
+                </IconButton>
+              </span>
+            </Tooltip>
+          )}
+        </Stack>
+      </Stack>
+    </Paper>
+  );
 }
 
 export default function ListDetail() {
@@ -351,6 +479,64 @@ export default function ListDetail() {
     [list, showMessage]
   );
 
+  const handleDragEnd = useCallback(
+    async (event: DragEndEvent) => {
+      const { active, over } = event;
+
+      if (!over || active.id === over.id || !list?.isOwner) return;
+
+      const oldIndex = records.findIndex((r) => r.id === active.id);
+      const newIndex = records.findIndex((r) => r.id === over.id);
+
+      if (oldIndex === -1 || newIndex === -1) return;
+
+      // Optimistically update the UI
+      const reorderedRecords = arrayMove(records, oldIndex, newIndex);
+      setRecords(reorderedRecords);
+
+      // Prepare updates with new sortOrder values
+      const updates = reorderedRecords.map((record, index) => ({
+        id: record.id,
+        sortOrder: index + 1,
+      }));
+
+      try {
+        const response = await fetch(
+          apiUrl(`/api/lists/${list.id}/records/reorder`),
+          {
+            method: "PUT",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ updates }),
+          }
+        );
+
+        if (!response.ok) {
+          const problem = await response.json().catch(() => ({}));
+          throw new Error(problem.error || "Failed to reorder records");
+        }
+
+        showMessage("Order updated", "success");
+      } catch (error) {
+        console.error(error);
+        // Revert on error
+        setRecords(records);
+        showMessage(
+          error instanceof Error ? error.message : "Failed to reorder records",
+          "error"
+        );
+      }
+    },
+    [records, list, showMessage]
+  );
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
   const renderCover = useCallback((cover: string | null, name: string) => {
     if (cover) {
       return (
@@ -400,21 +586,20 @@ export default function ListDetail() {
       <Box
         sx={{
           p: { md: 1.5, xs: 1 },
-          minHeight: "100vh",
+          height: "100vh",
           display: "flex",
           flexDirection: "column",
         }}
       >
         <TopBar
-          title={list ? list.name : "List"}
+          title="List"
           onLogout={handleLogout}
           username={username}
           displayName={displayName}
           profilePicUrl={profilePicUrl ?? undefined}
-          searchPlaceholder="Search records"
+          searchPlaceholder="Search..."
         />
         <Box
-          component="main"
           sx={{
             flex: 1,
             overflowY: { xs: "auto", md: "auto" },
@@ -423,249 +608,207 @@ export default function ListDetail() {
           }}
         >
           <Box
-            maxWidth={800}
+            maxWidth={860}
             mx="auto"
             sx={{ height: { md: "100%" }, pb: { xs: 4, sm: 0 } }}
           >
-            <Stack spacing={2}>
-              <Button
-                startIcon={<ArrowBackIcon />}
-                variant="outlined"
-                onClick={handleBack}
-                sx={{ alignSelf: "flex-start" }}
+            <Paper
+              variant="outlined"
+              sx={{
+                borderRadius: 2,
+                height: { md: "100%" },
+                overflow: "hidden",
+                display: "flex",
+                flexDirection: "column",
+              }}
+            >
+              <Box
+                sx={{
+                  flex: 1,
+                  overflowY: "auto",
+                  p: { xs: 2, md: 3 },
+                }}
               >
-                Back
-              </Button>
-              {loading ? (
-                <Paper sx={{ p: 4, textAlign: "center" }}>
-                  <CircularProgress />
-                </Paper>
-              ) : !list ? (
-                <Paper sx={{ p: 4 }}>
-                  <Typography color="text.secondary">
-                    List not available or you do not have access.
-                  </Typography>
-                </Paper>
-              ) : (
-                <>
-                  <Paper sx={{ p: 3 }}>
-                    <Stack
-                      direction={{ xs: "column", sm: "row" }}
-                      spacing={3}
-                      alignItems={{ xs: "flex-start", sm: "center" }}
-                    >
+                <Stack spacing={2}>
+                  <Button
+                    startIcon={<ArrowBackIcon />}
+                    variant="outlined"
+                    onClick={handleBack}
+                    sx={{ alignSelf: "flex-start" }}
+                  >
+                    Back
+                  </Button>
+                  {loading ? (
+                    <Paper sx={{ p: 4, textAlign: "center" }}>
+                      <CircularProgress />
+                    </Paper>
+                  ) : !list ? (
+                    <Paper sx={{ p: 4 }}>
+                      <Typography color="text.secondary">
+                        List not available or you do not have access.
+                      </Typography>
+                    </Paper>
+                  ) : (
+                    <>
                       <Box>
-                        {list.pictureUrl ? (
-                          <Avatar
-                            src={list.pictureUrl}
-                            alt={list.name}
-                            variant="rounded"
-                            sx={{ width: 140, height: 140, borderRadius: 2 }}
-                          />
-                        ) : (
-                          <Avatar
-                            variant="rounded"
-                            sx={{
-                              width: 140,
-                              height: 140,
-                              borderRadius: 2,
-                              bgcolor: "grey.900",
-                            }}
-                          >
-                            <ImageNotSupportedIcon fontSize="large" />
-                          </Avatar>
-                        )}
+                        <Stack
+                          direction={{ xs: "column", sm: "row" }}
+                          spacing={3}
+                        >
+                          <Box>
+                            {list.pictureUrl ? (
+                              <Avatar
+                                src={list.pictureUrl}
+                                alt={list.name}
+                                variant="rounded"
+                                sx={{
+                                  width: 140,
+                                  height: 140,
+                                  borderRadius: 2,
+                                }}
+                              />
+                            ) : (
+                              <Avatar
+                                variant="rounded"
+                                sx={{
+                                  width: 140,
+                                  height: 140,
+                                  borderRadius: 2,
+                                  bgcolor: "grey.800",
+                                }}
+                              >
+                                <ImageNotSupportedIcon fontSize="large" />
+                              </Avatar>
+                            )}
+                          </Box>
+                          <Box flex={1} minWidth={0}>
+                            <Typography variant="h5" fontWeight={700} mr={1}>
+                              {list.name}
+                            </Typography>
+                            {list.owner && (
+                              <Typography color="text.secondary" sx={{ mt: 1 }}>
+                                Curated by{" "}
+                                {list.owner.displayName ?? list.owner.username}
+                              </Typography>
+                            )}
+                            {list.description && (
+                              <Typography sx={{ mt: 1 }}>
+                                {list.description}
+                              </Typography>
+                            )}
+                            <Stack
+                              direction="row"
+                              spacing={1}
+                              alignItems="center"
+                              flexWrap="wrap"
+                              mt={1.5}
+                            >
+                              <Chip
+                                size="small"
+                                color={list.isPrivate ? "default" : "primary"}
+                                label={list.isPrivate ? "Private" : "Public"}
+                              />
+                              <Chip
+                                size="small"
+                                label={`${list.likes} likes`}
+                              />
+                              <Chip
+                                size="small"
+                                label={
+                                  list.recordCount === 0
+                                    ? "No records"
+                                    : list.recordCount === 1
+                                    ? `${list.recordCount} record`
+                                    : `${list.recordCount} records`
+                                }
+                              />
+                            </Stack>
+                            <Stack
+                              direction="row"
+                              spacing={1.5}
+                              mt={2}
+                              flexWrap="wrap"
+                            >
+                              {!list.isOwner && (
+                                <Button
+                                  variant="contained"
+                                  startIcon={
+                                    list.likedByCurrentUser ? (
+                                      <FavoriteIcon />
+                                    ) : (
+                                      <FavoriteBorderIcon />
+                                    )
+                                  }
+                                  onClick={() => void handleToggleLike()}
+                                  disabled={likeBusy}
+                                >
+                                  {list.likedByCurrentUser ? "Unlike" : "Like"}
+                                </Button>
+                              )}
+                              {list.isOwner && (
+                                <Button
+                                  component={RouterLink}
+                                  to="/lists"
+                                  variant="text"
+                                >
+                                  Manage lists
+                                </Button>
+                              )}
+                            </Stack>
+                          </Box>
+                        </Stack>
                       </Box>
-                      <Box flex={1} minWidth={0}>
+
+                      <Paper sx={{ p: 3 }}>
                         <Stack
                           direction="row"
                           spacing={1}
                           alignItems="center"
-                          flexWrap="wrap"
+                          mb={2}
                         >
-                          <Typography variant="h5" fontWeight={700} mr={1}>
-                            {list.name}
+                          <Typography variant="h6" fontWeight={700}>
+                            Records
                           </Typography>
-                          <Chip
-                            size="small"
-                            color={list.isPrivate ? "default" : "primary"}
-                            label={list.isPrivate ? "Private" : "Public"}
-                          />
-                          <Chip size="small" label={`${list.likes} likes`} />
-                          <Chip
-                            size="small"
-                            label={`${list.recordCount} records`}
-                          />
+                          <Chip size="small" label={safeRecords.length} />
                         </Stack>
-                        {list.owner && (
-                          <Typography color="text.secondary" sx={{ mt: 1 }}>
-                            Curated by{" "}
-                            {list.owner.displayName ?? list.owner.username}
+                        {safeRecords.length === 0 ? (
+                          <Typography color="text.secondary">
+                            This list does not contain any records yet.
                           </Typography>
-                        )}
-                        {list.description && (
-                          <Typography sx={{ mt: 1 }}>
-                            {list.description}
-                          </Typography>
-                        )}
-                        <Stack
-                          direction="row"
-                          spacing={1.5}
-                          mt={2}
-                          flexWrap="wrap"
-                        >
-                          <Button
-                            variant="contained"
-                            startIcon={
-                              list.likedByCurrentUser ? (
-                                <FavoriteIcon />
-                              ) : (
-                                <FavoriteBorderIcon />
-                              )
-                            }
-                            onClick={() => void handleToggleLike()}
-                            disabled={likeBusy}
+                        ) : (
+                          <DndContext
+                            sensors={sensors}
+                            collisionDetection={closestCenter}
+                            onDragEnd={handleDragEnd}
                           >
-                            {list.likedByCurrentUser ? "Unlike" : "Like"}
-                          </Button>
-                          <Button
-                            variant="outlined"
-                            startIcon={<RefreshIcon />}
-                            onClick={() => void loadList()}
-                          >
-                            Refresh
-                          </Button>
-                          {list.isOwner && (
-                            <Button
-                              component={RouterLink}
-                              to="/lists"
-                              variant="text"
+                            <SortableContext
+                              items={safeRecords.map((r) => r.id)}
+                              strategy={verticalListSortingStrategy}
                             >
-                              Manage lists
-                            </Button>
-                          )}
-                        </Stack>
-                      </Box>
-                    </Stack>
-                  </Paper>
-
-                  <Paper sx={{ p: 3 }}>
-                    <Stack
-                      direction="row"
-                      spacing={1}
-                      alignItems="center"
-                      mb={2}
-                    >
-                      <Typography variant="h6" fontWeight={700}>
-                        Records
-                      </Typography>
-                      <Chip size="small" label={safeRecords.length} />
-                    </Stack>
-                    {safeRecords.length === 0 ? (
-                      <Typography color="text.secondary">
-                        This list does not contain any records yet.
-                      </Typography>
-                    ) : (
-                      <Stack spacing={2.5}>
-                        {safeRecords.map((record) => {
-                          const removing = removingIds.has(record.id);
-                          return (
-                            <Paper
-                              key={record.id}
-                              variant="outlined"
-                              sx={{ p: 2 }}
-                            >
-                              <Stack
-                                direction={{ xs: "column", sm: "row" }}
-                                spacing={2}
-                                alignItems={{ xs: "flex-start", sm: "center" }}
-                              >
-                                {renderCover(record.cover, record.name)}
-                                <Box flex={1} minWidth={0}>
-                                  <Typography
-                                    variant="subtitle1"
-                                    fontWeight={700}
-                                    noWrap
-                                  >
-                                    {record.name}
-                                  </Typography>
-                                  {record.artist && (
-                                    <Typography color="text.secondary" noWrap>
-                                      {record.artist}
-                                    </Typography>
-                                  )}
-                                  <Stack
-                                    direction="row"
-                                    spacing={1}
-                                    mt={1}
-                                    flexWrap="wrap"
-                                  >
-                                    {record.rating !== null && (
-                                      <Chip
-                                        size="small"
-                                        label={`Rating ${record.rating}/10`}
-                                      />
-                                    )}
-                                    {record.releaseYear !== null && (
-                                      <Chip
-                                        size="small"
-                                        label={`Released ${record.releaseYear}`}
-                                      />
-                                    )}
-                                    {record.added && (
-                                      <Chip
-                                        size="small"
-                                        label={`Added ${record.added}`}
-                                      />
-                                    )}
-                                  </Stack>
-                                  {record.review && (
-                                    <Typography
-                                      color="text.secondary"
-                                      sx={{ mt: 1 }}
-                                    >
-                                      {record.review}
-                                    </Typography>
-                                  )}
-                                </Box>
-                                <Stack spacing={1} alignItems="center">
-                                  {record.masterId && (
-                                    <Button
-                                      variant="text"
-                                      size="small"
-                                      onClick={() =>
-                                        navigate(`/master/${record.masterId}`)
-                                      }
-                                    >
-                                      View master
-                                    </Button>
-                                  )}
-                                  {list.isOwner && (
-                                    <Tooltip title="Remove from list">
-                                      <span>
-                                        <IconButton
-                                          color="error"
-                                          onClick={() =>
-                                            void handleRemoveRecord(record)
-                                          }
-                                          disabled={removing}
-                                        >
-                                          <DeleteIcon />
-                                        </IconButton>
-                                      </span>
-                                    </Tooltip>
-                                  )}
-                                </Stack>
+                              <Stack spacing={2.5}>
+                                {safeRecords.map((record) => (
+                                  <SortableRecordItem
+                                    key={record.id}
+                                    record={record}
+                                    isOwner={list?.isOwner ?? false}
+                                    removing={removingIds.has(record.id)}
+                                    renderCover={renderCover}
+                                    onRemove={handleRemoveRecord}
+                                    onViewMaster={(masterId) =>
+                                      navigate(`/master/${masterId}`)
+                                    }
+                                  />
+                                ))}
                               </Stack>
-                            </Paper>
-                          );
-                        })}
-                      </Stack>
-                    )}
-                  </Paper>
-                </>
-              )}
-            </Stack>
+                            </SortableContext>
+                          </DndContext>
+                        )}
+                      </Paper>
+                    </>
+                  )}
+                </Stack>
+              </Box>
+            </Paper>
           </Box>
         </Box>
         <Snackbar

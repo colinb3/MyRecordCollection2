@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useState } from "react";
 import {
   Paper,
   Typography,
@@ -15,7 +16,14 @@ import {
   Slider,
   CircularProgress,
   Stack,
+  Select,
+  MenuItem,
+  FormControl,
+  IconButton,
+  Tooltip,
 } from "@mui/material";
+import AddIcon from "@mui/icons-material/Add";
+import SettingsIcon from "@mui/icons-material/Settings";
 
 export interface AlbumListItem {
   id: string;
@@ -50,7 +58,7 @@ interface FindRecordSidebarProps {
   listenedButton: SidebarActionConfig;
   collectionButton: SidebarActionConfig;
   listOptions: SidebarListOption[];
-  onToggleList: (option: SidebarListOption) => void;
+  onAddToList: (listId: number) => void;
   onManageLists: () => void;
   listActionDisabled?: boolean;
 }
@@ -80,10 +88,11 @@ export default function FindRecordSidebar({
   listenedButton,
   collectionButton,
   listOptions,
-  onToggleList,
+  onAddToList,
   onManageLists,
   listActionDisabled,
 }: FindRecordSidebarProps) {
+  const [selectedListId, setSelectedListId] = useState<number | "">("");
   const handleSlider = (_: Event, val: number | number[]) => {
     onRatingChange(val as number);
   };
@@ -285,68 +294,57 @@ export default function FindRecordSidebar({
             },
           }}
         />
-        <Typography
-          variant="subtitle1"
-          sx={{ display: "flex", alignItems: "center", mt: 2 }}
-        >
-          Lists
-        </Typography>
-        <Box
-          sx={{
-            flexGrow: 0,
-            overflowY: "auto",
-            border: "1px solid grey",
-            borderRadius: 2,
-            minHeight: 120,
-            my: 1,
-          }}
-        >
-          <List dense sx={{ p: 0 }}>
-            {listOptions.length > 0 ? (
-              listOptions.map((option) => (
-                <ListItem disablePadding key={option.listId}>
-                  <ListItemButton
-                    dense
-                    disabled={listActionDisabled}
-                    onClick={() => onToggleList(option)}
-                    sx={{ py: 0.25 }}
-                  >
-                    <ListItemIcon sx={{ minWidth: 35 }}>
-                      <Checkbox
-                        edge="start"
-                        checked={Boolean(option.listRecordId)}
-                        disabled={listActionDisabled}
-                        tabIndex={-1}
-                        disableRipple
-                      />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={option.name}
-                      secondary={option.isPrivate ? "Private" : undefined}
-                    />
-                  </ListItemButton>
-                </ListItem>
-              ))
-            ) : (
-              <ListItem>
-                <ListItemText
-                  primary="No lists yet"
-                  secondary="Use Manage Lists to create one."
-                />
-              </ListItem>
-            )}
-          </List>
-        </Box>
-        <Button
-          variant="text"
-          size="small"
-          onClick={onManageLists}
-          sx={{ alignSelf: "flex-start", mb: 1 }}
-        >
-          Manage Lists
-        </Button>
       </Box>
       <Box sx={{ mx: { xs: 1.3, sm: 1.5, md: 2 }, my: 1 }}>
+        <Box sx={{ mb: 1 }}>
+          <Stack direction="row" alignItems="center">
+            <FormControl size="small" sx={{ flex: 1 }}>
+              <Select
+                value={selectedListId}
+                onChange={(e) =>
+                  setSelectedListId(e.target.value as number | "")
+                }
+                displayEmpty
+                disabled={listActionDisabled || listOptions.length === 0}
+              >
+                <MenuItem value="" disabled>
+                  Select a list...
+                </MenuItem>
+                {listOptions
+                  .filter((option) => !option.listRecordId)
+                  .map((option) => (
+                    <MenuItem key={option.listId} value={option.listId}>
+                      {option.name}
+                      {option.isPrivate ? " (Private)" : ""}
+                    </MenuItem>
+                  ))}
+              </Select>
+            </FormControl>
+            <Tooltip title="Add to List">
+              <IconButton
+                onClick={() => {
+                  if (selectedListId !== "") {
+                    onAddToList(selectedListId);
+                    setSelectedListId("");
+                  }
+                }}
+                disabled={
+                  listActionDisabled ||
+                  selectedListId === "" ||
+                  listOptions.length === 0
+                }
+                sx={{ minWidth: "auto", ml: 0.5 }}
+              >
+                <AddIcon />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Manage Lists">
+              <IconButton onClick={onManageLists} color="primary">
+                <SettingsIcon />
+              </IconButton>
+            </Tooltip>
+          </Stack>
+        </Box>
         <Stack direction={"row"} spacing={1}>
           <Button
             disabled={wishlistButton.disabled ?? false}

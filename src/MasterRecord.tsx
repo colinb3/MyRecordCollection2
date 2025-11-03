@@ -42,6 +42,11 @@ import { clearRecordTablePreferencesCache } from "./preferences";
 import { clearCommunityCaches } from "./communityUsers";
 import { wikiGenres } from "./wiki";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import {
+  getCachedUserLists,
+  loadUserLists,
+  clearUserListsCache,
+} from "./userLists";
 
 interface RecordListItem {
   id: string;
@@ -415,6 +420,7 @@ export default function MasterRecord() {
     clearUserInfoCache();
     clearTagsCache();
     clearCommunityCaches();
+    clearUserListsCache();
     try {
       setUserId(undefined);
     } catch {
@@ -978,8 +984,8 @@ export default function MasterRecord() {
     );
   }, [masterInfo?.userLists]);
 
-  const handleToggleList = useCallback(
-    async (option: UserListEntry) => {
+  const handleAddToList = useCallback(
+    async (listId: number) => {
       if (!username) {
         if (location.pathname !== "/login") {
           const next = encodeURIComponent(
@@ -1000,61 +1006,36 @@ export default function MasterRecord() {
         ? releaseYear
         : masterInfo?.releaseYear ?? null;
 
+      const listOption = listOptions.find((opt) => opt.listId === listId);
+      const listName = listOption?.name ?? "list";
+
       setListActionLoading(true);
       try {
-        if (option.listRecordId) {
-          const response = await fetch(
-            apiUrl(
-              `/api/lists/${option.listId}/records/${option.listRecordId}`
-            ),
-            {
-              method: "DELETE",
-              credentials: "include",
-            }
+        const response = await fetch(apiUrl(`/api/lists/${listId}/records`), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            masterId: resolvedMasterId ?? null,
+            recordName: recordNameForList,
+            artist: artistForList,
+            cover: coverForList,
+            releaseYear: releaseYearForList,
+          }),
+        });
+        if (!response.ok) {
+          const problem = await response.json().catch(() => ({}));
+          throw new Error(
+            typeof problem.error === "string"
+              ? problem.error
+              : "Failed to add record to list"
           );
-          if (!response.ok) {
-            const problem = await response.json().catch(() => ({}));
-            throw new Error(
-              typeof problem.error === "string"
-                ? problem.error
-                : "Failed to remove record from list"
-            );
-          }
-          setSnackbar({
-            open: true,
-            message: `Removed from ${option.name}`,
-            severity: "success",
-          });
-        } else {
-          const response = await fetch(
-            apiUrl(`/api/lists/${option.listId}/records`),
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              credentials: "include",
-              body: JSON.stringify({
-                masterId: resolvedMasterId ?? null,
-                recordName: recordNameForList,
-                artist: artistForList,
-                cover: coverForList,
-                releaseYear: releaseYearForList,
-              }),
-            }
-          );
-          if (!response.ok) {
-            const problem = await response.json().catch(() => ({}));
-            throw new Error(
-              typeof problem.error === "string"
-                ? problem.error
-                : "Failed to add record to list"
-            );
-          }
-          setSnackbar({
-            open: true,
-            message: `Added to ${option.name}`,
-            severity: "success",
-          });
         }
+        setSnackbar({
+          open: true,
+          message: `Added to ${listName}`,
+          severity: "success",
+        });
         await loadMasterInfo({ preserveReleaseYear: true, force: true });
       } catch (error) {
         console.error(error);
@@ -1330,7 +1311,7 @@ export default function MasterRecord() {
           }}
         >
           <Box
-            maxWidth={800}
+            maxWidth={860}
             mx="auto"
             sx={{ height: { md: "100%" }, pb: { xs: 4, sm: 0 } }}
           >
@@ -1437,7 +1418,7 @@ export default function MasterRecord() {
                   listenedButton={listenedButtonConfig}
                   collectionButton={collectionButtonConfig}
                   listOptions={listOptions}
-                  onToggleList={handleToggleList}
+                  onAddToList={handleAddToList}
                   onManageLists={handleManageLists}
                   listActionDisabled={listActionLoading}
                 />

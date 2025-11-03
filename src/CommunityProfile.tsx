@@ -405,7 +405,7 @@ export default function CommunityProfile() {
           onLogout={handleLogout}
         />
         <Box sx={{ flex: 1, overflowY: "auto", pb: 3, px: 1 }}>
-          <Box maxWidth={800} mx="auto" sx={{ mt: 1 }}>
+          <Box maxWidth={860} mx="auto" sx={{ mt: 1 }}>
             <Grid container spacing={2}>
               <Grid size={{ xs: 12 }}>
                 <Paper

@@ -3849,10 +3849,10 @@ app.get('/api/lists/:listId', async (req, res) => {
     }
     const [recordRows] = await pool.query(
       `SELECT id, added, artist, cover, name, rating, release_year AS releaseYear,
-              review, masterId, isCustom
+              review, masterId, isCustom, sortOrder
          FROM ListRecord
         WHERE listId = ?
-        ORDER BY added DESC` ,
+        ORDER BY sortOrder ASC, added DESC` ,
       [listId]
     );
     const records = Array.isArray(recordRows) ? recordRows.map(mapListRecordRow) : [];
@@ -3970,9 +3970,16 @@ app.post('/api/lists/:listId/records', requireAuth, async (req, res) => {
       return res.status(409).json({ error: 'Record already exists in this list' });
     }
 
+    // Get the next sortOrder value (max + 1, or 1 if list is empty)
+    const [sortOrderRows] = await pool.query(
+      'SELECT COALESCE(MAX(sortOrder), 0) + 1 AS nextOrder FROM ListRecord WHERE listId = ?',
+      [listId]
+    );
+    const nextSortOrder = sortOrderRows?.[0]?.nextOrder || 1;
+
     const [result] = await pool.execute(
-      `INSERT INTO ListRecord (added, artist, cover, name, rating, release_year, isCustom, userUuid, listId, review, masterId, reviewLikes)
-       VALUES (UTC_TIMESTAMP(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+      `INSERT INTO ListRecord (added, artist, cover, name, rating, release_year, isCustom, userUuid, listId, review, masterId, reviewLikes, sortOrder)
+       VALUES (UTC_TIMESTAMP(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
       [
         artist,
         cover,
@@ -3984,6 +3991,7 @@ app.post('/api/lists/:listId/records', requireAuth, async (req, res) => {
         listId,
         review,
         masterId,
+        nextSortOrder,
       ]
     );
 
@@ -4027,6 +4035,66 @@ app.delete('/api/lists/:listId/records/:recordId', requireAuth, async (req, res)
   } catch (err) {
     console.error('Failed to remove record from list', err);
     res.status(500).json({ error: 'Failed to remove record from list' });
+  }
+});
+
+app.put('/api/lists/:listId/records/reorder', requireAuth, async (req, res) => {
+  console.log('Reordering list records...');
+  const listId = Number(req.params.listId);
+  if (!Number.isInteger(listId) || listId <= 0) {
+    return res.status(400).json({ error: 'Invalid list id' });
+  }
+  
+  // Expect an array of { id, sortOrder } objects
+  const updates = req.body?.updates;
+  if (!Array.isArray(updates) || updates.length === 0) {
+    return res.status(400).json({ error: 'Invalid updates array' });
+  }
+
+  let connection;
+  try {
+    const pool = await getPool();
+    connection = await pool.getConnection();
+    
+    // Verify the user owns this list
+    const [listRows] = await connection.query(
+      'SELECT userUuid FROM List WHERE id = ?',
+      [listId]
+    );
+    if (!Array.isArray(listRows) || listRows.length === 0 || listRows[0].userUuid !== req.userUuid) {
+      return res.status(404).json({ error: 'List not found or access denied' });
+    }
+
+    await connection.beginTransaction();
+
+    // Update sortOrder for each record
+    for (const update of updates) {
+      const recordId = Number(update.id);
+      const sortOrder = Number(update.sortOrder);
+      
+      if (!Number.isInteger(recordId) || !Number.isInteger(sortOrder)) {
+        await connection.rollback();
+        return res.status(400).json({ error: 'Invalid record id or sortOrder' });
+      }
+
+      await connection.execute(
+        'UPDATE ListRecord SET sortOrder = ? WHERE id = ? AND listId = ? AND userUuid = ?',
+        [sortOrder, recordId, listId, req.userUuid]
+      );
+    }
+
+    await connection.commit();
+    res.json({ success: true });
+  } catch (err) {
+    if (connection) {
+      await connection.rollback();
+    }
+    console.error('Failed to reorder list records', err);
+    res.status(500).json({ error: 'Failed to reorder list records' });
+  } finally {
+    if (connection) {
+      connection.release();
+    }
   }
 });
 

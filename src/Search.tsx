@@ -381,7 +381,7 @@ export default function Search() {
             mt: 1,
           }}
         >
-          <Box maxWidth={800} mx="auto" sx={{ height: { md: "100%" } }}>
+          <Box maxWidth={860} mx="auto" sx={{ height: { md: "100%" } }}>
             <Paper
               variant="outlined"
               sx={{
