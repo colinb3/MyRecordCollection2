@@ -51,14 +51,16 @@ const USERS_PAGE_SIZE = 25;
 const RECORDS_PAGE_SIZE = 25;
 const MASTERS_PAGE_SIZE = 25;
 const TAGS_PAGE_SIZE = 25;
+const LISTS_PAGE_SIZE = 25;
 
-type AdminTabKey = "users" | "records" | "masters" | "tags";
+type AdminTabKey = "users" | "records" | "masters" | "tags" | "lists";
 
 const TAB_OPTIONS: { label: string; value: AdminTabKey }[] = [
   { label: "Users", value: "users" },
   { label: "Records", value: "records" },
   { label: "Masters", value: "masters" },
   { label: "Tags", value: "tags" },
+  { label: "Lists", value: "lists" },
 ];
 
 type AdminUser = {
@@ -112,6 +114,37 @@ type AdminTag = {
   name: string;
   owner: AdminTagOwner | null;
   usageCount: number;
+};
+
+type AdminListOwner = {
+  username: string;
+  displayName: string | null;
+  profilePicUrl: string | null;
+};
+
+type AdminList = {
+  id: number;
+  name: string;
+  description: string | null;
+  isPrivate: boolean;
+  likes: number;
+  pictureUrl: string | null;
+  recordCount: number;
+  created: string | null;
+  owner: AdminListOwner;
+};
+
+type AdminListRecord = {
+  id: number;
+  name: string;
+  artist: string | null;
+  cover: string | null;
+  rating: number | null;
+  releaseYear: number | null;
+  added: string | null;
+  isCustom: boolean;
+  masterId: number | null;
+  sortOrder: number | null;
 };
 
 function toDateTimeLocal(value: string | null): string {
@@ -1675,6 +1708,524 @@ function MastersTab() {
   );
 }
 
+function ListsTab() {
+  const [searchInput, setSearchInput] = useState("");
+  const [ownerInput, setOwnerInput] = useState("");
+  const [filters, setFilters] = useState({ search: "", owner: "" });
+  const [lists, setLists] = useState<AdminList[]>([]);
+  const [total, setTotal] = useState(0);
+  const [offset, setOffset] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState<AdminList | null>(null);
+  const [editNameInput, setEditNameInput] = useState("");
+  const [editDescriptionInput, setEditDescriptionInput] = useState("");
+  const [editIsPrivate, setEditIsPrivate] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [viewingRecords, setViewingRecords] = useState<AdminList | null>(null);
+  const [records, setRecords] = useState<AdminListRecord[]>([]);
+  const [loadingRecords, setLoadingRecords] = useState(false);
+
+  const fetchLists = useCallback(
+    async (startOffset: number, append: boolean) => {
+      setError(null);
+      if (append) {
+        setLoadingMore(true);
+      } else {
+        setLoading(true);
+      }
+
+      try {
+        const params = new URLSearchParams();
+        params.set("limit", String(LISTS_PAGE_SIZE));
+        params.set("offset", String(startOffset));
+        if (filters.search) {
+          params.set("q", filters.search);
+        }
+        if (filters.owner) {
+          params.set("user", filters.owner);
+        }
+
+        const response = await fetch(
+          apiUrl(`/api/admin/lists?${params.toString()}`),
+          { credentials: "include" }
+        );
+
+        let payload: unknown = null;
+        try {
+          payload = await response.json();
+        } catch {
+          payload = null;
+        }
+
+        if (!response.ok) {
+          const message = getErrorMessage(
+            payload,
+            `Failed to load lists (${response.status})`
+          );
+          throw new Error(message);
+        }
+
+        const body = (payload ?? {}) as {
+          lists?: AdminList[];
+        };
+        const items = Array.isArray(body.lists) ? body.lists : [];
+        setLists((prev) => (append ? [...prev, ...items] : items));
+        const nextOffset = startOffset + items.length;
+        setOffset(nextOffset);
+        setTotal(items.length < LISTS_PAGE_SIZE ? nextOffset : nextOffset + 1);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load lists");
+        if (!append) {
+          setLists([]);
+          setOffset(0);
+          setTotal(0);
+        }
+      } finally {
+        setLoading(false);
+        setLoadingMore(false);
+      }
+    },
+    [filters]
+  );
+
+  useEffect(() => {
+    fetchLists(0, false);
+  }, [fetchLists]);
+
+  const hasMore = offset < total;
+
+  const applyFilters = () => {
+    setFilters({ search: searchInput.trim(), owner: ownerInput.trim() });
+  };
+
+  const handleFieldKey = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      applyFilters();
+    }
+  };
+
+  useEffect(() => {
+    if (!editing) {
+      setEditNameInput("");
+      setEditDescriptionInput("");
+      setEditIsPrivate(false);
+      return;
+    }
+    setEditNameInput(editing.name);
+    setEditDescriptionInput(editing.description ?? "");
+    setEditIsPrivate(editing.isPrivate);
+  }, [editing]);
+
+  const handleSave = async () => {
+    if (!editing) return;
+    if (!editNameInput.trim()) {
+      setError("List name is required.");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      const response = await fetch(apiUrl(`/api/admin/lists/${editing.id}`), {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: editNameInput.trim(),
+          description: editDescriptionInput.trim() || null,
+          isPrivate: editIsPrivate,
+        }),
+      });
+
+      let payload: unknown = null;
+      try {
+        payload = await response.json();
+      } catch {
+        payload = null;
+      }
+
+      if (!response.ok) {
+        const message = getErrorMessage(
+          payload,
+          `Failed to update list (${response.status})`
+        );
+        throw new Error(message);
+      }
+
+      const updatedList =
+        payload && typeof payload === "object" && payload !== null
+          ? (payload as { list?: AdminList }).list
+          : undefined;
+
+      if (updatedList) {
+        setLists((prev) =>
+          prev.map((entry) =>
+            entry.id === updatedList.id ? updatedList : entry
+          )
+        );
+      } else {
+        await fetchLists(0, false);
+      }
+      setEditing(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update list");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeletePicture = async (list: AdminList) => {
+    const confirmed = window.confirm(`Delete picture for list "${list.name}"?`);
+    if (!confirmed) return;
+    setError(null);
+    try {
+      const response = await fetch(
+        apiUrl(`/api/admin/lists/${list.id}/picture`),
+        {
+          method: "DELETE",
+          credentials: "include",
+        }
+      );
+
+      let payload: unknown = null;
+      try {
+        payload = await response.json();
+      } catch {
+        payload = null;
+      }
+
+      if (!response.ok) {
+        const message = getErrorMessage(
+          payload,
+          `Failed to delete picture (${response.status})`
+        );
+        throw new Error(message);
+      }
+
+      await fetchLists(0, false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete picture");
+    }
+  };
+
+  const handleViewRecords = async (list: AdminList) => {
+    setViewingRecords(list);
+    setLoadingRecords(true);
+    setRecords([]);
+    setError(null);
+
+    try {
+      const response = await fetch(
+        apiUrl(`/api/admin/lists/${list.id}/records`),
+        { credentials: "include" }
+      );
+
+      let payload: unknown = null;
+      try {
+        payload = await response.json();
+      } catch {
+        payload = null;
+      }
+
+      if (!response.ok) {
+        const message = getErrorMessage(
+          payload,
+          `Failed to load records (${response.status})`
+        );
+        throw new Error(message);
+      }
+
+      const body = (payload ?? {}) as { records?: AdminListRecord[] };
+      const items = Array.isArray(body.records) ? body.records : [];
+      setRecords(items);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load records");
+      setRecords([]);
+    } finally {
+      setLoadingRecords(false);
+    }
+  };
+
+  const handleDeleteRecord = async (record: AdminListRecord) => {
+    if (!viewingRecords) return;
+    const confirmed = window.confirm(
+      `Remove "${record.name}" from list "${viewingRecords.name}"?`
+    );
+    if (!confirmed) return;
+    setError(null);
+
+    try {
+      const response = await fetch(
+        apiUrl(`/api/admin/lists/${viewingRecords.id}/records/${record.id}`),
+        {
+          method: "DELETE",
+          credentials: "include",
+        }
+      );
+
+      let payload: unknown = null;
+      try {
+        payload = await response.json();
+      } catch {
+        payload = null;
+      }
+
+      if (!response.ok) {
+        const message = getErrorMessage(
+          payload,
+          `Failed to delete record (${response.status})`
+        );
+        throw new Error(message);
+      }
+
+      setRecords((prev) => prev.filter((r) => r.id !== record.id));
+      await fetchLists(0, false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete record");
+    }
+  };
+
+  return (
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+        <TextField
+          label="Search lists"
+          value={searchInput}
+          onChange={(event) => setSearchInput(event.target.value)}
+          onKeyDown={handleFieldKey}
+          size="small"
+          sx={{ width: { xs: "100%", md: 280 } }}
+        />
+        <TextField
+          label="Owner username"
+          value={ownerInput}
+          onChange={(event) => setOwnerInput(event.target.value)}
+          onKeyDown={handleFieldKey}
+          size="small"
+          sx={{ width: { xs: "100%", md: 220 } }}
+        />
+        <Button
+          variant="outlined"
+          onClick={() => fetchLists(0, false)}
+          disabled={loading}
+        >
+          Refresh
+        </Button>
+        <Box sx={{ flexGrow: 1 }} />
+        <Typography variant="body2" sx={{ alignSelf: "center", opacity: 0.8 }}>
+          {lists.length} shown
+        </Typography>
+      </Stack>
+
+      {error && <Alert severity="error">{error}</Alert>}
+
+      <TableContainer component={Paper} sx={{ maxHeight: 420 }}>
+        <Table stickyHeader size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell>ID</TableCell>
+              <TableCell>Name</TableCell>
+              <TableCell>Owner</TableCell>
+              <TableCell>Records</TableCell>
+              <TableCell>Likes</TableCell>
+              <TableCell>Privacy</TableCell>
+              <TableCell>Picture</TableCell>
+              <TableCell align="right">Actions</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {lists.map((list) => (
+              <TableRow hover key={list.id}>
+                <TableCell>{list.id}</TableCell>
+                <TableCell>
+                  <Tooltip title={list.description || "No description"}>
+                    <span>{list.name}</span>
+                  </Tooltip>
+                </TableCell>
+                <TableCell>
+                  {list.owner.displayName
+                    ? `${list.owner.displayName} (@${list.owner.username})`
+                    : `@${list.owner.username}`}
+                </TableCell>
+                <TableCell>
+                  <Chip
+                    label={list.recordCount}
+                    size="small"
+                    onClick={() => handleViewRecords(list)}
+                    clickable
+                  />
+                </TableCell>
+                <TableCell>{list.likes}</TableCell>
+                <TableCell>
+                  <Chip
+                    label={list.isPrivate ? "Private" : "Public"}
+                    size="small"
+                    color={list.isPrivate ? "default" : "primary"}
+                  />
+                </TableCell>
+                <TableCell>
+                  {list.pictureUrl ? (
+                    <Button
+                      size="small"
+                      color="error"
+                      onClick={() => handleDeletePicture(list)}
+                    >
+                      Delete
+                    </Button>
+                  ) : (
+                    "—"
+                  )}
+                </TableCell>
+                <TableCell align="right">
+                  <IconButton size="small" onClick={() => setEditing(list)}>
+                    <EditIcon fontSize="small" />
+                  </IconButton>
+                </TableCell>
+              </TableRow>
+            ))}
+            {!loading && lists.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={8} align="center">
+                  No lists found.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      {loading && lists.length === 0 ? (
+        <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+          <CircularProgress size={28} />
+        </Box>
+      ) : (
+        hasMore && (
+          <Box sx={{ display: "flex", justifyContent: "center" }}>
+            <Button
+              variant="contained"
+              onClick={() => fetchLists(offset, true)}
+              disabled={loadingMore}
+            >
+              {loadingMore ? "Loading…" : "Load more"}
+            </Button>
+          </Box>
+        )
+      )}
+
+      <Dialog
+        open={Boolean(editing)}
+        onClose={() => (saving ? undefined : setEditing(null))}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Edit list</DialogTitle>
+        <DialogContent
+          sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}
+        >
+          <TextField
+            label="Name"
+            value={editNameInput}
+            onChange={(event) => setEditNameInput(event.target.value)}
+            required
+            size="small"
+          />
+          <TextField
+            label="Description"
+            value={editDescriptionInput}
+            onChange={(event) => setEditDescriptionInput(event.target.value)}
+            multiline
+            minRows={2}
+            maxRows={4}
+            size="small"
+            sx={{
+              "& .MuiInputBase-root": {
+                height: "auto",
+              },
+            }}
+          />
+          <FormControlLabel
+            control={
+              <Switch
+                checked={editIsPrivate}
+                onChange={(event) => setEditIsPrivate(event.target.checked)}
+              />
+            }
+            label="Private"
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditing(null)} disabled={saving}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={saving} variant="contained">
+            {saving ? "Saving…" : "Save"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(viewingRecords)}
+        onClose={() => setViewingRecords(null)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          Records in "{viewingRecords?.name || ""}" ({records.length})
+        </DialogTitle>
+        <DialogContent>
+          {loadingRecords ? (
+            <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+              <CircularProgress size={28} />
+            </Box>
+          ) : records.length === 0 ? (
+            <Typography variant="body2" sx={{ py: 2, textAlign: "center" }}>
+              No records in this list.
+            </Typography>
+          ) : (
+            <TableContainer component={Paper} sx={{ mt: 1 }}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Name</TableCell>
+                    <TableCell>Artist</TableCell>
+                    <TableCell>Year</TableCell>
+                    <TableCell>Rating</TableCell>
+                    <TableCell align="right">Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {records.map((record) => (
+                    <TableRow hover key={record.id}>
+                      <TableCell>{record.name}</TableCell>
+                      <TableCell>{record.artist ?? "—"}</TableCell>
+                      <TableCell>{record.releaseYear ?? "—"}</TableCell>
+                      <TableCell>{record.rating ?? "—"}</TableCell>
+                      <TableCell align="right">
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={() => handleDeleteRecord(record)}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setViewingRecords(null)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+}
+
 function TagsTab() {
   const [searchInput, setSearchInput] = useState("");
   const [ownerInput, setOwnerInput] = useState("");
@@ -2073,6 +2624,8 @@ export default function Admin() {
         return <RecordsTab />;
       case "masters":
         return <MastersTab />;
+      case "lists":
+        return <ListsTab />;
       case "tags":
       default:
         return <TagsTab />;

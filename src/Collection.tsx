@@ -325,7 +325,7 @@ export default function Collection({ tableName, title }: CollectionProps) {
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
             sx={{
-              width: { xs: "100%", sm: 350 },
+              width: 300,
             }}
           />
           <Button

@@ -1139,6 +1139,19 @@ export default function MasterRecord() {
       return;
     }
     if (fromCollectionPath) {
+      // If we arrived at the master via a collection/list navigation (i.e. the
+      // location state contains a `fromCollection` object), prefer going back
+      // in history to avoid pushing a duplicate list entry. If there is no
+      // in-memory history entry (for example a direct link to the master),
+      // fall back to navigating to the list path.
+      const locState = locationState as any;
+      if (locState && locState.fromCollection) {
+        // Go back one step in the browser history which should return to the
+        // originating list page without adding a new history entry.
+        navigate(-1);
+        return;
+      }
+
       // Preserve any upstream origin (fromPath) when navigating back to the
       // collection/record so that subsequent back actions can continue to
       // return the user to the original page (e.g., Activity or Profile).

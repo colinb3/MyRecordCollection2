@@ -212,6 +212,10 @@ export default function RecordTable({
       sx={{
         border: "none",
         height: "100%",
+        // Smooth transition for row hover background-color
+        "& .MuiDataGrid-row": {
+          transition: "background-color 0.2s ease",
+        },
         "& .MuiDataGrid-cell": {
           display: "flex",
           alignItems: "center",

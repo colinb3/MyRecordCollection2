@@ -35,6 +35,11 @@ export function parseUtcDate(value: string | null | undefined): Date | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+const noYearDateFormatter = new Intl.DateTimeFormat(undefined, {
+  month: "short",
+  day: "numeric",
+});
+
 const defaultDateFormatter = new Intl.DateTimeFormat(undefined, {
   year: "numeric",
   month: "short",
@@ -79,6 +84,7 @@ export function formatRelativeTime(
   const diffMinutes = Math.floor(diffMs / (1000 * 60));
   const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const diffYears = Math.floor(diffMs / (1000 * 60 * 60 * 24 * 365));
 
   // Last hour: "x minutes ago"
   if (diffMinutes < 60) {
@@ -94,6 +100,11 @@ export function formatRelativeTime(
   // Last week: "x days ago"
   if (diffDays < 7) {
     return diffDays === 1 ? "1 day ago" : `${diffDays} days ago`;
+  }
+
+  // Last week: "x days ago"
+  if (diffYears < 1) {
+    return noYearDateFormatter.format(parsed);
   }
 
   // Otherwise, show the formatted date

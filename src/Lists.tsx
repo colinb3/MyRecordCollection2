@@ -905,6 +905,7 @@ export default function Lists() {
                     <Paper
                       sx={{
                         p: 2,
+                        pr: 1,
                         maxHeight: { xs: 400, md: 763 },
                         display: "flex",
                         flexDirection: "column",
@@ -920,6 +921,7 @@ export default function Lists() {
                       <Box
                         sx={{
                           flex: 1,
+                          pr: 1,
                           overflowY: "auto",
                           minHeight: 0,
                           display: "flex",
@@ -936,7 +938,7 @@ export default function Lists() {
                           </Typography>
                         ) : (
                           <>
-                            <Stack spacing={2}>
+                            <Stack spacing={0.75}>
                               {popularLists.map((list) => {
                                 const liked = list.likedByCurrentUser === true;
                                 const likeBusy = likeBusyIds.has(list.id);
@@ -950,6 +952,7 @@ export default function Lists() {
                                       p: 0,
                                       overflow: "hidden",
                                       cursor: "pointer",
+                                      transition: "background-color 0.2s ease",
                                       "&:hover": {
                                         bgcolor: "action.hover",
                                       },
@@ -1210,6 +1213,7 @@ export default function Lists() {
                         overflowY: "auto",
                         display: "flex",
                         flexDirection: "column",
+                        mr: sortedMyLists.length == 0 ? 0 : -1,
                       }}
                     >
                       {loadingMine ? (
@@ -1224,7 +1228,7 @@ export default function Lists() {
                         </Paper>
                       ) : (
                         <>
-                          <Stack spacing={2}>
+                          <Stack spacing={1} pr={1}>
                             {sortedMyLists.map((list) => {
                               return (
                                 <Paper
@@ -1233,6 +1237,7 @@ export default function Lists() {
                                     p: 0,
                                     overflow: "hidden",
                                     cursor: "pointer",
+                                    transition: "background-color 0.2s ease",
                                     "&:hover": {
                                       bgcolor: "action.hover",
                                     },
@@ -1297,6 +1302,7 @@ export default function Lists() {
                                           >
                                             <Chip
                                               size="small"
+                                              sx={{ pl: 1 }}
                                               color={
                                                 list.isPrivate
                                                   ? "default"
@@ -1308,11 +1314,6 @@ export default function Lists() {
                                                 ) : (
                                                   <PublicIcon fontSize="small" />
                                                 )
-                                              }
-                                              label={
-                                                list.isPrivate
-                                                  ? "Private"
-                                                  : "Public"
                                               }
                                             />
                                             <Chip

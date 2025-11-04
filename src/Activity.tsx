@@ -575,6 +575,7 @@ export default function Activity() {
                                     px: 0.5,
                                     py: 0.5,
                                     textAlign: "left",
+                                    transition: "background-color 0.2s ease",
                                     "&:hover": {
                                       bgcolor: "action.hover",
                                     },
@@ -792,6 +793,7 @@ export default function Activity() {
                                     px: 0.5,
                                     py: 0.5,
                                     textAlign: "left",
+                                    transition: "background-color 0.2s ease",
                                     "&:hover": {
                                       bgcolor: "action.hover",
                                     },

@@ -61,6 +61,10 @@ import { clearRecordTablePreferencesCache } from "./preferences";
 import { clearCommunityCaches } from "./communityUsers";
 import { setUserId } from "./analytics";
 import { optimizeProfileImageFile } from "./profileImageOptimizer";
+import { formatLocalDate } from "./dateUtils";
+import LockIcon from "@mui/icons-material/Lock";
+import PublicIcon from "@mui/icons-material/Public";
+import { alignSelf } from "@mui/system";
 
 interface OwnerInfo {
   username: string;
@@ -76,6 +80,7 @@ interface ListDetailData {
   likes: number;
   pictureUrl: string | null;
   recordCount: number;
+  created: string | null;
   likedByCurrentUser?: boolean;
   owner: OwnerInfo | null;
   isOwner: boolean;
@@ -199,7 +204,7 @@ function SortableRecordItem({
                 <Chip size="small" label={`${record.releaseYear}`} />
               )}
               {record.rating !== null && record.rating > 0 && (
-                <Chip size="small" label={`Rated ${record.rating}/10`} />
+                <Chip size="small" label={`${record.rating}/10`} />
               )}
             </Stack>
             {/* list records no longer store freeform review text */}
@@ -347,6 +352,10 @@ export default function ListDetail() {
           Number(input.recordCount) >= 0
             ? Math.trunc(Number(input.recordCount))
             : 0,
+        created:
+          typeof input.created === "string" && input.created.trim()
+            ? input.created.trim()
+            : null,
         likedByCurrentUser: input.likedByCurrentUser === true,
         owner: input.owner
           ? {
@@ -935,13 +944,27 @@ export default function ListDetail() {
                               justifyContent={"space-between"}
                             >
                               <Typography variant="h5" fontWeight={700} mr={1}>
-                                {list.name}
+                                {list.name}{" "}
+                                {list.isOwner ? (
+                                  list.isPrivate ? (
+                                    <Tooltip title="Private list">
+                                      <LockIcon
+                                        fontSize="medium"
+                                        sx={{ mb: -0.5 }}
+                                      />
+                                    </Tooltip>
+                                  ) : (
+                                    <Tooltip title="Public list">
+                                      <PublicIcon
+                                        fontSize="medium"
+                                        sx={{ mb: -0.5 }}
+                                      />
+                                    </Tooltip>
+                                  )
+                                ) : null}
                               </Typography>
                               <Box>
-                                <Stack
-                                  direction={{ xs: "column", sm: "row" }}
-                                  spacing={0.5}
-                                >
+                                <Stack direction="row" spacing={0.5}>
                                   {!list.isOwner && (
                                     <Tooltip
                                       title={
@@ -1033,11 +1056,14 @@ export default function ListDetail() {
                               mt={1.5}
                               sx={{ gap: 1 }}
                             >
-                              {list.isOwner && (
+                              {list.created && (
                                 <Chip
                                   size="small"
-                                  color={list.isPrivate ? "default" : "primary"}
-                                  label={list.isPrivate ? "Private" : "Public"}
+                                  color="primary"
+                                  label={
+                                    formatLocalDate(list.created) ??
+                                    list.created
+                                  }
                                 />
                               )}
                               <Chip
@@ -1089,7 +1115,7 @@ export default function ListDetail() {
                               items={safeRecords.map((r) => r.id)}
                               strategy={verticalListSortingStrategy}
                             >
-                              <Stack spacing={1}>
+                              <Stack spacing={0.75}>
                                 {safeRecords.map((record) => (
                                   <SortableRecordItem
                                     key={record.id}

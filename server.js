@@ -2125,7 +2125,7 @@ app.post(
 
       try {
         await pool.execute(
-          `INSERT INTO Follows (userUuid, followsUuid) VALUES (?, ?)`,
+          `INSERT INTO Follows (userUuid, followsUuid, created) VALUES (?, ?, UTC_TIMESTAMP())`,
           [req.userUuid, targetUser.uuid]
         );
       } catch (error) {
@@ -2222,7 +2222,7 @@ app.post('/api/register', async (req, res) => {
         : username;
     const pool = await getPool();
     await pool.execute(
-      'INSERT INTO User (uuid, username, displayName, password, bio, profilePic) VALUES (?, ?, ?, ?, ?, ?)',
+      'INSERT INTO User (uuid, username, displayName, password, bio, profilePic, created) VALUES (?, ?, ?, ?, ?, ?, UTC_TIMESTAMP())',
       [userUuid, username.toLowerCase(), displayName, hashedPassword, null, null]
     );
     await pool.execute(
@@ -2747,7 +2747,7 @@ app.post('/api/records/:id/review/like', requireAuth, async (req, res) => {
     }
 
     await pool.execute(
-      `INSERT IGNORE INTO LikedReview (userUuid, recordId) VALUES (?, ?)` ,
+      `INSERT IGNORE INTO LikedReview (userUuid, recordId, created) VALUES (?, ?, UTC_TIMESTAMP())` ,
       [req.userUuid, recordId]
     );
 
@@ -2864,12 +2864,12 @@ app.post('/api/records/update', requireAuth, async (req, res) => {
       let [tagRows] = await pool.execute(`SELECT id FROM Tag WHERE name = ? AND userUuid = ?`, [tagName, req.userUuid]);
       let tagId;
       if (tagRows.length === 0) {
-        const [result] = await pool.execute(`INSERT INTO Tag (name, userUuid) VALUES (?, ?)`, [tagName, req.userUuid]);
+        const [result] = await pool.execute(`INSERT INTO Tag (name, userUuid, created) VALUES (?, ?, UTC_TIMESTAMP())`, [tagName, req.userUuid]);
         tagId = result.insertId;
       } else {
         tagId = tagRows[0].id;
       }
-      await pool.execute(`INSERT IGNORE INTO Tagged (recordId, tagId) VALUES (?, ?)`, [id, tagId]);
+      await pool.execute(`INSERT IGNORE INTO Tagged (recordId, tagId, created) VALUES (?, ?, UTC_TIMESTAMP())`, [id, tagId]);
     }
 
     const [rows] = await pool.execute(
@@ -2988,8 +2988,8 @@ app.post('/api/records/create', requireAuth, async (req, res) => {
       }
       const masterCoverValue = masterCover || cleanCover || null;
       await pool.execute(
-        `INSERT INTO Master (id, artist, cover, name, release_year)
-         VALUES (?, ?, ?, ?, ?)
+        `INSERT INTO Master (id, artist, cover, name, release_year, created)
+         VALUES (?, ?, ?, ?, ?, UTC_TIMESTAMP())
          ON DUPLICATE KEY UPDATE
            artist = VALUES(artist),
            cover = CASE WHEN VALUES(cover) IS NOT NULL THEN VALUES(cover) ELSE cover END,
@@ -3022,12 +3022,12 @@ app.post('/api/records/create', requireAuth, async (req, res) => {
       let [tagRows] = await pool.execute(`SELECT id FROM Tag WHERE name = ? AND userUuid = ?`, [tagName, req.userUuid]);
       let tagId;
       if (tagRows.length === 0) {
-        const [tagResult] = await pool.execute(`INSERT INTO Tag (name, userUuid) VALUES (?, ?)`, [tagName, req.userUuid]);
+        const [tagResult] = await pool.execute(`INSERT INTO Tag (name, userUuid, created) VALUES (?, ?, UTC_TIMESTAMP())`, [tagName, req.userUuid]);
         tagId = tagResult.insertId;
       } else {
         tagId = tagRows[0].id;
       }
-      await pool.execute(`INSERT IGNORE INTO Tagged (recordId, tagId) VALUES (?, ?)`, [newId, tagId]);
+      await pool.execute(`INSERT IGNORE INTO Tagged (recordId, tagId, created) VALUES (?, ?, UTC_TIMESTAMP())`, [newId, tagId]);
     }
     // Return new record
     const [rows] = await pool.execute(
@@ -3060,7 +3060,7 @@ app.post('/api/tags/create', requireAuth, async (req, res) => {
     // Check duplicate
     const [existing] = await pool.execute(`SELECT id FROM Tag WHERE name = ? AND userUuid = ?`, [trimmed, req.userUuid]);
     if (existing.length > 0) return res.status(409).json({ error: 'Tag already exists' });
-    await pool.execute(`INSERT INTO Tag (name, userUuid) VALUES (?, ?)`, [trimmed, req.userUuid]);
+    await pool.execute(`INSERT INTO Tag (name, userUuid, created) VALUES (?, ?, UTC_TIMESTAMP())`, [trimmed, req.userUuid]);
     const [rows] = await pool.execute(`SELECT name FROM Tag WHERE userUuid = ? ORDER BY name`, [req.userUuid]);
     res.json({ tags: rows.map(r => r.name) });
   } catch (err) {
@@ -3244,7 +3244,7 @@ app.post('/api/import/discogs', requireAuth, async (req, res) => {
             tagId = tagRows[0].id;
           } else {
             const [tagInsert] = await pool.execute(
-              `INSERT INTO Tag (name, userUuid) VALUES (?, ?)`,
+              `INSERT INTO Tag (name, userUuid, created) VALUES (?, ?, UTC_TIMESTAMP())`,
               [tagName, req.userUuid]
             );
             tagId = tagInsert.insertId;
@@ -3252,7 +3252,7 @@ app.post('/api/import/discogs', requireAuth, async (req, res) => {
           tagCache.set(cacheKey, tagId);
         }
         await pool.execute(
-          `INSERT IGNORE INTO Tagged (recordId, tagId) VALUES (?, ?)`,
+          `INSERT IGNORE INTO Tagged (recordId, tagId, created) VALUES (?, ?, UTC_TIMESTAMP())`,
           [newRecordId, tagId]
         );
       }
@@ -4231,7 +4231,7 @@ app.post('/api/lists/:listId/like', requireAuth, async (req, res) => {
     }
 
     await connection.query(
-      `INSERT INTO ListLike (listId, userUuid) VALUES (?, ?)`,
+      `INSERT INTO ListLike (listId, userUuid, created) VALUES (?, ?, UTC_TIMESTAMP())`,
       [listId, req.userUuid]
     );
     await connection.query(
@@ -5326,6 +5326,203 @@ app.delete('/api/admin/tags/:tagId', requireAuth, requireAdmin, async (req, res)
   } catch (error) {
     console.error('Failed to delete tag as admin', error);
     res.status(500).json({ error: 'Failed to delete tag' });
+  }
+});
+
+// Admin list endpoints
+app.get('/api/admin/lists', requireAuth, requireAdmin, async (req, res) => {
+  console.log('Admin listing lists...');
+  const rawSearch = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+  const rawOwner = typeof req.query.user === 'string' ? req.query.user.trim() : '';
+  const limitRaw = Number(req.query.limit);
+  const offsetRaw = Number(req.query.offset);
+  const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.trunc(limitRaw), 100) : 25;
+  const offset = Number.isFinite(offsetRaw) && offsetRaw >= 0 ? Math.trunc(offsetRaw) : 0;
+  const searchTerm = rawSearch.slice(0, 128);
+  const conditions = [];
+  const params = [];
+
+  if (searchTerm) {
+    const like = `%${escapeForLike(searchTerm)}%`;
+    conditions.push('(l.name LIKE ? OR l.description LIKE ?)');
+    params.push(like, like);
+  }
+
+  if (rawOwner) {
+    conditions.push('u.username = ?');
+    params.push(rawOwner);
+  }
+
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  params.push(limit, offset);
+
+  try {
+    const pool = await getPool();
+    const [rows] = await pool.query(
+      `SELECT l.id, l.name, l.description, l.isPrivate, l.likes, l.picture, l.created,
+              u.username, u.displayName, u.profilePic,
+              COALESCE(stats.recordCount, 0) AS recordCount
+         FROM List l
+         JOIN User u ON u.uuid = l.userUuid
+         LEFT JOIN (
+           SELECT listId, COUNT(*) AS recordCount FROM ListRecord GROUP BY listId
+         ) stats ON stats.listId = l.id
+        ${whereClause}
+        ORDER BY l.created DESC
+        LIMIT ? OFFSET ?`,
+      params
+    );
+    const lists = Array.isArray(rows) ? rows.map(row => ({
+      id: Number(row.id),
+      name: String(row.name ?? ''),
+      description: row.description && String(row.description).trim() ? String(row.description) : null,
+      isPrivate: row.isPrivate === 1 || row.isPrivate === true,
+      likes: Number.isFinite(Number(row.likes)) ? Number(row.likes) : 0,
+      pictureUrl: row.picture && String(row.picture).trim() ? String(row.picture) : null,
+      recordCount: Number.isFinite(Number(row.recordCount)) ? Number(row.recordCount) : 0,
+      created: row.created && String(row.created).trim() ? String(row.created) : null,
+      owner: {
+        username: String(row.username ?? ''),
+        displayName: row.displayName && String(row.displayName).trim() ? String(row.displayName) : null,
+        profilePicUrl: buildProfilePicPublicPath(row.profilePic),
+      },
+    })) : [];
+    res.json({ lists });
+  } catch (error) {
+    console.error('Failed to fetch admin lists', error);
+    res.status(500).json({ error: 'Failed to fetch lists' });
+  }
+});
+
+app.get('/api/admin/lists/:listId/records', requireAuth, requireAdmin, async (req, res) => {
+  console.log('Admin fetching list records...');
+  const listId = Number(req.params.listId);
+  if (!Number.isInteger(listId) || listId <= 0) {
+    return res.status(400).json({ error: 'listId must be a positive integer' });
+  }
+
+  try {
+    const pool = await getPool();
+    const [rows] = await pool.query(
+      `SELECT lr.id, lr.name, lr.artist, lr.cover, lr.rating, lr.release_year AS releaseYear,
+              lr.added, lr.isCustom, lr.masterId, lr.sortOrder
+         FROM ListRecord lr
+        WHERE lr.listId = ?
+        ORDER BY lr.sortOrder ASC, lr.added DESC`,
+      [listId]
+    );
+    const records = Array.isArray(rows) ? rows.map(mapListRecordRow) : [];
+    res.json({ records });
+  } catch (error) {
+    console.error('Failed to fetch list records as admin', error);
+    res.status(500).json({ error: 'Failed to fetch list records' });
+  }
+});
+
+app.patch('/api/admin/lists/:listId', requireAuth, requireAdmin, async (req, res) => {
+  console.log('Admin updating list...');
+  const listId = Number(req.params.listId);
+  if (!Number.isInteger(listId) || listId <= 0) {
+    return res.status(400).json({ error: 'listId must be a positive integer' });
+  }
+
+  const name = typeof req.body.name === 'string' ? req.body.name.trim() : null;
+  const description = typeof req.body.description === 'string' ? req.body.description.trim() : null;
+  const isPrivate = req.body.isPrivate === true || req.body.isPrivate === 1 || req.body.isPrivate === '1';
+
+  if (!name) {
+    return res.status(400).json({ error: 'name is required' });
+  }
+
+  try {
+    const pool = await getPool();
+    await pool.execute(
+      `UPDATE List SET name = ?, description = ?, isPrivate = ? WHERE id = ?`,
+      [name, description, isPrivate, listId]
+    );
+
+    const [rows] = await pool.query(
+      `SELECT l.id, l.name, l.description, l.isPrivate, l.likes, l.picture, l.created,
+              u.username, u.displayName, u.profilePic,
+              COALESCE(stats.recordCount, 0) AS recordCount
+         FROM List l
+         JOIN User u ON u.uuid = l.userUuid
+         LEFT JOIN (
+           SELECT listId, COUNT(*) AS recordCount FROM ListRecord GROUP BY listId
+         ) stats ON stats.listId = l.id
+        WHERE l.id = ?
+        LIMIT 1`,
+      [listId]
+    );
+
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return res.status(404).json({ error: 'List not found' });
+    }
+
+    const row = rows[0];
+    const list = {
+      id: Number(row.id),
+      name: String(row.name ?? ''),
+      description: row.description && String(row.description).trim() ? String(row.description) : null,
+      isPrivate: row.isPrivate === 1 || row.isPrivate === true,
+      likes: Number.isFinite(Number(row.likes)) ? Number(row.likes) : 0,
+      pictureUrl: row.picture && String(row.picture).trim() ? String(row.picture) : null,
+      recordCount: Number.isFinite(Number(row.recordCount)) ? Number(row.recordCount) : 0,
+      created: row.created && String(row.created).trim() ? String(row.created) : null,
+      owner: {
+        username: String(row.username ?? ''),
+        displayName: row.displayName && String(row.displayName).trim() ? String(row.displayName) : null,
+        profilePicUrl: buildProfilePicPublicPath(row.profilePic),
+      },
+    };
+    res.json({ list });
+  } catch (error) {
+    console.error('Failed to update list as admin', error);
+    res.status(500).json({ error: 'Failed to update list' });
+  }
+});
+
+app.delete('/api/admin/lists/:listId/picture', requireAuth, requireAdmin, async (req, res) => {
+  console.log('Admin deleting list picture...');
+  const listId = Number(req.params.listId);
+  if (!Number.isInteger(listId) || listId <= 0) {
+    return res.status(400).json({ error: 'listId must be a positive integer' });
+  }
+
+  try {
+    const pool = await getPool();
+    await pool.execute('UPDATE List SET picture = NULL WHERE id = ?', [listId]);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Failed to delete list picture as admin', error);
+    res.status(500).json({ error: 'Failed to delete list picture' });
+  }
+});
+
+app.delete('/api/admin/lists/:listId/records/:recordId', requireAuth, requireAdmin, async (req, res) => {
+  console.log('Admin deleting record from list...');
+  const listId = Number(req.params.listId);
+  const recordId = Number(req.params.recordId);
+  if (!Number.isInteger(listId) || listId <= 0) {
+    return res.status(400).json({ error: 'listId must be a positive integer' });
+  }
+  if (!Number.isInteger(recordId) || recordId <= 0) {
+    return res.status(400).json({ error: 'recordId must be a positive integer' });
+  }
+
+  try {
+    const pool = await getPool();
+    const [result] = await pool.execute(
+      'DELETE FROM ListRecord WHERE id = ? AND listId = ?',
+      [recordId, listId]
+    );
+    if (!result || result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Record not found in list' });
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Failed to delete record from list as admin', error);
+    res.status(500).json({ error: 'Failed to delete record from list' });
   }
 });
 
