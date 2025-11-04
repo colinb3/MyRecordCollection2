@@ -95,9 +95,23 @@ function normalizeRecords(raw: unknown): MrcRecord[] {
 }
 
 function cloneFeedEntry(entry: CommunityFeedEntry): CommunityFeedEntry {
+  if (entry.type === 'record') {
+    return {
+      type: 'record',
+      owner: { ...entry.owner },
+      record: cloneRecord(entry.record),
+    };
+  }
+
+  const previews = Array.isArray(entry.previewRecords)
+    ? entry.previewRecords.map((preview) => ({ ...preview }))
+    : [];
+
   return {
+    type: 'list',
     owner: { ...entry.owner },
-    record: cloneRecord(entry.record),
+    list: { ...entry.list },
+    previewRecords: previews,
   };
 }
 
@@ -107,14 +121,13 @@ function cloneFeedEntries(entries: CommunityFeedEntry[]): CommunityFeedEntry[] {
 
 function normalizeFeedEntry(raw: AnyObject): CommunityFeedEntry | null {
   const ownerRaw = raw.owner;
-  const recordRaw = raw.record;
-  if (!isObject(ownerRaw) || !isObject(recordRaw)) {
+  const type = typeof raw.type === 'string' ? raw.type : 'record';
+
+  if (!isObject(ownerRaw)) {
     return null;
   }
 
   const ownerObject = ownerRaw as AnyObject;
-  const recordObject = recordRaw as AnyObject;
-
   const ownerUsername =
     typeof ownerObject.username === "string" && ownerObject.username.trim()
       ? ownerObject.username.trim()
@@ -123,6 +136,83 @@ function normalizeFeedEntry(raw: AnyObject): CommunityFeedEntry | null {
     return null;
   }
 
+  const displayName =
+    typeof ownerObject.displayName === "string" &&
+    ownerObject.displayName.trim()
+      ? ownerObject.displayName
+      : null;
+
+  const profilePicUrl = normalizeProfilePicUrl(ownerObject.profilePicUrl);
+
+  const owner = {
+    username: ownerUsername,
+    displayName,
+    profilePicUrl,
+  };
+
+  // Handle list entry
+  if (type === 'list') {
+    const listRaw = raw.list;
+    if (!isObject(listRaw)) {
+      return null;
+    }
+    const listObject = listRaw as AnyObject;
+    const previewsRaw = Array.isArray(raw.previewRecords)
+      ? raw.previewRecords
+      : [];
+    const previewRecords = previewsRaw
+      .map((item) => {
+        if (!isObject(item)) {
+          return null;
+        }
+        const previewObject = item as AnyObject;
+        const previewId = Number(previewObject.id);
+        const name =
+          typeof previewObject.name === "string" ? previewObject.name : "";
+        const cover =
+          typeof previewObject.cover === "string" && previewObject.cover.trim()
+            ? previewObject.cover.trim()
+            : null;
+        return {
+          id: Number.isInteger(previewId) && previewId > 0 ? previewId : 0,
+          name,
+          cover,
+        };
+      })
+      .filter(
+        (item): item is {
+          id: number;
+          name: string;
+          cover: string | null;
+        } => item !== null
+      );
+    
+    return {
+      type: 'list',
+      owner,
+      list: {
+        id: Number(listObject.id) || 0,
+        name: typeof listObject.name === 'string' ? listObject.name : '',
+        description: typeof listObject.description === 'string' && listObject.description.trim()
+          ? listObject.description
+          : null,
+        picture: typeof listObject.picture === 'string' && listObject.picture.trim()
+          ? listObject.picture
+          : null,
+        recordCount: Number(listObject.recordCount) || 0,
+        created: typeof listObject.created === 'string' ? listObject.created : '',
+      },
+      previewRecords,
+    };
+  }
+
+  // Handle record entry
+  const recordRaw = raw.record;
+  if (!isObject(recordRaw)) {
+    return null;
+  }
+
+  const recordObject = recordRaw as AnyObject;
   const record = normalizeApiRecord(recordObject);
   if (!record) {
     return null;
@@ -134,20 +224,9 @@ function normalizeFeedEntry(raw: AnyObject): CommunityFeedEntry | null {
     record.tags = [];
   }
 
-  const displayName =
-    typeof ownerObject.displayName === "string" &&
-    ownerObject.displayName.trim()
-      ? ownerObject.displayName
-      : null;
-
-  const profilePicUrl = normalizeProfilePicUrl(ownerObject.profilePicUrl);
-
   return {
-    owner: {
-      username: ownerUsername,
-      displayName,
-      profilePicUrl,
-    },
+    type: 'record',
+    owner,
     record,
   };
 }
@@ -159,7 +238,7 @@ type ActivityScope = "friends" | "you";
 
 const activityFeedCache = new Map<ActivityScope, CommunityFeedEntry[]>();
 const activityFeedInFlight = new Map<
-  ActivityScope,
+  string,
   Promise<CommunityFeedEntry[]>
 >();
 
@@ -210,23 +289,29 @@ export async function searchCommunityUsers(
 }
 
 export async function loadActivityFeed(
-  scope: ActivityScope = "friends"
+  scope: ActivityScope = "friends",
+  limit: number = 10,
+  offset: number = 0
 ): Promise<CommunityFeedEntry[]> {
   const normalizedScope: ActivityScope = scope === "you" ? "you" : "friends";
 
-  if (activityFeedCache.has(normalizedScope)) {
+  // Don't use cache for paginated requests
+  if (offset === 0 && activityFeedCache.has(normalizedScope)) {
     return cloneFeedEntries(activityFeedCache.get(normalizedScope)!);
   }
 
-  if (activityFeedInFlight.has(normalizedScope)) {
+  const cacheKey = `${normalizedScope}-${offset}`;
+  if (activityFeedInFlight.has(cacheKey)) {
     return activityFeedInFlight
-      .get(normalizedScope)!
+      .get(cacheKey)!
       .then((entries) => cloneFeedEntries(entries));
   }
 
   const fetchPromise = (async () => {
     const searchParams = new URLSearchParams();
     searchParams.set("scope", normalizedScope);
+    searchParams.set("limit", limit.toString());
+    searchParams.set("offset", offset.toString());
     const query = searchParams.toString();
 
     try {
@@ -252,17 +337,19 @@ export async function loadActivityFeed(
         .map((item) => normalizeFeedEntry(item))
         .filter((item): item is CommunityFeedEntry => item !== null);
 
-      activityFeedCache.set(
-        normalizedScope,
-        cloneFeedEntries(normalized)
-      );
+      if (offset === 0) {
+        activityFeedCache.set(
+          normalizedScope,
+          cloneFeedEntries(normalized)
+        );
+      }
       return cloneFeedEntries(normalized);
     } finally {
-      activityFeedInFlight.delete(normalizedScope);
+      activityFeedInFlight.delete(cacheKey);
     }
   })();
 
-  activityFeedInFlight.set(normalizedScope, fetchPromise);
+  activityFeedInFlight.set(cacheKey, fetchPromise);
   return fetchPromise;
 }
 

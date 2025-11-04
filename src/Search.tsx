@@ -23,11 +23,11 @@ import {
   Avatar,
   ListItemText,
 } from "@mui/material";
+import ImageNotSupportedIcon from "@mui/icons-material/ImageNotSupported";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import TopBar from "./components/TopBar";
 import { darkTheme } from "./theme";
 import { setUserId } from "./analytics";
-import placeholderCover from "./assets/missingImg.jpg";
 import {
   clearUserInfoCache,
   getCachedUserInfo,
@@ -36,6 +36,7 @@ import {
 import { clearRecordTablePreferencesCache } from "./preferences";
 import { clearCommunityCaches, searchCommunityUsers } from "./communityUsers";
 import type { CommunityUserSummary } from "./types";
+import { formatLocalDate } from "./dateUtils";
 
 interface AlbumResult {
   name: string;
@@ -52,15 +53,37 @@ interface RecordListItem {
   cover: string;
 }
 
+interface ListOwnerSummary {
+  username: string;
+  displayName: string | null;
+  profilePicUrl: string | null;
+}
+
+interface ListSearchResult {
+  id: number;
+  name: string;
+  description: string | null;
+  pictureUrl: string | null;
+  recordCount: number;
+  likes: number;
+  created: string | null;
+  owner: ListOwnerSummary | null;
+}
+
 const MIN_USER_QUERY_LENGTH = 2;
-const SEARCH_TAB_VALUES = ["records", "users"] as const;
+const MIN_LIST_QUERY_LENGTH = 2;
+const SEARCH_TAB_VALUES = ["records", "lists", "users"] as const;
 type SearchTab = (typeof SEARCH_TAB_VALUES)[number];
 
 export default function Search() {
   const [searchParams, setSearchParams] = useSearchParams();
   const paramTab = searchParams.get("tab");
   const paramQuery = searchParams.get("q") ?? "";
-  const initialTab: SearchTab = paramTab === "users" ? "users" : "records";
+  const initialTab: SearchTab = SEARCH_TAB_VALUES.includes(
+    paramTab as SearchTab
+  )
+    ? (paramTab as SearchTab) || "records"
+    : "records";
 
   const navigate = useNavigate();
   const cachedUser = getCachedUserInfo();
@@ -75,7 +98,9 @@ export default function Search() {
   const [activeTab, setActiveTab] = useState<SearchTab>(initialTab);
 
   useEffect(() => {
-    const nextTab: SearchTab = paramTab === "users" ? "users" : "records";
+    const nextTab: SearchTab = SEARCH_TAB_VALUES.includes(paramTab as SearchTab)
+      ? (paramTab as SearchTab) || "records"
+      : "records";
     setActiveTab(nextTab);
   }, [paramTab]);
 
@@ -207,6 +232,123 @@ export default function Search() {
     [navigate, searchParams]
   );
 
+  const [listResults, setListResults] = useState<ListSearchResult[]>([]);
+  const [listStatus, setListStatus] = useState<
+    "idle" | "loading" | "error" | "ready"
+  >("idle");
+  const [listError, setListError] = useState<string | null>(null);
+  const [listSearchInput, setListSearchInput] = useState(paramQuery);
+  const [listSubmittedQuery, setListSubmittedQuery] = useState(paramQuery);
+
+  const runListSearch = useCallback(async (value: string) => {
+    const trimmed = value.trim();
+    setListSubmittedQuery(trimmed);
+    if (!trimmed) {
+      setListResults([]);
+      setListStatus("idle");
+      setListError(null);
+      return;
+    }
+    if (trimmed.length < MIN_LIST_QUERY_LENGTH) {
+      setListResults([]);
+      setListStatus("error");
+      setListError(
+        `Enter at least ${MIN_LIST_QUERY_LENGTH} characters to search.`
+      );
+      return;
+    }
+
+    setListStatus("loading");
+    setListError(null);
+    try {
+      const response = await fetch(
+        apiUrl(
+          `/api/lists/search?q=${encodeURIComponent(trimmed)}&limit=20&offset=0`
+        ),
+        { credentials: "include" }
+      );
+      if (!response.ok) {
+        const problem = await response.json().catch(() => ({}));
+        throw new Error(problem.error || `Search failed (${response.status})`);
+      }
+      const data = await response.json();
+      const lists: ListSearchResult[] = Array.isArray(data?.lists)
+        ? data.lists.map((entry: any) => ({
+            id: Number(entry?.id) || 0,
+            name: typeof entry?.name === "string" ? entry.name : "",
+            description:
+              typeof entry?.description === "string" && entry.description.trim()
+                ? entry.description.trim()
+                : null,
+            pictureUrl:
+              typeof entry?.pictureUrl === "string" && entry.pictureUrl.trim()
+                ? entry.pictureUrl.trim()
+                : null,
+            recordCount:
+              Number.isFinite(entry?.recordCount) && entry.recordCount >= 0
+                ? Math.trunc(entry.recordCount)
+                : 0,
+            likes:
+              Number.isFinite(entry?.likes) && entry.likes >= 0
+                ? Math.trunc(entry.likes)
+                : 0,
+            created:
+              typeof entry?.created === "string" && entry.created.trim()
+                ? entry.created.trim()
+                : null,
+            owner:
+              entry?.owner && typeof entry.owner === "object"
+                ? {
+                    username:
+                      typeof entry.owner.username === "string"
+                        ? entry.owner.username
+                        : "",
+                    displayName:
+                      typeof entry.owner.displayName === "string" &&
+                      entry.owner.displayName.trim()
+                        ? entry.owner.displayName.trim()
+                        : null,
+                    profilePicUrl:
+                      typeof entry.owner.profilePicUrl === "string" &&
+                      entry.owner.profilePicUrl.trim()
+                        ? entry.owner.profilePicUrl.trim()
+                        : null,
+                  }
+                : null,
+          }))
+        : [];
+      setListResults(lists);
+      setListStatus("ready");
+    } catch (error) {
+      console.error(error);
+      const message =
+        error instanceof Error ? error.message : "Failed to search lists";
+      setListError(message);
+      setListStatus("error");
+    }
+  }, []);
+
+  const handleListClick = useCallback(
+    (listId: number) => {
+      navigate(`/lists/${listId}`);
+    },
+    [navigate]
+  );
+
+  const handleListsClear = useCallback(
+    (updateUrl = true) => {
+      setListSearchInput("");
+      setListResults([]);
+      setListStatus("idle");
+      setListError(null);
+      setListSubmittedQuery("");
+      if (updateUrl) {
+        updateSearchParams("lists", "");
+      }
+    },
+    [updateSearchParams]
+  );
+
   const [userResults, setUserResults] = useState<CommunityUserSummary[]>([]);
   const [userStatus, setUserStatus] = useState<
     "idle" | "loading" | "error" | "ready"
@@ -271,22 +413,36 @@ export default function Search() {
   const handleTabChange = useCallback(
     (_event: SyntheticEvent, value: SearchTab) => {
       const currentInput =
-        activeTab === "records" ? recordSearchInput : userSearchInput;
+        activeTab === "records"
+          ? recordSearchInput
+          : activeTab === "lists"
+          ? listSearchInput
+          : userSearchInput;
       if (value === "records") {
         setRecordSearchInput(currentInput);
+      } else if (value === "lists") {
+        setListSearchInput(currentInput);
       } else {
         setUserSearchInput(currentInput);
       }
       setActiveTab(value);
       updateSearchParams(value, currentInput.trim());
     },
-    [activeTab, recordSearchInput, updateSearchParams, userSearchInput]
+    [
+      activeTab,
+      listSearchInput,
+      recordSearchInput,
+      updateSearchParams,
+      userSearchInput,
+    ]
   );
 
   const handleTopBarSearchChange = useCallback(
     (value: string) => {
       if (activeTab === "records") {
         setRecordSearchInput(value);
+      } else if (activeTab === "lists") {
+        setListSearchInput(value);
       } else {
         setUserSearchInput(value);
       }
@@ -304,6 +460,14 @@ export default function Search() {
           return;
         }
         updateSearchParams("records", trimmed);
+      } else if (activeTab === "lists") {
+        setListSearchInput(value);
+        const trimmed = value.trim();
+        if (!trimmed) {
+          handleListsClear();
+          return;
+        }
+        updateSearchParams("lists", trimmed);
       } else {
         setUserSearchInput(value);
         const trimmed = value.trim();
@@ -314,28 +478,40 @@ export default function Search() {
         updateSearchParams("users", trimmed);
       }
     },
-    [activeTab, handleRecordsClear, handleUsersClear, updateSearchParams]
+    [
+      activeTab,
+      handleListsClear,
+      handleRecordsClear,
+      handleUsersClear,
+      updateSearchParams,
+    ]
   );
 
   useEffect(() => {
     setRecordSearchInput(paramQuery);
+    setListSearchInput(paramQuery);
     setUserSearchInput(paramQuery);
     const trimmed = paramQuery.trim();
     if (!trimmed) {
       handleRecordsClear(false);
+      handleListsClear(false);
       handleUsersClear(false);
       return;
     }
     if (activeTab === "records") {
       void handleRecordsSearchSubmit(trimmed);
+    } else if (activeTab === "lists") {
+      void runListSearch(trimmed);
     } else {
       void runUserSearch(trimmed);
     }
   }, [
     activeTab,
+    handleListsClear,
     handleRecordsClear,
     handleRecordsSearchSubmit,
     handleUsersClear,
+    runListSearch,
     paramQuery,
     runUserSearch,
   ]);
@@ -364,10 +540,16 @@ export default function Search() {
           searchPlaceholder={
             activeTab === "records"
               ? "Search albums by title"
+              : activeTab === "lists"
+              ? "Search public lists"
               : "Search for users"
           }
           searchValue={
-            activeTab === "records" ? recordSearchInput : userSearchInput
+            activeTab === "records"
+              ? recordSearchInput
+              : activeTab === "lists"
+              ? listSearchInput
+              : userSearchInput
           }
           onSearchChange={handleTopBarSearchChange}
           onSearchSubmit={handleTopBarSearchSubmit}
@@ -399,10 +581,11 @@ export default function Search() {
                 indicatorColor="primary"
               >
                 <Tab label="Records" value="records" />
+                <Tab label="Lists" value="lists" />
                 <Tab label="Users" value="users" />
               </Tabs>
               <Divider />
-              {activeTab === "records" ? (
+              {activeTab === "records" && (
                 <Box
                   sx={{
                     flex: 1,
@@ -422,8 +605,6 @@ export default function Search() {
                   <Box
                     sx={{
                       flex: 1,
-                      // Ensure there's space for the absolute spinner when loading
-                      // and there are no items yet (otherwise height could collapse to 0)
                       minHeight:
                         recordLoading && recordItems.length === 0 ? 240 : 0,
                       position: "relative",
@@ -462,44 +643,59 @@ export default function Search() {
                           pr: 1,
                         }}
                       >
-                        {recordItems.map((item) => (
-                          <ListItemButton
-                            key={item.id}
-                            onClick={() => handleRecordSelect(item)}
-                            divider
-                            sx={{ alignItems: "flex-start", gap: 2 }}
-                          >
-                            <ListItemAvatar>
-                              <Avatar
-                                variant="square"
-                                src={item.cover || placeholderCover}
-                                alt={item.record}
-                                sx={{
-                                  width: { xs: 90, md: 120 },
-                                  height: { xs: 90, md: 120 },
-                                  borderRadius: 1,
-                                  bgcolor: "grey.900",
-                                }}
-                              />
-                            </ListItemAvatar>
-                            <ListItemText
-                              sx={{ alignSelf: "center" }}
-                              primary={
-                                <Typography
-                                  variant="subtitle1"
-                                  fontWeight={700}
+                        {recordItems.map((item) => {
+                          const coverUrl =
+                            typeof item.cover === "string" && item.cover.trim()
+                              ? item.cover.trim()
+                              : "";
+                          return (
+                            <ListItemButton
+                              key={item.id}
+                              onClick={() => handleRecordSelect(item)}
+                              divider
+                              sx={{ alignItems: "flex-start", gap: 2 }}
+                            >
+                              <ListItemAvatar>
+                                <Avatar
+                                  variant="square"
+                                  src={coverUrl || undefined}
+                                  alt={item.record}
+                                  sx={{
+                                    width: { xs: 90, md: 120 },
+                                    height: { xs: 90, md: 120 },
+                                    borderRadius: 1,
+                                    bgcolor: "grey.900",
+                                  }}
                                 >
-                                  {item.record}
-                                </Typography>
-                              }
-                              secondary={
-                                <Typography color="text.secondary">
-                                  {item.artist}
-                                </Typography>
-                              }
-                            />
-                          </ListItemButton>
-                        ))}
+                                  {!coverUrl && (
+                                    <ImageNotSupportedIcon
+                                      sx={{
+                                        fontSize: { xs: 36, md: 48 },
+                                        color: "text.secondary",
+                                      }}
+                                    />
+                                  )}
+                                </Avatar>
+                              </ListItemAvatar>
+                              <ListItemText
+                                sx={{ alignSelf: "center" }}
+                                primary={
+                                  <Typography
+                                    variant="subtitle1"
+                                    fontWeight={700}
+                                  >
+                                    {item.record}
+                                  </Typography>
+                                }
+                                secondary={
+                                  <Typography color="text.secondary">
+                                    {item.artist}
+                                  </Typography>
+                                }
+                              />
+                            </ListItemButton>
+                          );
+                        })}
                       </List>
                     )}
                     {recordLoading && (
@@ -518,7 +714,186 @@ export default function Search() {
                     )}
                   </Box>
                 </Box>
-              ) : (
+              )}
+              {activeTab === "lists" && (
+                <Box
+                  sx={{
+                    px: { xs: 1.5, md: 2 },
+                    py: 1,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 2,
+                    flex: 1,
+                    minHeight: 0,
+                    overflow: "hidden",
+                  }}
+                >
+                  {listStatus === "idle" && (
+                    <Box
+                      sx={{
+                        height: "100%",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        textAlign: "center",
+                        px: 2,
+                        py: 4,
+                      }}
+                    >
+                      <Typography variant="h6" gutterBottom>
+                        Search for a list to get started.
+                      </Typography>
+                      <Typography color="text.secondary">
+                        Use the search box above to find public lists.
+                      </Typography>
+                    </Box>
+                  )}
+                  {listStatus === "loading" && (
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 2,
+                        justifyContent: "center",
+                        py: 4,
+                      }}
+                    >
+                      <CircularProgress size={24} />
+                      <Typography color="text.secondary">
+                        Searching lists…
+                      </Typography>
+                    </Box>
+                  )}
+                  {listStatus === "error" && listError && (
+                    <Alert severity="error">{listError}</Alert>
+                  )}
+                  {listStatus === "ready" && listResults.length === 0 && (
+                    <Box
+                      sx={{
+                        height: "100%",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        textAlign: "center",
+                        px: 2,
+                        py: 4,
+                      }}
+                    >
+                      <Typography variant="h6" gutterBottom>
+                        No lists matched “{listSubmittedQuery}”.
+                      </Typography>
+                    </Box>
+                  )}
+                  {listStatus === "ready" && listResults.length > 0 && (
+                    <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+                      <List disablePadding>
+                        {listResults.map((list) => {
+                          const coverUrl =
+                            typeof list.pictureUrl === "string" &&
+                            list.pictureUrl.trim()
+                              ? list.pictureUrl.trim()
+                              : "";
+                          const createdText = list.created
+                            ? formatLocalDate(list.created) ?? list.created
+                            : null;
+                          const recordCountText = `${list.recordCount} ${
+                            list.recordCount === 1 ? "record" : "records"
+                          }`;
+                          const metaSegments = [recordCountText];
+                          if (list.likes > 0) {
+                            metaSegments.push(
+                              `${list.likes} ${
+                                list.likes === 1 ? "like" : "likes"
+                              }`
+                            );
+                          }
+                          if (createdText) {
+                            metaSegments.push(`Created ${createdText}`);
+                          }
+                          const ownerUsername = list.owner?.username ?? null;
+                          const ownerDisplayName =
+                            list.owner?.displayName &&
+                            list.owner.displayName.trim()
+                              ? list.owner.displayName.trim()
+                              : null;
+                          const primaryOwnerLabel = ownerDisplayName
+                            ? ownerDisplayName
+                            : ownerUsername
+                            ? `@${ownerUsername}`
+                            : null;
+
+                          return (
+                            <ListItemButton
+                              key={list.id}
+                              onClick={() => handleListClick(list.id)}
+                              sx={{ borderRadius: 1, alignItems: "flex-start" }}
+                            >
+                              <ListItemAvatar>
+                                <Avatar
+                                  variant="rounded"
+                                  src={coverUrl || undefined}
+                                  alt={list.name}
+                                  sx={{
+                                    width: 90,
+                                    height: 90,
+                                    bgcolor: "grey.800",
+                                  }}
+                                >
+                                  {!coverUrl && (
+                                    <ImageNotSupportedIcon
+                                      sx={{
+                                        fontSize: 32,
+                                        color: "text.secondary",
+                                      }}
+                                    />
+                                  )}
+                                </Avatar>
+                              </ListItemAvatar>
+                              <ListItemText
+                                sx={{ ml: 2 }}
+                                primary={
+                                  <Typography
+                                    variant="subtitle1"
+                                    fontWeight={700}
+                                    sx={{ pr: 2 }}
+                                  >
+                                    {list.name}
+                                  </Typography>
+                                }
+                                secondary={
+                                  <>
+                                    {primaryOwnerLabel && (
+                                      <Typography
+                                        component="span"
+                                        variant="body2"
+                                        color="text.secondary"
+                                        sx={{ display: "block" }}
+                                      >
+                                        {primaryOwnerLabel}
+                                      </Typography>
+                                    )}
+                                    <Typography
+                                      component="span"
+                                      variant="body2"
+                                      color="text.secondary"
+                                      sx={{ display: "block", mt: 0.75 }}
+                                    >
+                                      {metaSegments.join(" · ")}
+                                    </Typography>
+                                  </>
+                                }
+                              />
+                            </ListItemButton>
+                          );
+                        })}
+                      </List>
+                    </Box>
+                  )}
+                </Box>
+              )}
+              {activeTab === "users" && (
                 <Box
                   sx={{
                     px: { xs: 1.5, md: 2 },

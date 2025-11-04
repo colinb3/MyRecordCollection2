@@ -520,7 +520,7 @@ export default function BarcodeScanner() {
         >
           <Box
             sx={{
-              maxWidth: 800,
+              maxWidth: 860,
               mx: "auto",
             }}
           >
@@ -560,7 +560,7 @@ export default function BarcodeScanner() {
                       borderRadius: 2,
                       overflow: "hidden",
                       bgcolor: "grey.900",
-                      minHeight: 300,
+                      minHeight: 320,
                     }}
                   >
                     <video

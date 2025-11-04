@@ -21,7 +21,9 @@ import {
   Button,
   ButtonBase,
   Stack,
+  ListItem,
 } from "@mui/material";
+import ImageNotSupportedIcon from "@mui/icons-material/ImageNotSupported";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import TopBar from "./components/TopBar";
 import { darkTheme } from "./theme";
@@ -34,10 +36,12 @@ import { clearRecordTablePreferencesCache } from "./preferences";
 import { setUserId } from "./analytics";
 import { clearProfileHighlightsCache } from "./profileHighlights";
 import { clearCollectionRecordsCache } from "./collectionRecords";
-import type { CommunityFeedEntry } from "./types";
+import type {
+  CommunityFeedEntry,
+  CommunityFeedListPreviewRecord,
+} from "./types";
 import { clearCommunityCaches, loadActivityFeed } from "./communityUsers";
 import apiUrl from "./api";
-import placeholderCover from "./assets/missingImg.jpg";
 import { Grid } from "@mui/system";
 import { formatRelativeTime } from "./dateUtils";
 
@@ -90,6 +94,10 @@ export default function Activity() {
     entries: [],
     error: null,
   });
+  const [hasMoreFriends, setHasMoreFriends] = useState(true);
+  const [hasMoreYou, setHasMoreYou] = useState(true);
+  const [loadingMoreFriends, setLoadingMoreFriends] = useState(false);
+  const [loadingMoreYou, setLoadingMoreYou] = useState(false);
 
   const location = useLocation();
 
@@ -130,10 +138,11 @@ export default function Activity() {
 
     let cancelled = false;
 
-    loadActivityFeed("friends")
+    loadActivityFeed("friends", 10, 0)
       .then((data) => {
         if (cancelled) return;
         setFriendsFeed({ status: "ready", entries: data, error: null });
+        setHasMoreFriends(data.length === 10);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -154,10 +163,11 @@ export default function Activity() {
 
     let cancelled = false;
 
-    loadActivityFeed("you")
+    loadActivityFeed("you", 10, 0)
       .then((data) => {
         if (cancelled) return;
         setYouFeed({ status: "ready", entries: data, error: null });
+        setHasMoreYou(data.length === 10);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -218,9 +228,67 @@ export default function Activity() {
     [navigate]
   );
 
+  const loadMoreFriends = useCallback(() => {
+    if (
+      loadingMoreFriends ||
+      !hasMoreFriends ||
+      friendsFeed.status !== "ready"
+    ) {
+      return;
+    }
+
+    setLoadingMoreFriends(true);
+    const currentOffset = friendsFeed.entries.length;
+
+    loadActivityFeed("friends", 10, currentOffset)
+      .then((data) => {
+        setFriendsFeed((prev) => ({
+          status: "ready",
+          entries: [...prev.entries, ...data],
+          error: null,
+        }));
+        setHasMoreFriends(data.length === 10);
+      })
+      .catch((err: unknown) => {
+        const message =
+          err instanceof Error ? err.message : "Failed to load more activity";
+        console.error("Error loading more friends activity:", message);
+      })
+      .finally(() => {
+        setLoadingMoreFriends(false);
+      });
+  }, [loadingMoreFriends, hasMoreFriends, friendsFeed]);
+
+  const loadMoreYou = useCallback(() => {
+    if (loadingMoreYou || !hasMoreYou || youFeed.status !== "ready") {
+      return;
+    }
+
+    setLoadingMoreYou(true);
+    const currentOffset = youFeed.entries.length;
+
+    loadActivityFeed("you", 10, currentOffset)
+      .then((data) => {
+        setYouFeed((prev) => ({
+          status: "ready",
+          entries: [...prev.entries, ...data],
+          error: null,
+        }));
+        setHasMoreYou(data.length === 10);
+      })
+      .catch((err: unknown) => {
+        const message =
+          err instanceof Error ? err.message : "Failed to load more activity";
+        console.error("Error loading more your activity:", message);
+      })
+      .finally(() => {
+        setLoadingMoreYou(false);
+      });
+  }, [loadingMoreYou, hasMoreYou, youFeed]);
+
   const handleRecordNavigate = useCallback(
     (entry: CommunityFeedEntry) => {
-      if (!entry.record || entry.record.id <= 0) {
+      if (entry.type !== "record" || !entry.record || entry.record.id <= 0) {
         return;
       }
 
@@ -234,6 +302,30 @@ export default function Activity() {
         ? `/record/${entry.record.id}`
         : `/community/${encodeURIComponent(ownerUsername)}/record/${
             entry.record.id
+          }`;
+
+      const originPath = `${location.pathname}${location.search}${location.hash}`;
+      navigate(targetPath, { state: { fromPath: originPath } });
+    },
+    [navigate, username, location]
+  );
+
+  const handleListNavigate = useCallback(
+    (entry: CommunityFeedEntry) => {
+      if (entry.type !== "list" || !entry.list || entry.list.id <= 0) {
+        return;
+      }
+
+      const ownerUsername = entry.owner.username;
+      const normalizedOwner = ownerUsername.toLowerCase();
+      const normalizedViewer = (username ?? "").toLowerCase();
+      const isOwnList =
+        normalizedOwner.length > 0 && normalizedOwner === normalizedViewer;
+
+      const targetPath = isOwnList
+        ? `/lists/${entry.list.id}`
+        : `/community/${encodeURIComponent(ownerUsername)}/lists/${
+            entry.list.id
           }`;
 
       const originPath = `${location.pathname}${location.search}${location.hash}`;
@@ -262,6 +354,20 @@ export default function Activity() {
     }
   }, [isFriendsView, setFriendsFeed, setYouFeed]);
 
+  const resolveImageUrl = useCallback((path?: string | null) => {
+    if (typeof path !== "string") {
+      return undefined;
+    }
+    const trimmed = path.trim();
+    if (!trimmed) {
+      return undefined;
+    }
+    if (/^https?:\/\//i.test(trimmed)) {
+      return trimmed;
+    }
+    return apiUrl(trimmed);
+  }, []);
+
   return (
     <ThemeProvider theme={darkTheme}>
       <CssBaseline />
@@ -281,14 +387,29 @@ export default function Activity() {
           profilePicUrl={profilePicUrl ?? undefined}
           onLogout={handleLogout}
         />
-        <Box sx={{ flex: 1, overflowY: "auto", pb: 3, px: 1 }}>
-          <Box maxWidth={860} mx="auto" sx={{ mt: 1 }}>
+        <Box
+          sx={{
+            flex: 1,
+            /* Keep outer container non-scrolling so the inner Paper/List
+               always owns scrolling. Previously xs allowed the page-level
+               scrollbar which moved the scrollbar outside the activity
+               Paper on small screens. Force hidden at all sizes. */
+            overflowY: "hidden",
+            pb: 3,
+            px: 1,
+            mt: 1,
+          }}
+        >
+          <Box maxWidth={860} mx="auto" sx={{ height: "100%" }}>
             <Paper
               variant="outlined"
               sx={{
                 borderRadius: 2,
                 display: "flex",
                 flexDirection: "column",
+                /* Allow Paper to fill height on larger screens so inner list can
+                   be constrained and show its own scrollbar. */
+                height: "100%",
               }}
             >
               <Tabs
@@ -302,7 +423,19 @@ export default function Activity() {
                 <Tab label="You" value="you" />
               </Tabs>
               <Divider />
-              <Box sx={{ p: { xs: 1.5, sm: 3 }, minHeight: 320 }}>
+              <Box
+                sx={{
+                  p: { xs: 1.5, sm: 2 },
+                  /* Make this box grow to fill available space and allow its
+                     children (the List) to use height:100% for an internal
+                     scrollbar. minHeight: 0 is required for flex children to
+                     correctly constrain overflowing children. */
+                  flex: 1,
+                  minHeight: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                }}
+              >
                 {currentStatus === "loading" && (
                   <Box
                     sx={{
@@ -337,7 +470,14 @@ export default function Activity() {
                   <Typography color="text.secondary">{emptyMessage}</Typography>
                 )}
                 {currentStatus === "ready" && currentEntries.length > 0 && (
-                  <List disablePadding>
+                  <List
+                    disablePadding
+                    sx={{
+                      height: "100%",
+                      overflowY: "auto",
+                      pr: 1,
+                    }}
+                  >
                     {currentEntries.map((entry: CommunityFeedEntry) => {
                       const rawDisplayName =
                         typeof entry.owner.displayName === "string"
@@ -350,220 +490,537 @@ export default function Activity() {
                       const avatarInitial = avatarSource
                         .charAt(0)
                         .toUpperCase();
-                      const addedDate = entry.record.added
-                        ? formatRelativeTime(entry.record.added) ??
-                          entry.record.added
-                        : null;
-                      const tagsLabel =
-                        entry.record.tags && entry.record.tags.length > 0
-                          ? entry.record.tags.join(", ")
-                          : "";
-                      const coverSrc = entry.record.cover
-                        ? entry.record.cover
-                        : placeholderCover;
-                      const tableName = (() => {
-                        const raw =
-                          typeof entry.record.tableName === "string"
-                            ? entry.record.tableName.trim()
-                            : "";
-                        if (!raw) {
-                          return isFriendsView
-                            ? "their collection"
-                            : "your collection";
-                        }
-                        const normalized = raw.toLowerCase();
-                        if (normalized === "my collection") {
-                          return "collected";
-                        }
-                        if (normalized === "wishlist") {
-                          return "wishlisted";
-                        }
-                        if (normalized === "listened") {
-                          return "listened to";
-                        }
-                        return raw;
-                      })();
-                      const canNavigateToRecord =
-                        Number.isInteger(entry.record.id) &&
-                        Number(entry.record.id) > 0;
 
-                      return (
-                        <ListItemButton
-                          key={`${entry.owner.username}-${entry.record.id}`}
-                          onClick={() => {
-                            if (canNavigateToRecord) {
-                              handleRecordNavigate(entry);
-                            }
-                          }}
-                          sx={{
-                            borderRadius: 1,
-                            mb: 1,
-                            alignItems: "stretch",
-                            display: "flex",
-                            gap: 2,
-                            px: { xs: 1, sm: 2 },
-                            pt: 1.5,
-                            pb: 2,
-                            cursor: canNavigateToRecord ? "pointer" : "default",
-                            opacity: canNavigateToRecord ? 1 : 0.85,
-                          }}
-                        >
-                          <Grid container spacing={1} width={"100%"}>
-                            <Grid
-                              size={12}
-                              sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 0.5,
-                              }}
-                            >
-                              <ButtonBase
-                                onClick={(event) =>
-                                  handleOwnerClick(event, entry.owner.username)
-                                }
+                      // Type-specific rendering
+                      if (entry.type === "record") {
+                        const addedDate = entry.record.added
+                          ? formatRelativeTime(entry.record.added) ??
+                            entry.record.added
+                          : null;
+                        const tagsLabel =
+                          entry.record.tags && entry.record.tags.length > 0
+                            ? entry.record.tags.join(", ")
+                            : "";
+                        const recordCoverSrc = resolveImageUrl(
+                          entry.record.cover
+                        );
+                        const tableName = (() => {
+                          const raw =
+                            typeof entry.record.tableName === "string"
+                              ? entry.record.tableName.trim()
+                              : "";
+                          if (!raw) {
+                            return isFriendsView
+                              ? "their collection"
+                              : "your collection";
+                          }
+                          const normalized = raw.toLowerCase();
+                          if (normalized === "my collection") {
+                            return "collected";
+                          }
+                          if (normalized === "wishlist") {
+                            return "wishlisted";
+                          }
+                          if (normalized === "listened") {
+                            return "listened to";
+                          }
+                          return raw;
+                        })();
+                        const canNavigateToRecord =
+                          Number.isInteger(entry.record.id) &&
+                          Number(entry.record.id) > 0;
+
+                        return (
+                          <ListItemButton
+                            key={`${entry.owner.username}-record-${entry.record.id}`}
+                            onClick={() => {
+                              if (canNavigateToRecord) {
+                                handleRecordNavigate(entry);
+                              }
+                            }}
+                            sx={{
+                              borderRadius: 1,
+                              mb: 1,
+                              alignItems: "stretch",
+                              display: "flex",
+                              gap: 2,
+                              px: { xs: 1, sm: 2 },
+                              pt: 1.5,
+                              pb: 2,
+                              cursor: canNavigateToRecord
+                                ? "pointer"
+                                : "default",
+                              opacity: canNavigateToRecord ? 1 : 0.85,
+                            }}
+                          >
+                            <Grid container spacing={1} width={"100%"}>
+                              <Grid
+                                size={12}
                                 sx={{
-                                  alignSelf: "flex-start",
-                                  borderRadius: 1,
-                                  px: 0.5,
-                                  py: 0.5,
-                                  textAlign: "left",
-                                  "&:hover": {
-                                    bgcolor: "action.hover",
-                                  },
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 0.5,
+                                }}
+                              >
+                                <ButtonBase
+                                  onClick={(event) =>
+                                    handleOwnerClick(
+                                      event,
+                                      entry.owner.username
+                                    )
+                                  }
+                                  sx={{
+                                    alignSelf: "flex-start",
+                                    borderRadius: 1,
+                                    px: 0.5,
+                                    py: 0.5,
+                                    textAlign: "left",
+                                    "&:hover": {
+                                      bgcolor: "action.hover",
+                                    },
+                                    minWidth: 0,
+                                  }}
+                                >
+                                  <Stack
+                                    direction="row"
+                                    spacing={1.5}
+                                    alignItems="center"
+                                    sx={{ minWidth: 0 }}
+                                  >
+                                    <Avatar
+                                      src={
+                                        entry.owner.profilePicUrl ?? undefined
+                                      }
+                                      alt={ownerDisplay}
+                                      sx={{
+                                        width: 40,
+                                        height: 40,
+                                        bgcolor: "grey.700",
+                                        flex: "0 0 auto",
+                                      }}
+                                    >
+                                      {!entry.owner.profilePicUrl &&
+                                        avatarInitial}
+                                    </Avatar>
+
+                                    <Typography
+                                      fontWeight={700}
+                                      noWrap
+                                      sx={{
+                                        overflow: "hidden",
+                                        textOverflow: "ellipsis",
+                                        whiteSpace: "nowrap",
+                                        minWidth: 0,
+                                      }}
+                                    >
+                                      {ownerDisplay}
+                                    </Typography>
+                                  </Stack>
+                                </ButtonBase>
+                                <Typography
+                                  component="span"
+                                  sx={{ ml: -0.5 }}
+                                  noWrap
+                                  overflow={"visible"}
+                                >
+                                  {tableName}:
+                                </Typography>
+                                {addedDate && (
+                                  <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                    ml={"auto"}
+                                    textAlign={"right"}
+                                    noWrap
+                                    overflow={"visible"}
+                                    pl={1}
+                                  >
+                                    {addedDate}
+                                  </Typography>
+                                )}
+                              </Grid>
+                              {recordCoverSrc ? (
+                                <Avatar
+                                  src={recordCoverSrc}
+                                  alt={`${entry.record.record} cover`}
+                                  variant="rounded"
+                                  sx={{
+                                    width: { xs: 100, sm: 150, md: 175 },
+                                    height: { xs: 100, sm: 150, md: 175 },
+                                    borderRadius: 1,
+                                    flexShrink: 0,
+                                    boxShadow: 1,
+                                  }}
+                                />
+                              ) : (
+                                <Avatar
+                                  variant="rounded"
+                                  sx={{
+                                    width: { xs: 100, sm: 150, md: 175 },
+                                    height: { xs: 100, sm: 150, md: 175 },
+                                    borderRadius: 1,
+                                    bgcolor: "grey.800",
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  <ImageNotSupportedIcon
+                                    sx={{
+                                      fontSize: { xs: 40, sm: 60, md: 70 },
+                                    }}
+                                  />
+                                </Avatar>
+                              )}
+                              <Box
+                                sx={{
+                                  flex: 1,
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: 0.6,
+                                  pl: 1,
                                   minWidth: 0,
                                 }}
                               >
-                                <Stack
-                                  direction="row"
-                                  spacing={1.5}
-                                  alignItems="center"
-                                  sx={{ minWidth: 0 }}
+                                <Typography
+                                  variant="h6"
+                                  component="div"
+                                  sx={{
+                                    fontWeight: 600,
+                                    lineHeight: 1.2,
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    display: "-webkit-box",
+                                    WebkitLineClamp: 2,
+                                    WebkitBoxOrient: "vertical",
+                                  }}
                                 >
-                                  <Avatar
-                                    src={entry.owner.profilePicUrl ?? undefined}
-                                    alt={ownerDisplay}
-                                    sx={{
-                                      width: 40,
-                                      height: 40,
-                                      bgcolor: "grey.700",
-                                      flex: "0 0 auto",
-                                    }}
-                                  >
-                                    {!entry.owner.profilePicUrl &&
-                                      avatarInitial}
-                                  </Avatar>
-
+                                  {entry.record.record}
+                                </Typography>
+                                <Typography
+                                  variant="body2"
+                                  color="text.secondary"
+                                  sx={{ display: "block" }}
+                                >
+                                  by {entry.record.artist || "Unknown Artist"}
+                                </Typography>
+                                {entry.record.rating > 0 && (
                                   <Typography
-                                    fontWeight={700}
+                                    variant="body2"
+                                    color="text.secondary"
+                                  >
+                                    Rating: {entry.record.rating}/10
+                                  </Typography>
+                                )}
+                                {tagsLabel && (
+                                  <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                  >
+                                    Tags: {tagsLabel}
+                                  </Typography>
+                                )}
+                                {entry.record.review && (
+                                  <>
+                                    <Divider sx={{ my: 0.5 }} />
+                                    <Typography variant="body1">
+                                      {entry.record.review}
+                                    </Typography>
+                                  </>
+                                )}
+                              </Box>
+                            </Grid>
+                          </ListItemButton>
+                        );
+                      }
+
+                      // List entry rendering
+                      if (entry.type === "list") {
+                        const createdDate = entry.list.created
+                          ? formatRelativeTime(entry.list.created) ??
+                            entry.list.created
+                          : null;
+                        const listPictureSrc = resolveImageUrl(
+                          entry.list.picture
+                        );
+                        const canNavigateToList =
+                          Number.isInteger(entry.list.id) &&
+                          Number(entry.list.id) > 0;
+                        const previewRecords: CommunityFeedListPreviewRecord[] =
+                          Array.isArray(entry.previewRecords)
+                            ? entry.previewRecords
+                            : [];
+
+                        return (
+                          <ListItemButton
+                            key={`${entry.owner.username}-list-${entry.list.id}`}
+                            onClick={() => {
+                              if (canNavigateToList) {
+                                handleListNavigate(entry);
+                              }
+                            }}
+                            sx={{
+                              borderRadius: 1,
+                              mb: 1,
+                              alignItems: "stretch",
+                              display: "flex",
+                              gap: 2,
+                              px: { xs: 1, sm: 2 },
+                              pt: 1.5,
+                              pb: 2,
+                              cursor: canNavigateToList ? "pointer" : "default",
+                              opacity: canNavigateToList ? 1 : 0.85,
+                            }}
+                          >
+                            <Grid container spacing={1} width={"100%"}>
+                              <Grid
+                                size={12}
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 0.5,
+                                }}
+                              >
+                                <ButtonBase
+                                  onClick={(event) =>
+                                    handleOwnerClick(
+                                      event,
+                                      entry.owner.username
+                                    )
+                                  }
+                                  sx={{
+                                    alignSelf: "flex-start",
+                                    borderRadius: 1,
+                                    px: 0.5,
+                                    py: 0.5,
+                                    textAlign: "left",
+                                    "&:hover": {
+                                      bgcolor: "action.hover",
+                                    },
+                                    minWidth: 0,
+                                  }}
+                                >
+                                  <Stack
+                                    direction="row"
+                                    spacing={1.5}
+                                    alignItems="center"
+                                    sx={{ minWidth: 0 }}
+                                  >
+                                    <Avatar
+                                      src={
+                                        entry.owner.profilePicUrl ?? undefined
+                                      }
+                                      alt={ownerDisplay}
+                                      sx={{
+                                        width: 40,
+                                        height: 40,
+                                        bgcolor: "grey.700",
+                                        flex: "0 0 auto",
+                                      }}
+                                    >
+                                      {!entry.owner.profilePicUrl &&
+                                        avatarInitial}
+                                    </Avatar>
+
+                                    <Typography
+                                      fontWeight={700}
+                                      noWrap
+                                      sx={{
+                                        overflow: "hidden",
+                                        textOverflow: "ellipsis",
+                                        whiteSpace: "nowrap",
+                                        minWidth: 0,
+                                      }}
+                                    >
+                                      {ownerDisplay}
+                                    </Typography>
+                                  </Stack>
+                                </ButtonBase>
+                                <Typography
+                                  component="span"
+                                  sx={{ ml: -0.5 }}
+                                  noWrap
+                                  overflow={"visible"}
+                                >
+                                  created a list:
+                                </Typography>
+                                {createdDate && (
+                                  <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                    ml={"auto"}
+                                    textAlign={"right"}
                                     noWrap
+                                    overflow={"visible"}
+                                    pl={1}
+                                  >
+                                    {createdDate}
+                                  </Typography>
+                                )}
+                              </Grid>
+                              {listPictureSrc ? (
+                                <Avatar
+                                  src={listPictureSrc}
+                                  alt={`${entry.list.name} cover`}
+                                  variant="rounded"
+                                  sx={{
+                                    width: { xs: 100, sm: 150, md: 175 },
+                                    height: { xs: 100, sm: 150, md: 175 },
+                                    borderRadius: 1,
+                                    flexShrink: 0,
+                                    boxShadow: 1,
+                                  }}
+                                />
+                              ) : (
+                                <Avatar
+                                  variant="rounded"
+                                  sx={{
+                                    width: { xs: 100, sm: 150, md: 175 },
+                                    height: { xs: 100, sm: 150, md: 175 },
+                                    borderRadius: 1,
+                                    bgcolor: "grey.800",
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  <ImageNotSupportedIcon
+                                    sx={{
+                                      fontSize: { xs: 40, sm: 60, md: 70 },
+                                    }}
+                                  />
+                                </Avatar>
+                              )}
+                              <Box
+                                sx={{
+                                  flex: 1,
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: 0.6,
+                                  pl: 1,
+                                  minWidth: 0,
+                                }}
+                              >
+                                <Typography
+                                  variant="h6"
+                                  component="div"
+                                  sx={{
+                                    fontWeight: 600,
+                                    lineHeight: 1.2,
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    display: "-webkit-box",
+                                    WebkitLineClamp: 2,
+                                    WebkitBoxOrient: "vertical",
+                                  }}
+                                >
+                                  {entry.list.name}
+                                </Typography>
+                                {entry.list.description && (
+                                  <Typography
+                                    variant="body2"
+                                    color="text.secondary"
                                     sx={{
                                       overflow: "hidden",
                                       textOverflow: "ellipsis",
-                                      whiteSpace: "nowrap",
-                                      minWidth: 0,
+                                      display: "-webkit-box",
+                                      WebkitLineClamp: 2,
+                                      WebkitBoxOrient: "vertical",
                                     }}
                                   >
-                                    {ownerDisplay}
+                                    {entry.list.description}
                                   </Typography>
-                                </Stack>
-                              </ButtonBase>
-                              <Typography
-                                component="span"
-                                sx={{ ml: -0.5 }}
-                                noWrap
-                                overflow={"visible"}
-                              >
-                                {tableName}:
-                              </Typography>
-                              {addedDate && (
+                                )}
                                 <Typography
                                   variant="body2"
                                   color="text.secondary"
-                                  ml={"auto"}
-                                  textAlign={"right"}
-                                  noWrap
-                                  overflow={"visible"}
-                                  pl={1}
                                 >
-                                  {addedDate}
+                                  {entry.list.recordCount}{" "}
+                                  {entry.list.recordCount === 1
+                                    ? "record"
+                                    : "records"}
                                 </Typography>
-                              )}
+                                {previewRecords.length > 0 && (
+                                  <Stack
+                                    direction="row"
+                                    spacing={1}
+                                    sx={{ mt: 1 }}
+                                  >
+                                    {previewRecords.map((preview, index) => {
+                                      const previewSrc = resolveImageUrl(
+                                        preview.cover
+                                      );
+                                      const previewKey =
+                                        preview.id > 0
+                                          ? `${entry.list.id}-${preview.id}`
+                                          : `${entry.list.id}-preview-${index}`;
+                                      return (
+                                        <Avatar
+                                          key={previewKey}
+                                          variant="rounded"
+                                          src={previewSrc}
+                                          alt={preview.name || "List record"}
+                                          sx={{
+                                            width: { xs: 40, sm: 55, md: 70 },
+                                            height: { xs: 40, sm: 55, md: 70 },
+                                            borderRadius: 1,
+                                            bgcolor: previewSrc
+                                              ? "transparent"
+                                              : "grey.800",
+                                            boxShadow: previewSrc ? 1 : 0,
+                                          }}
+                                        >
+                                          {!previewSrc && (
+                                            <ImageNotSupportedIcon
+                                              sx={{ fontSize: 24 }}
+                                            />
+                                          )}
+                                        </Avatar>
+                                      );
+                                    })}
+                                  </Stack>
+                                )}
+                              </Box>
                             </Grid>
-                            <Box
-                              component="img"
-                              src={coverSrc}
-                              alt={`${entry.record.record} cover`}
-                              sx={{
-                                maxWidth: { xs: 100, sm: 150, md: 175 },
-                                maxHeight: { xs: 100, sm: 150, md: 175 },
-                                objectFit: "cover",
-                                borderRadius: 1,
-                                flexShrink: 0,
-                                boxShadow: 1,
-                                bgcolor: "grey.900",
-                              }}
-                            />
-                            <Box
-                              sx={{
-                                flex: 1,
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: 0.6,
-                                pl: 1,
-                                minWidth: 0,
-                              }}
-                            >
-                              <Typography
-                                variant="h6"
-                                component="div"
-                                sx={{
-                                  fontWeight: 600,
-                                  lineHeight: 1.2,
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                  display: "-webkit-box",
-                                  WebkitLineClamp: 2,
-                                  WebkitBoxOrient: "vertical",
-                                }}
-                              >
-                                {entry.record.record}
-                              </Typography>
-                              <Typography
-                                variant="body2"
-                                color="text.secondary"
-                                sx={{ display: "block" }}
-                              >
-                                by {entry.record.artist || "Unknown Artist"}
-                              </Typography>
-                              {entry.record.rating > 0 && (
-                                <Typography
-                                  variant="body2"
-                                  color="text.secondary"
-                                >
-                                  Rating: {entry.record.rating}/10
-                                </Typography>
-                              )}
-                              {tagsLabel && (
-                                <Typography
-                                  variant="body2"
-                                  color="text.secondary"
-                                >
-                                  Tags: {tagsLabel}
-                                </Typography>
-                              )}
-                              {entry.record.review && (
-                                <>
-                                  <Divider sx={{ my: 0.5 }} />
-                                  <Typography variant="body1">
-                                    {entry.record.review}
-                                  </Typography>
-                                </>
-                              )}
-                            </Box>
-                          </Grid>
-                        </ListItemButton>
-                      );
+                          </ListItemButton>
+                        );
+                      }
+
+                      return null;
                     })}
+                    {/* Append a load-more row inside the scrollable list so the
+                        button sits at the bottom of the activity content and
+                        scrolls with the entries. */}
+                    {currentEntries.length > 0 && (
+                      <ListItem
+                        sx={{
+                          justifyContent: "center",
+                          display: "flex",
+                          py: 2,
+                        }}
+                      >
+                        <Button
+                          variant="outlined"
+                          onClick={
+                            isFriendsView ? loadMoreFriends : loadMoreYou
+                          }
+                          disabled={
+                            isFriendsView
+                              ? !hasMoreFriends || loadingMoreFriends
+                              : !hasMoreYou || loadingMoreYou
+                          }
+                          sx={{ minWidth: 200 }}
+                        >
+                          {isFriendsView
+                            ? loadingMoreFriends
+                              ? "Loading..."
+                              : hasMoreFriends
+                              ? "Load More"
+                              : "No More Activity"
+                            : loadingMoreYou
+                            ? "Loading..."
+                            : hasMoreYou
+                            ? "Load More"
+                            : "No More Activity"}
+                        </Button>
+                      </ListItem>
+                    )}
                   </List>
                 )}
               </Box>

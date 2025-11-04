@@ -9,18 +9,28 @@ import {
   Chip,
   Avatar,
   Button,
+  ButtonBase,
   IconButton,
   Tooltip,
   CircularProgress,
   Snackbar,
   Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Switch,
+  FormControlLabel,
 } from "@mui/material";
 import FavoriteIcon from "@mui/icons-material/Favorite";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import DeleteIcon from "@mui/icons-material/Delete";
+import EditIcon from "@mui/icons-material/Edit";
 import ImageNotSupportedIcon from "@mui/icons-material/ImageNotSupported";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
+import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
 import {
   DndContext,
   closestCenter,
@@ -38,7 +48,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useNavigate, useParams, Link as RouterLink } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import TopBar from "./components/TopBar";
 import apiUrl from "./api";
 import { darkTheme } from "./theme";
@@ -77,7 +87,6 @@ interface ListRecordEntry {
   cover: string | null;
   rating: number | null;
   releaseYear: number | null;
-  review: string | null;
   masterId: number | null;
   added: string | null;
   isCustom: boolean;
@@ -89,6 +98,8 @@ interface SnackbarState {
   message: string;
   severity: "success" | "error" | "info";
 }
+
+const ACCEPTED_IMAGE_TYPES = "image/jpeg,image/png,image/webp,image/avif";
 
 interface SortableRecordItemProps {
   record: ListRecordEntry;
@@ -122,85 +133,104 @@ function SortableRecordItem({
     opacity: isDragging ? 0.5 : 1,
   };
 
+  const canViewMaster =
+    typeof record.masterId === "number" && record.masterId > 0;
+
+  const handleMasterNavigate = useCallback(() => {
+    if (!canViewMaster) {
+      return;
+    }
+    onViewMaster(record.masterId!);
+  }, [canViewMaster, onViewMaster, record.masterId]);
+
+  const actionStackVisible = isOwner;
+
   return (
-    <Paper ref={setNodeRef} style={style} variant="outlined" sx={{ p: 2 }}>
-      <Stack
-        direction={{ xs: "column", sm: "row" }}
-        spacing={2}
-        alignItems={{
-          xs: "flex-start",
-          sm: "center",
-        }}
-      >
-        {isOwner && (
-          <Box
-            {...attributes}
-            {...listeners}
-            sx={{
-              cursor: isDragging ? "grabbing" : "grab",
-              display: "flex",
-              alignItems: "center",
-              color: "text.secondary",
-              touchAction: "none",
-            }}
-          >
-            <DragIndicatorIcon />
-          </Box>
-        )}
-        {renderCover(record.cover, record.name)}
-        <Box flex={1} minWidth={0}>
-          <Typography variant="subtitle1" fontWeight={700} noWrap>
-            {record.name}
-          </Typography>
-          {record.artist && (
-            <Typography color="text.secondary" noWrap>
-              {record.artist}
-            </Typography>
-          )}
-          <Stack direction="row" spacing={1} mt={1} flexWrap="wrap">
-            {record.rating !== null && (
-              <Chip size="small" label={`Rating ${record.rating}/10`} />
-            )}
-            {record.releaseYear !== null && (
-              <Chip size="small" label={`Released ${record.releaseYear}`} />
-            )}
-          </Stack>
-          {record.review && (
-            <Typography color="text.secondary" sx={{ mt: 1 }}>
-              {record.review}
-            </Typography>
-          )}
-        </Box>
-        <Stack spacing={1} alignItems="center">
-          {record.masterId && (
-            <Button
-              variant="text"
-              size="small"
-              onClick={() => onViewMaster(record.masterId!)}
-            >
-              View master
-            </Button>
-          )}
+    <Paper ref={setNodeRef} style={style} variant="outlined">
+      <Stack direction="row" alignItems="center">
+        <ButtonBase
+          onClick={handleMasterNavigate}
+          disabled={!canViewMaster}
+          sx={{
+            flex: 1,
+            display: "flex",
+            alignItems: "center",
+            textAlign: "left",
+            borderRadius: 1,
+            p: 1,
+            minWidth: 0,
+            transition: "background-color 0.2s ease",
+            cursor: canViewMaster ? "pointer" : "default",
+            "&:hover": canViewMaster
+              ? {
+                  bgcolor: "action.hover",
+                }
+              : undefined,
+          }}
+        >
           {isOwner && (
-            <Tooltip title="Remove from list">
-              <span>
-                <IconButton
-                  color="error"
-                  onClick={() => onRemove(record)}
-                  disabled={removing}
-                >
-                  <DeleteIcon />
-                </IconButton>
-              </span>
-            </Tooltip>
+            <Box
+              {...attributes}
+              {...listeners}
+              sx={{
+                cursor: isDragging ? "grabbing" : "grab",
+                display: "flex",
+                alignItems: "center",
+                color: "text.secondary",
+                touchAction: "none",
+              }}
+            >
+              <DragIndicatorIcon />
+            </Box>
           )}
-        </Stack>
+          <Box pl={1}>{renderCover(record.cover, record.name)}</Box>
+          <Stack flex={1} minWidth={0} sx={{ gap: 0, ml: 2 }}>
+            <Typography variant="subtitle1" fontWeight={700} noWrap>
+              {record.name}
+            </Typography>
+            {record.artist && (
+              <Typography color="text.secondary" noWrap>
+                {record.artist}
+              </Typography>
+            )}
+            <Stack direction="row" spacing={1} mt={1} flexWrap="wrap">
+              {record.releaseYear !== null && (
+                <Chip size="small" label={`${record.releaseYear}`} />
+              )}
+              {record.rating !== null && record.rating > 0 && (
+                <Chip size="small" label={`Rated ${record.rating}/10`} />
+              )}
+            </Stack>
+            {/* list records no longer store freeform review text */}
+          </Stack>
+          {actionStackVisible && (
+            <Stack spacing={1} alignItems="center">
+              <Tooltip title="Remove from list">
+                <span>
+                  <IconButton
+                    color="error"
+                    onClick={(e) => {
+                      // prevent the ButtonBase parent from receiving this click
+                      e.stopPropagation();
+                      e.preventDefault();
+                      onRemove(record);
+                    }}
+                    disabled={removing}
+                  >
+                    <DeleteIcon />
+                  </IconButton>
+                </span>
+              </Tooltip>
+            </Stack>
+          )}
+        </ButtonBase>
       </Stack>
     </Paper>
   );
 }
 
 export default function ListDetail() {
+  const location = useLocation();
   const cachedUser = getCachedUserInfo();
   const [username, setUsername] = useState<string>(cachedUser?.username ?? "");
   const [displayName, setDisplayName] = useState<string>(
@@ -240,6 +270,28 @@ export default function ListDetail() {
     message: "",
     severity: "success",
   });
+  const [saving, setSaving] = useState(false);
+  const [editState, setEditState] = useState<{
+    open: boolean;
+    name: string;
+    description: string;
+    isPrivate: boolean;
+    pictureUrl: string | null;
+  }>({
+    open: false,
+    name: "",
+    description: "",
+    isPrivate: false,
+    pictureUrl: null,
+  });
+  const [editPictureFile, setEditPictureFile] = useState<File | null>(null);
+  const [editPicturePreview, setEditPicturePreview] = useState<string | null>(
+    null
+  );
+  const [removePictureFlag, setRemovePictureFlag] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{
+    open: boolean;
+  }>({ open: false });
 
   useEffect(() => {
     let cancelled = false;
@@ -345,10 +397,6 @@ export default function ListDetail() {
           releaseYear:
             Number.isInteger(releaseYear) && releaseYear >= 1000
               ? releaseYear
-              : null,
-          review:
-            typeof row?.review === "string" && row.review.trim()
-              ? row.review.trim()
               : null,
           masterId:
             Number.isInteger(masterId) && masterId > 0 ? masterId : null,
@@ -530,6 +578,167 @@ export default function ListDetail() {
     [records, list, showMessage]
   );
 
+  const handleOpenEdit = useCallback(() => {
+    if (!list) return;
+    setEditState({
+      open: true,
+      name: list.name,
+      description: list.description ?? "",
+      isPrivate: list.isPrivate,
+      pictureUrl: list.pictureUrl,
+    });
+    setEditPictureFile(null);
+    setEditPicturePreview(null);
+    setRemovePictureFlag(false);
+  }, [list]);
+
+  const handleCloseEdit = useCallback(() => {
+    setEditState({
+      open: false,
+      name: "",
+      description: "",
+      isPrivate: false,
+      pictureUrl: null,
+    });
+    setEditPictureFile(null);
+    setEditPicturePreview(null);
+    setRemovePictureFlag(false);
+  }, []);
+
+  const handleEditPictureChange = useCallback((file: File | null) => {
+    setEditPictureFile(file);
+    setEditPicturePreview((prev) => {
+      if (prev) {
+        URL.revokeObjectURL(prev);
+      }
+      return file ? URL.createObjectURL(file) : null;
+    });
+    if (file) {
+      setRemovePictureFlag(false);
+    }
+  }, []);
+
+  const handleRemoveEditPicture = useCallback(() => {
+    if (editPicturePreview) {
+      URL.revokeObjectURL(editPicturePreview);
+    }
+    setEditPictureFile(null);
+    setEditPicturePreview(null);
+    setRemovePictureFlag(true);
+  }, [editPicturePreview]);
+
+  const handleSaveEdit = useCallback(async () => {
+    if (!list) return;
+    const name = editState.name.trim();
+    if (!name) {
+      showMessage("List name is required", "error");
+      return;
+    }
+    setSaving(true);
+    try {
+      // First update the list metadata
+      const response = await fetch(apiUrl(`/api/lists/${list.id}`), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          name,
+          description: editState.description.trim() || null,
+          isPrivate: editState.isPrivate,
+        }),
+      });
+      if (!response.ok) {
+        const problem = await response.json().catch(() => ({}));
+        throw new Error(problem.error || "Failed to update list");
+      }
+
+      // Handle picture removal if flagged
+      if (removePictureFlag) {
+        const removeResponse = await fetch(
+          apiUrl(`/api/lists/${list.id}/picture`),
+          {
+            method: "DELETE",
+            credentials: "include",
+          }
+        );
+        if (!removeResponse.ok) {
+          console.error("Failed to remove picture");
+        }
+      }
+
+      // Handle new picture upload
+      if (editPictureFile) {
+        const formData = new FormData();
+        formData.append("picture", editPictureFile);
+        const uploadResponse = await fetch(
+          apiUrl(`/api/lists/${list.id}/picture`),
+          {
+            method: "POST",
+            credentials: "include",
+            body: formData,
+          }
+        );
+        if (!uploadResponse.ok) {
+          console.error("Failed to upload new picture");
+        }
+      }
+
+      showMessage("List updated", "success");
+      handleCloseEdit();
+      await loadList();
+    } catch (error) {
+      console.error(error);
+      showMessage(
+        error instanceof Error ? error.message : "Failed to update list",
+        "error"
+      );
+    } finally {
+      setSaving(false);
+    }
+  }, [
+    list,
+    editState,
+    editPictureFile,
+    removePictureFlag,
+    showMessage,
+    handleCloseEdit,
+    loadList,
+  ]);
+
+  const handleOpenDeleteConfirmation = useCallback(() => {
+    setDeleteConfirmation({ open: true });
+  }, []);
+
+  const handleCloseDeleteConfirmation = useCallback(() => {
+    setDeleteConfirmation({ open: false });
+  }, []);
+
+  const handleDeleteList = useCallback(async () => {
+    if (!list) return;
+    setSaving(true);
+    handleCloseDeleteConfirmation();
+    try {
+      const response = await fetch(apiUrl(`/api/lists/${list.id}`), {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!response.ok) {
+        const problem = await response.json().catch(() => ({}));
+        throw new Error(problem.error || "Failed to delete list");
+      }
+      showMessage("List deleted", "success");
+      navigate("/lists");
+    } catch (error) {
+      console.error(error);
+      showMessage(
+        error instanceof Error ? error.message : "Failed to delete list",
+        "error"
+      );
+    } finally {
+      setSaving(false);
+    }
+  }, [list, showMessage, handleCloseDeleteConfirmation, navigate]);
+
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -561,6 +770,32 @@ export default function ListDetail() {
   const handleBack = useCallback(() => {
     navigate(-1);
   }, [navigate]);
+
+  const handleNavigateToMaster = useCallback(
+    (masterId: number | null) => {
+      if (!masterId || !Number.isInteger(masterId) || masterId <= 0) return;
+      const originPath = `${location.pathname}${location.search}${location.hash}`;
+      const locState = (location.state as any) ?? {};
+
+      const fromCollectionState: any = {
+        path: originPath,
+        title: list?.name ?? undefined,
+        tableName: undefined,
+        // propagate any upstream origin so back navigation can continue
+        fromPath: locState?.fromPath ?? undefined,
+      };
+
+      navigate(`/master/${masterId}`, {
+        state: {
+          masterId,
+          fromCollection: fromCollectionState,
+          // also propagate an overall fromPath if present
+          fromPath: locState?.fromPath ?? undefined,
+        },
+      });
+    },
+    [location, navigate, list]
+  );
 
   if (!Number.isInteger(listId) || listId <= 0) {
     return (
@@ -651,10 +886,7 @@ export default function ListDetail() {
                   ) : (
                     <>
                       <Box>
-                        <Stack
-                          direction={{ xs: "column", sm: "row" }}
-                          spacing={3}
-                        >
+                        <Stack direction={{ xs: "row", sm: "row" }} spacing={2}>
                           <Box>
                             {list.pictureUrl ? (
                               <Avatar
@@ -686,14 +918,96 @@ export default function ListDetail() {
                             )}
                           </Box>
                           <Box flex={1} minWidth={0}>
-                            <Typography variant="h5" fontWeight={700} mr={1}>
-                              {list.name}
-                            </Typography>
-                            {list.owner && (
-                              <Typography color="text.secondary" sx={{ mt: 1 }}>
-                                Curated by{" "}
-                                {list.owner.displayName ?? list.owner.username}
+                            <Stack
+                              direction={"row"}
+                              justifyContent={"space-between"}
+                            >
+                              <Typography variant="h5" fontWeight={700} mr={1}>
+                                {list.name}
                               </Typography>
+                              <Box>
+                                <Stack
+                                  direction={{ xs: "column", sm: "row" }}
+                                  spacing={0.5}
+                                >
+                                  {!list.isOwner && (
+                                    <Tooltip
+                                      title={
+                                        list.likedByCurrentUser
+                                          ? "Unlike"
+                                          : "Like"
+                                      }
+                                    >
+                                      <span>
+                                        <IconButton
+                                          color={
+                                            list.likedByCurrentUser
+                                              ? "error"
+                                              : "default"
+                                          }
+                                          size="small"
+                                          onClick={() =>
+                                            void handleToggleLike()
+                                          }
+                                          disabled={likeBusy}
+                                        >
+                                          {list.likedByCurrentUser ? (
+                                            <FavoriteIcon />
+                                          ) : (
+                                            <FavoriteBorderIcon />
+                                          )}
+                                        </IconButton>
+                                      </span>
+                                    </Tooltip>
+                                  )}
+                                  {list.isOwner && (
+                                    <>
+                                      <IconButton
+                                        size="small"
+                                        color="primary"
+                                        onClick={handleOpenEdit}
+                                      >
+                                        <EditIcon />
+                                      </IconButton>
+                                      <IconButton
+                                        size="small"
+                                        color="error"
+                                        onClick={handleOpenDeleteConfirmation}
+                                        disabled={saving}
+                                      >
+                                        <DeleteIcon />
+                                      </IconButton>
+                                    </>
+                                  )}
+                                </Stack>
+                              </Box>
+                            </Stack>
+                            {list.owner && (
+                              <ButtonBase
+                                onClick={() =>
+                                  navigate(
+                                    `/community/${encodeURIComponent(
+                                      list.owner!.username
+                                    )}`
+                                  )
+                                }
+                                sx={{
+                                  mt: 1,
+                                  ml: -0.5,
+                                  borderRadius: 1,
+                                  px: 0.5,
+                                  py: 0.25,
+                                  "&:hover": {
+                                    bgcolor: "action.hover",
+                                  },
+                                }}
+                              >
+                                <Typography color="text.secondary">
+                                  Curated by{" "}
+                                  {list.owner.displayName ??
+                                    list.owner.username}
+                                </Typography>
+                              </ButtonBase>
                             )}
                             {list.description && (
                               <Typography sx={{ mt: 1 }}>
@@ -702,20 +1016,18 @@ export default function ListDetail() {
                             )}
                             <Stack
                               direction="row"
-                              spacing={1}
                               alignItems="center"
                               flexWrap="wrap"
                               mt={1.5}
+                              sx={{ gap: 1 }}
                             >
-                              <Chip
-                                size="small"
-                                color={list.isPrivate ? "default" : "primary"}
-                                label={list.isPrivate ? "Private" : "Public"}
-                              />
-                              <Chip
-                                size="small"
-                                label={`${list.likes} likes`}
-                              />
+                              {list.isOwner && (
+                                <Chip
+                                  size="small"
+                                  color={list.isPrivate ? "default" : "primary"}
+                                  label={list.isPrivate ? "Private" : "Public"}
+                                />
+                              )}
                               <Chip
                                 size="small"
                                 label={
@@ -726,44 +1038,20 @@ export default function ListDetail() {
                                     : `${list.recordCount} records`
                                 }
                               />
-                            </Stack>
-                            <Stack
-                              direction="row"
-                              spacing={1.5}
-                              mt={2}
-                              flexWrap="wrap"
-                            >
-                              {!list.isOwner && (
-                                <Button
-                                  variant="contained"
-                                  startIcon={
-                                    list.likedByCurrentUser ? (
-                                      <FavoriteIcon />
-                                    ) : (
-                                      <FavoriteBorderIcon />
-                                    )
-                                  }
-                                  onClick={() => void handleToggleLike()}
-                                  disabled={likeBusy}
-                                >
-                                  {list.likedByCurrentUser ? "Unlike" : "Like"}
-                                </Button>
-                              )}
-                              {list.isOwner && (
-                                <Button
-                                  component={RouterLink}
-                                  to="/lists"
-                                  variant="text"
-                                >
-                                  Manage lists
-                                </Button>
-                              )}
+                              <Chip
+                                size="small"
+                                label={
+                                  list.likes === 1
+                                    ? `${list.likes} like`
+                                    : `${list.likes} likes`
+                                }
+                              />
                             </Stack>
                           </Box>
                         </Stack>
                       </Box>
 
-                      <Paper sx={{ p: 3 }}>
+                      <Paper sx={{ p: { xs: 2, md: 3 } }}>
                         <Stack
                           direction="row"
                           spacing={1}
@@ -789,7 +1077,7 @@ export default function ListDetail() {
                               items={safeRecords.map((r) => r.id)}
                               strategy={verticalListSortingStrategy}
                             >
-                              <Stack spacing={2.5}>
+                              <Stack spacing={1}>
                                 {safeRecords.map((record) => (
                                   <SortableRecordItem
                                     key={record.id}
@@ -799,7 +1087,7 @@ export default function ListDetail() {
                                     renderCover={renderCover}
                                     onRemove={handleRemoveRecord}
                                     onViewMaster={(masterId) =>
-                                      navigate(`/master/${masterId}`)
+                                      handleNavigateToMaster(masterId)
                                     }
                                   />
                                 ))}
@@ -829,6 +1117,182 @@ export default function ListDetail() {
             {snackbar.message}
           </Alert>
         </Snackbar>
+
+        {/* Edit List Dialog */}
+        <Dialog
+          open={editState.open}
+          onClose={handleCloseEdit}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>Edit list</DialogTitle>
+          <DialogContent dividers>
+            <Stack direction={"row"} spacing={2} alignItems="center" mb={1}>
+              {editPicturePreview ? (
+                <Avatar
+                  src={editPicturePreview}
+                  variant="rounded"
+                  alt={editState.name}
+                  sx={{ width: 96, height: 96, borderRadius: 2 }}
+                />
+              ) : editState.pictureUrl && !removePictureFlag ? (
+                <Avatar
+                  src={
+                    editState.pictureUrl.startsWith("http")
+                      ? editState.pictureUrl
+                      : apiUrl(editState.pictureUrl)
+                  }
+                  variant="rounded"
+                  alt={editState.name}
+                  sx={{ width: 96, height: 96, borderRadius: 2 }}
+                />
+              ) : (
+                <Avatar
+                  variant="rounded"
+                  sx={{
+                    width: 96,
+                    height: 96,
+                    borderRadius: 2,
+                    bgcolor: "grey.800",
+                  }}
+                >
+                  <ImageNotSupportedIcon />
+                </Avatar>
+              )}
+              <Stack spacing={1}>
+                <Button
+                  variant="outlined"
+                  component="label"
+                  startIcon={<PhotoCameraIcon />}
+                  disabled={saving}
+                  size="small"
+                >
+                  {editPicturePreview ||
+                  (editState.pictureUrl && !removePictureFlag)
+                    ? "Change Image"
+                    : "Upload Image"}
+                  <input
+                    type="file"
+                    hidden
+                    accept={ACCEPTED_IMAGE_TYPES}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0] ?? null;
+                      handleEditPictureChange(file);
+                      event.target.value = "";
+                    }}
+                  />
+                </Button>
+                {(editPicturePreview ||
+                  (editState.pictureUrl && !removePictureFlag)) && (
+                  <Button
+                    variant="text"
+                    size="small"
+                    onClick={handleRemoveEditPicture}
+                    disabled={saving}
+                  >
+                    Remove Image
+                  </Button>
+                )}
+                <Typography variant="caption" color="text.secondary">
+                  JPG, PNG, WEBP, or AVIF (3 MB)
+                </Typography>
+              </Stack>
+            </Stack>
+            <Stack sx={{ mt: 2 }}>
+              <TextField
+                label="List name"
+                value={editState.name}
+                onChange={(event) =>
+                  setEditState((prev) => ({
+                    ...prev,
+                    name: event.target.value,
+                  }))
+                }
+                required
+                sx={{ mb: 2 }}
+              />
+              <TextField
+                label="Description"
+                value={editState.description}
+                size="small"
+                onChange={(event) =>
+                  setEditState((prev) => ({
+                    ...prev,
+                    description: event.target.value,
+                  }))
+                }
+                multiline
+                minRows={2}
+                maxRows={4}
+                sx={{
+                  "& .MuiInputBase-root": {
+                    height: "auto",
+                  },
+                  mb: 1,
+                }}
+              />
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={editState.isPrivate}
+                    onChange={(event) =>
+                      setEditState((prev) => ({
+                        ...prev,
+                        isPrivate: event.target.checked,
+                      }))
+                    }
+                  />
+                }
+                label="Private"
+              />
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseEdit}>Cancel</Button>
+            <Button
+              variant="contained"
+              onClick={() => void handleSaveEdit()}
+              disabled={saving}
+            >
+              Save
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog
+          open={deleteConfirmation.open}
+          onClose={handleCloseDeleteConfirmation}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>Delete List?</DialogTitle>
+          <DialogContent>
+            <Typography>
+              Are you sure you want to delete the list "{list?.name}"?
+              {list && list.recordCount > 0 && (
+                <>
+                  {" "}
+                  This list contains {list.recordCount} record
+                  {list.recordCount !== 1 ? "s" : ""}.
+                </>
+              )}
+            </Typography>
+            <Typography sx={{ mt: 2, color: "text.secondary" }}>
+              This action cannot be undone.
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseDeleteConfirmation}>Cancel</Button>
+            <Button
+              variant="contained"
+              color="error"
+              onClick={() => void handleDeleteList()}
+            >
+              Delete
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Box>
     </ThemeProvider>
   );

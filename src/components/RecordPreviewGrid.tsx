@@ -3,7 +3,7 @@ import Box from "@mui/material/Box";
 import Grid from "@mui/material/Grid";
 import Paper from "@mui/material/Paper";
 import Typography from "@mui/material/Typography";
-import placeholderCover from "../assets/missingImg.jpg";
+import ImageNotSupportedIcon from "@mui/icons-material/ImageNotSupported";
 import type { Record } from "../types";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Divider } from "@mui/material";
@@ -49,9 +49,8 @@ export default function RecordPreviewGrid({
   };
 
   return (
-    <Grid container spacing={{ xs: 1, sm: 2 }}>
+    <Grid container spacing={{ xs: 1, sm: 2, md: 3 }}>
       {records.map((record) => {
-        const coverSrc = record.cover || placeholderCover;
         const key = keyPrefix ? `${keyPrefix}-${record.id}` : record.id;
         const addedDateText =
           showDateAdded && record.added
@@ -89,21 +88,30 @@ export default function RecordPreviewGrid({
                   position: "relative",
                   width: "100%",
                   aspectRatio: "1 / 1",
-                  backgroundColor: "grey.900",
+                  backgroundColor: "grey.800",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
                 }}
               >
-                <Box
-                  component="img"
-                  src={coverSrc}
-                  alt={record.record}
-                  sx={{
-                    position: "absolute",
-                    inset: 0,
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                  }}
-                />
+                {record.cover ? (
+                  <Box
+                    component="img"
+                    src={record.cover}
+                    alt={record.record}
+                    sx={{
+                      position: "absolute",
+                      inset: 0,
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                    }}
+                  />
+                ) : (
+                  <ImageNotSupportedIcon
+                    sx={{ fontSize: 48, color: "text.secondary" }}
+                  />
+                )}
               </Box>
               <Box sx={{ p: { xs: 1, sm: 1.25, md: 1.5 } }}>
                 <Typography variant="subtitle1" noWrap>

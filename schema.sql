@@ -107,7 +107,6 @@ CREATE TABLE ListRecord (
     sortOrder INT DEFAULT 0,
     userUuid CHAR(36),
     listId INT,
-    review TEXT,
     masterId INT,
     reviewLikes INT DEFAULT 0,
     FOREIGN KEY (masterId) REFERENCES Master(id) ON DELETE SET NULL,

@@ -45,10 +45,9 @@ const DEFAULT_COLLECTION_NAME = "My Collection";
 const WISHLIST_COLLECTION_NAME = "Wishlist";
 const LISTENED_COLLECTION_NAME = "Listened";
 const MAX_PROFILE_HIGHLIGHTS = 3;
-const PROFILE_RECENT_DEFAULT_LIMIT = 3;
-const PROFILE_RECENT_MAX_LIMIT = 20;
+const PROFILE_RECENT_PREVIEW_LIMIT = 3;
 const PROFILE_WISHLIST_PREVIEW_LIMIT = 3;
-const PROFILE_LISTENED_PREVIEW_LIMIT = 6;
+const PROFILE_LISTENED_PREVIEW_LIMIT = 3;
 const MASTER_REVIEW_LIMIT = 10;
 const DISCOGS_API_URL = "https://api.discogs.com/database/search";
 const DISCOGS_USER_AGENT = process.env.DISCOGS_USER_AGENT || "MyRecordCollection/1.0 (+https://myrecordcollection.app)";
@@ -492,10 +491,6 @@ function mapListRecordRow(row) {
         ? Math.trunc(ratingValue)
         : null,
     releaseYear: Number.isInteger(releaseYearValue) ? releaseYearValue : null,
-    review:
-      typeof row?.review === "string" && row.review.trim()
-        ? row.review.trim()
-        : null,
     masterId: Number.isInteger(masterIdValue) && masterIdValue > 0 ? masterIdValue : null,
     added: row?.added ? formatUtcDateTime(row.added) : null,
     isCustom: Number(row?.isCustom) === 1,
@@ -1572,59 +1567,6 @@ app.get("/api/records/master-reviews", async (req, res) => {
   }
 });
 
-app.get("/api/profile/recent", requireAuth, async (req, res) => {
-  console.log("Fetching recent profile records...");
-  try {
-    const rawLimit = Number(req.query.limit);
-    let limit = PROFILE_RECENT_DEFAULT_LIMIT;
-    if (Number.isInteger(rawLimit) && rawLimit > 0) {
-      limit = Math.min(rawLimit, PROFILE_RECENT_MAX_LIMIT);
-    }
-
-    const pool = await getPool();
-    // Only include records that are in the user's default collection (RecTable.name = DEFAULT_COLLECTION_NAME)
-    const [rows] = await pool.query(
-  `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId, r.isCustom as isCustom, r.masterId as masterId, r.review as review
-       FROM Record r
-       JOIN RecTable t ON r.tableId = t.id
-       WHERE r.userUuid = ? AND t.name = ?
-       ORDER BY r.added DESC
-       LIMIT ?`,
-      [req.userUuid, DEFAULT_COLLECTION_NAME, limit]
-    );
-
-    const recordIds = rows.map((row) => row.id);
-    const tagsByRecord = {};
-    if (recordIds.length > 0) {
-      const placeholders = recordIds.map(() => "?").join(", ");
-      const [tagRows] = await pool.query(
-        `SELECT t.name, tg.recordId
-         FROM Tag t
-         JOIN Tagged tg ON t.id = tg.tagId
-         WHERE tg.recordId IN (${placeholders})`,
-        recordIds
-      );
-      for (const tagRow of tagRows) {
-        const recordId = tagRow.recordId;
-        if (!tagsByRecord[recordId]) {
-          tagsByRecord[recordId] = [];
-        }
-        tagsByRecord[recordId].push(tagRow.name);
-      }
-    }
-
-    const response = rows.map((row) => ({
-      ...row,
-      tags: tagsByRecord[row.id] || [],
-    }));
-
-    res.json(response);
-  } catch (err) {
-    console.error("Failed to load recent profile records", err);
-    res.status(500).json({ error: "DB error" });
-  }
-});
-
 app.get("/api/community/search", async (req, res) => {
   console.log("Community user search...");
   const rawQuery = typeof req.query.q === "string" ? req.query.q.trim() : "";
@@ -1736,7 +1678,7 @@ app.get("/api/community/users/:username", async (req, res) => {
        WHERE r.userUuid = ? AND t.name = ?
        ORDER BY r.added DESC
        LIMIT ?`,
-        [userRow.uuid, DEFAULT_COLLECTION_NAME, PROFILE_RECENT_DEFAULT_LIMIT]
+        [userRow.uuid, DEFAULT_COLLECTION_NAME, PROFILE_RECENT_PREVIEW_LIMIT]
       );
 
       const recentRecordIds = recentRows.map((row) => row.id);
@@ -1899,55 +1841,178 @@ app.get("/api/activity", requireAuth, async (req, res) => {
   const scopeRaw =
     typeof req.query.scope === "string" ? req.query.scope.toLowerCase() : "friends";
   const scope = scopeRaw === "you" ? "you" : "friends";
-  console.log(`Fetching activity feed for scope=${scope}`);
+  const limitRaw = Number(req.query.limit);
+  const limit = Number.isInteger(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 50) : 10;
+  const offsetRaw = Number(req.query.offset);
+  const offset = Number.isInteger(offsetRaw) && offsetRaw >= 0 ? offsetRaw : 0;
+  console.log(`Fetching activity feed for scope=${scope}, limit=${limit}, offset=${offset}`);
 
   try {
     const pool = await getPool();
-    let rows;
+    let recordRows, listRows;
 
     if (scope === "friends") {
-      [rows] = await pool.query(
-        `SELECT r.id, r.name as record, r.artist, r.cover, r.rating,
-                r.release_year as 'release', r.added as added, r.tableId, r.isCustom as isCustom,
+      // Get records from followed users
+      [recordRows] = await pool.query(
+        `SELECT 'record' as activityType, r.id, r.name as record, r.artist, r.cover, r.rating,
+                r.release_year as 'release', r.added as timestamp, r.tableId, r.isCustom as isCustom,
                 r.masterId as masterId, r.review as review,
                 u.username, u.displayName, u.profilePic, t.name as tableName
            FROM Record r
            JOIN Follows f ON f.followsUuid = r.userUuid
            JOIN User u ON u.uuid = r.userUuid
            JOIN RecTable t ON r.tableId = t.id
-          WHERE f.userUuid = ? AND t.isPrivate = 0
-          ORDER BY r.added DESC, r.id DESC
-          LIMIT 20`,
+          WHERE f.userUuid = ? AND t.isPrivate = 0`,
+        [req.userUuid]
+      );
+      // Get lists from followed users
+      [listRows] = await pool.query(
+        `SELECT 'list' as activityType, l.id, l.name as listName, l.description, l.picture,
+                l.created as timestamp,
+                u.username, u.displayName, u.profilePic,
+                COALESCE(stats.recordCount, 0) as recordCount
+           FROM List l
+           JOIN Follows f ON f.followsUuid = l.userUuid
+           JOIN User u ON u.uuid = l.userUuid
+           LEFT JOIN (
+             SELECT listId, COUNT(*) AS recordCount FROM ListRecord GROUP BY listId
+           ) stats ON stats.listId = l.id
+          WHERE f.userUuid = ? AND l.isPrivate = 0 AND COALESCE(stats.recordCount, 0) > 0`,
         [req.userUuid]
       );
     } else {
-      [rows] = await pool.query(
-        `SELECT r.id, r.name as record, r.artist, r.cover, r.rating,
-                r.release_year as 'release', r.added as added, r.tableId, r.isCustom as isCustom,
+      // Get user's own records
+      [recordRows] = await pool.query(
+        `SELECT 'record' as activityType, r.id, r.name as record, r.artist, r.cover, r.rating,
+                r.release_year as 'release', r.added as timestamp, r.tableId, r.isCustom as isCustom,
                 r.masterId as masterId, r.review as review,
                 u.username, u.displayName, u.profilePic, t.name as tableName
            FROM Record r
            JOIN User u ON u.uuid = r.userUuid
            LEFT JOIN RecTable t ON r.tableId = t.id
-          WHERE r.userUuid = ?
-          ORDER BY r.added DESC, r.id DESC
-          LIMIT 20`,
+          WHERE r.userUuid = ?`,
+        [req.userUuid]
+      );
+      // Get user's own lists
+      [listRows] = await pool.query(
+        `SELECT 'list' as activityType, l.id, l.name as listName, l.description, l.picture,
+                l.created as timestamp,
+                u.username, u.displayName, u.profilePic,
+                COALESCE(stats.recordCount, 0) as recordCount
+           FROM List l
+           JOIN User u ON u.uuid = l.userUuid
+           LEFT JOIN (
+             SELECT listId, COUNT(*) AS recordCount FROM ListRecord GROUP BY listId
+           ) stats ON stats.listId = l.id
+          WHERE l.userUuid = ? AND COALESCE(stats.recordCount, 0) > 0`,
         [req.userUuid]
       );
     }
 
-    if (!Array.isArray(rows) || rows.length === 0) {
+    // Combine and sort all activity
+    const allActivity = [
+      ...(Array.isArray(recordRows) ? recordRows : []),
+      ...(Array.isArray(listRows) ? listRows : [])
+    ];
+    
+    allActivity.sort((a, b) => {
+      const timeA = new Date(a.timestamp).getTime();
+      const timeB = new Date(b.timestamp).getTime();
+      if (timeB !== timeA) return timeB - timeA;
+      return b.id - a.id;
+    });
+
+    // Apply pagination
+    const paginatedActivity = allActivity.slice(offset, offset + limit);
+
+    if (paginatedActivity.length === 0) {
       return res.json([]);
     }
 
-    const recordIds = rows.map((row) => row.id);
-    const tagsByRecord = await fetchTagsByRecordIds(pool, recordIds);
+    const listIds = Array.from(
+      new Set(
+        paginatedActivity
+          .filter((row) => row.activityType === 'list')
+          .map((row) => Number(row.id))
+          .filter((id) => Number.isInteger(id) && id > 0)
+      )
+    );
 
-    const feed = rows.map((row) => {
+    const previewRecordsByListId = new Map();
+    if (listIds.length > 0) {
+      const [previewRows] = await pool.query(
+        `SELECT lr.listId, lr.id, lr.name, lr.cover
+           FROM ListRecord lr
+          WHERE lr.listId IN (?)
+          ORDER BY lr.listId ASC, lr.sortOrder ASC, lr.added DESC, lr.id DESC`,
+        [listIds]
+      );
+
+      if (Array.isArray(previewRows)) {
+        for (const row of previewRows) {
+          const listId = Number(row.listId);
+          if (!Number.isInteger(listId) || listId <= 0) {
+            continue;
+          }
+          const existing = previewRecordsByListId.get(listId) || [];
+          if (existing.length >= 3) {
+            continue;
+          }
+          const recordIdValue = Number(row.id);
+          existing.push({
+            id: Number.isInteger(recordIdValue) && recordIdValue > 0 ? recordIdValue : 0,
+            name: typeof row.name === 'string' ? row.name : '',
+            cover:
+              typeof row.cover === 'string' && row.cover.trim()
+                ? row.cover.trim()
+                : null,
+          });
+          previewRecordsByListId.set(listId, existing);
+        }
+      }
+    }
+
+    // Get record IDs for tag fetching
+    const recordIds = paginatedActivity
+      .filter(row => row.activityType === 'record')
+      .map(row => row.id);
+    const tagsByRecord = recordIds.length > 0 ? await fetchTagsByRecordIds(pool, recordIds) : {};
+
+    const feed = paginatedActivity.map((row) => {
       const displayName =
         typeof row.displayName === "string" && row.displayName.trim()
           ? row.displayName.trim()
           : null;
+
+      // Handle list activity
+      if (row.activityType === 'list') {
+        const previews = previewRecordsByListId.get(row.id) || [];
+        return {
+          type: 'list',
+          owner: {
+            username: row.username,
+            displayName,
+            profilePicUrl: buildProfilePicPublicPath(row.profilePic),
+          },
+          list: {
+            id: row.id,
+            name: row.listName,
+            description: typeof row.description === 'string' && row.description.trim()
+              ? row.description.trim()
+              : null,
+            picture: buildListPicPublicPath(
+              typeof row.picture === 'string' && row.picture.trim()
+                ? row.picture.trim()
+                : null
+            ),
+            recordCount: row.recordCount,
+            created: row.timestamp,
+          },
+          previewRecords: previews,
+        };
+      }
+
+      // Handle record activity
       const ratingRaw = Number(row.rating);
       const rating = Number.isFinite(ratingRaw) ? ratingRaw : 0;
       const releaseRaw = Number(row.release);
@@ -1955,7 +2020,7 @@ app.get("/api/activity", requireAuth, async (req, res) => {
       const masterIdRaw = Number(row.masterId);
       const masterId =
         Number.isInteger(masterIdRaw) && masterIdRaw > 0 ? masterIdRaw : null;
-      const added = row.added;
+  const added = row.timestamp;
       const cover =
         typeof row.cover === "string" && row.cover ? row.cover : undefined;
       const tags = tagsByRecord[row.id] || [];
@@ -1994,6 +2059,7 @@ app.get("/api/activity", requireAuth, async (req, res) => {
       }
 
       return {
+        type: 'record',
         owner: {
           username: row.username,
           displayName,
@@ -3524,6 +3590,10 @@ app.post('/api/records/move', requireAuth, async (req, res) => {
 app.get('/api/lists/mine', requireAuth, async (req, res) => {
   console.log('Fetching user lists...');
   try {
+    const limitRaw = Number(req.query.limit);
+    const limit = Number.isInteger(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 50) : 50;
+    const offsetRaw = Number(req.query.offset);
+    const offset = Number.isInteger(offsetRaw) && offsetRaw >= 0 ? offsetRaw : 0;
     const pool = await getPool();
     const [rows] = await pool.query(
       `SELECT l.id, l.name, l.description, l.isPrivate, l.likes, l.picture, l.created,
@@ -3533,11 +3603,12 @@ app.get('/api/lists/mine', requireAuth, async (req, res) => {
            SELECT listId, COUNT(*) AS recordCount FROM ListRecord GROUP BY listId
          ) stats ON stats.listId = l.id
         WHERE l.userUuid = ?
-        ORDER BY l.created DESC`,
-      [req.userUuid]
+        ORDER BY l.created DESC
+        LIMIT ? OFFSET ?`,
+      [req.userUuid, limit, offset]
     );
     const lists = Array.isArray(rows) ? rows.map(mapListSummaryRow) : [];
-    res.json({ lists });
+    res.json({ lists, limit, offset });
   } catch (err) {
     console.error('Failed to fetch lists', err);
     res.status(500).json({ error: 'Failed to fetch lists' });
@@ -3783,12 +3854,55 @@ app.delete('/api/lists/:listId/picture', requireAuth, async (req, res) => {
   }
 });
 
+app.get('/api/lists/search', async (req, res) => {
+  console.log('Searching public lists...');
+  const limitRaw = Number(req.query.limit);
+  const limit = Number.isInteger(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 50) : 20;
+  const offsetRaw = Number(req.query.offset);
+  const offset = Number.isInteger(offsetRaw) && offsetRaw >= 0 ? offsetRaw : 0;
+  const rawQuery = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+  if (rawQuery.length < 2) {
+    return res.json({ lists: [], limit, offset: 0 });
+  }
+
+  try {
+    const currentUserUuid = extractUserUuidFromRequest(req);
+    const pool = await getPool();
+    const likeTerm = `%${escapeForLike(rawQuery)}%`;
+    const [rows] = await pool.query(
+      `SELECT l.id, l.name, l.description, l.isPrivate, l.likes, l.picture, l.created,
+              COALESCE(stats.recordCount, 0) AS recordCount,
+              u.username, u.displayName, u.profilePic,
+              CASE WHEN ll.userUuid IS NULL THEN 0 ELSE 1 END AS likedByCurrentUser
+         FROM List l
+         JOIN User u ON u.uuid = l.userUuid
+         LEFT JOIN (
+           SELECT listId, COUNT(*) AS recordCount FROM ListRecord GROUP BY listId
+         ) stats ON stats.listId = l.id
+         LEFT JOIN ListLike ll ON ll.listId = l.id AND ll.userUuid = ?
+        WHERE l.isPrivate = 0
+          AND COALESCE(stats.recordCount, 0) > 0
+          AND (l.name LIKE ? OR l.description LIKE ?)
+        ORDER BY l.likes DESC, l.created DESC
+        LIMIT ? OFFSET ?`,
+      [currentUserUuid, likeTerm, likeTerm, limit, offset]
+    );
+    const lists = Array.isArray(rows) ? rows.map(mapListSummaryWithOwner) : [];
+    res.json({ lists, limit, offset });
+  } catch (err) {
+    console.error('Failed to search lists', err);
+    res.status(500).json({ error: 'Failed to search lists' });
+  }
+});
+
 app.get('/api/lists/popular', async (req, res) => {
   console.log('Fetching popular lists...');
   try {
     const currentUserUuid = extractUserUuidFromRequest(req);
     const limitRaw = Number(req.query.limit);
     const limit = Number.isInteger(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 50) : 12;
+    const offsetRaw = Number(req.query.offset);
+    const offset = Number.isInteger(offsetRaw) && offsetRaw >= 0 ? offsetRaw : 0;
     const pool = await getPool();
     const [rows] = await pool.query(
       `SELECT l.id, l.name, l.description, l.isPrivate, l.likes, l.picture, l.created,
@@ -3803,11 +3917,11 @@ app.get('/api/lists/popular', async (req, res) => {
          LEFT JOIN ListLike ll ON ll.listId = l.id AND ll.userUuid = ?
         WHERE l.isPrivate = 0
         ORDER BY l.likes DESC, l.created DESC
-        LIMIT ?`,
-      [currentUserUuid, limit]
+        LIMIT ? OFFSET ?`,
+      [currentUserUuid, limit, offset]
     );
     const lists = Array.isArray(rows) ? rows.map(mapListSummaryWithOwner) : [];
-    res.json({ lists, limit });
+    res.json({ lists, limit, offset });
   } catch (err) {
     console.error('Failed to fetch popular lists', err);
     res.status(500).json({ error: 'Failed to fetch popular lists' });
@@ -3849,7 +3963,7 @@ app.get('/api/lists/:listId', async (req, res) => {
     }
     const [recordRows] = await pool.query(
       `SELECT id, added, artist, cover, name, rating, release_year AS releaseYear,
-              review, masterId, isCustom, sortOrder
+              masterId, isCustom, sortOrder
          FROM ListRecord
         WHERE listId = ?
         ORDER BY sortOrder ASC, added DESC` ,
@@ -3885,6 +3999,7 @@ app.post('/api/lists/:listId/records', requireAuth, async (req, res) => {
     typeof req.body?.cover === 'string' && req.body.cover.trim() ? req.body.cover.trim() : null;
   let releaseYearValue = Number(req.body?.releaseYear);
   let ratingValue = Number(req.body?.rating);
+  console.log('Received rating val:', ratingValue);
   const review =
     typeof req.body?.review === 'string' && req.body.review.trim()
       ? req.body.review.trim()
@@ -3954,7 +4069,6 @@ app.post('/api/lists/:listId/records', requireAuth, async (req, res) => {
     recordName = recordName || 'Untitled';
 
     // Get the next sortOrder value (max + 1, or 1 if list is empty)
-    // Note: Duplicates are allowed - same record can be added multiple times
     const [sortOrderRows] = await pool.query(
       'SELECT COALESCE(MAX(sortOrder), 0) + 1 AS nextOrder FROM ListRecord WHERE listId = ?',
       [listId]
@@ -3962,8 +4076,8 @@ app.post('/api/lists/:listId/records', requireAuth, async (req, res) => {
     const nextSortOrder = sortOrderRows?.[0]?.nextOrder || 1;
 
     const [result] = await pool.execute(
-      `INSERT INTO ListRecord (added, artist, cover, name, rating, release_year, isCustom, userUuid, listId, review, masterId, reviewLikes, sortOrder)
-       VALUES (UTC_TIMESTAMP(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
+      `INSERT INTO ListRecord (added, artist, cover, name, rating, release_year, isCustom, userUuid, listId, masterId, reviewLikes, sortOrder)
+       VALUES (UTC_TIMESTAMP(), ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
       [
         artist,
         cover,
@@ -3973,7 +4087,6 @@ app.post('/api/lists/:listId/records', requireAuth, async (req, res) => {
         masterId ? 0 : 1,
         req.userUuid,
         listId,
-        review,
         masterId,
         nextSortOrder,
       ]
@@ -3981,7 +4094,7 @@ app.post('/api/lists/:listId/records', requireAuth, async (req, res) => {
 
     const newId = Number(result?.insertId);
     const [rows] = await pool.query(
-      `SELECT id, added, artist, cover, name, rating, release_year AS releaseYear, review, masterId, isCustom
+      `SELECT id, added, artist, cover, name, rating, release_year AS releaseYear, masterId, isCustom
          FROM ListRecord
         WHERE id = ? AND listId = ? AND userUuid = ?
         LIMIT 1`,

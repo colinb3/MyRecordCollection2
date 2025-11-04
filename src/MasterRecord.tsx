@@ -30,7 +30,7 @@ import apiUrl from "./api";
 import TopBar from "./components/TopBar";
 import { darkTheme } from "./theme";
 import { setUserId } from "./analytics";
-import placeholderCover from "./assets/missingImg.jpg";
+import ImageNotSupportedIcon from "@mui/icons-material/ImageNotSupported";
 import FindRecordSidebar from "./components/FindRecordSidebar";
 import {
   clearUserInfoCache,
@@ -112,6 +112,7 @@ function RatingsHistogram({ counts }: { counts: number[] }) {
       Number.isFinite(current) && current > max ? current : max,
     0
   );
+
   const safeMax = maxValue > 0 ? maxValue : 1;
 
   return (
@@ -243,6 +244,17 @@ export default function MasterRecord() {
   const [masterLoading, setMasterLoading] = useState(false);
   const [masterError, setMasterError] = useState<string | null>(null);
   const [releaseYearTouched, setReleaseYearTouched] = useState(false);
+
+  const albumCoverUrl =
+    typeof album?.cover === "string" && album.cover.trim()
+      ? album.cover.trim()
+      : "";
+  const masterCoverUrl =
+    typeof masterInfo?.cover === "string" && masterInfo.cover.trim()
+      ? masterInfo.cover.trim()
+      : "";
+  const displayedCoverUrl = fromCollection ? masterCoverUrl : albumCoverUrl;
+
   const [cachedListNames] = useState<UserListEntry[]>(() => {
     // Initialize with cached list names on mount
     const cached = getCachedUserLists();
@@ -1002,7 +1014,7 @@ export default function MasterRecord() {
     const lists = Array.isArray(masterInfo?.userLists)
       ? masterInfo.userLists
       : cachedListNames;
-    
+
     return [...lists].sort((a, b) =>
       a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
     );
@@ -1045,6 +1057,7 @@ export default function MasterRecord() {
             artist: artistForList,
             cover: coverForList,
             releaseYear: releaseYearForList,
+            rating: Number.isFinite(Number(rating)) ? Math.trunc(Number(rating)) : null,
           }),
         });
         if (!response.ok) {
@@ -1075,6 +1088,7 @@ export default function MasterRecord() {
     },
     [
       album,
+      rating,
       loadMasterInfo,
       masterIdOverride,
       masterInfo,
@@ -1384,22 +1398,41 @@ export default function MasterRecord() {
                     </Box>
                   ) : (
                     <Box
-                      component="img"
-                      src={
-                        !fromCollection
-                          ? album.cover || placeholderCover
-                          : masterInfo?.cover || placeholderCover
-                      }
-                      alt={album.record}
                       sx={{
                         width: { xs: 150, sm: 175, md: 200 },
                         height: { xs: 150, sm: 175, md: 200 },
-                        objectFit: "cover",
                         borderRadius: 2,
                         bgcolor: "grey.900",
                         mb: { xs: 0, md: 1.5 },
+                        overflow: "hidden",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        position: "relative",
                       }}
-                    />
+                    >
+                      {displayedCoverUrl ? (
+                        <Box
+                          component="img"
+                          src={displayedCoverUrl}
+                          alt={album?.record ?? "Album cover"}
+                          sx={{
+                            position: "absolute",
+                            inset: 0,
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "cover",
+                          }}
+                        />
+                      ) : (
+                        <ImageNotSupportedIcon
+                          sx={{
+                            fontSize: { xs: 54, md: 72 },
+                            color: "text.secondary",
+                          }}
+                        />
+                      )}
+                    </Box>
                   )}
                   <Box sx={{ ml: { xs: 2, md: 0 } }}>
                     <Typography variant="h5" fontWeight={700}>

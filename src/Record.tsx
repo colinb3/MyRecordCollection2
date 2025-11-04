@@ -31,7 +31,7 @@ import FavoriteIcon from "@mui/icons-material/Favorite";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import TopBar from "./components/TopBar";
 import { darkTheme } from "./theme";
-import placeholderCover from "./assets/missingImg.jpg";
+import ImageNotSupportedIcon from "@mui/icons-material/ImageNotSupported";
 import apiUrl from "./api";
 import {
   clearUserInfoCache,
@@ -88,6 +88,11 @@ export default function RecordDetails() {
   const [viewerHasLikedReview, setViewerHasLikedReview] =
     useState<boolean>(false);
   const [likeLoading, setLikeLoading] = useState(false);
+
+  const recordCoverUrl =
+    typeof record?.cover === "string" && record.cover.trim()
+      ? record.cover.trim()
+      : "";
 
   useEffect(() => {
     let cancelled = false;
@@ -721,7 +726,13 @@ export default function RecordDetails() {
                                   </Typography>
                                 </Stack>
                                 <Avatar
-                                  src={owner?.profilePicUrl ?? undefined}
+                                  src={
+                                    owner?.profilePicUrl
+                                      ? owner.profilePicUrl.startsWith("http")
+                                        ? owner.profilePicUrl
+                                        : apiUrl(owner.profilePicUrl)
+                                      : undefined
+                                  }
                                   alt={ownerProfileAlt}
                                   sx={{ width: 40, height: 40, flexShrink: 0 }}
                                 >
@@ -744,17 +755,41 @@ export default function RecordDetails() {
                           }}
                         >
                           <Box
-                            component="img"
-                            src={record.cover || placeholderCover}
-                            alt={record.record}
                             sx={{
                               width: { xs: 150, sm: 175, md: 200 },
                               height: { xs: 150, sm: 175, md: 200 },
                               borderRadius: 2,
-                              objectFit: "cover",
                               aspectRatio: "1 / 1",
+                              bgcolor: "grey.900",
+                              overflow: "hidden",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              position: "relative",
                             }}
-                          />
+                          >
+                            {recordCoverUrl ? (
+                              <Box
+                                component="img"
+                                src={recordCoverUrl}
+                                alt={record.record}
+                                sx={{
+                                  position: "absolute",
+                                  inset: 0,
+                                  width: "100%",
+                                  height: "100%",
+                                  objectFit: "cover",
+                                }}
+                              />
+                            ) : (
+                              <ImageNotSupportedIcon
+                                sx={{
+                                  fontSize: { xs: 48, md: 64 },
+                                  color: "text.secondary",
+                                }}
+                              />
+                            )}
+                          </Box>
                         </Box>
                         <Stack spacing={2} sx={{ flex: 1 }}>
                           <Stack spacing={0.5}>

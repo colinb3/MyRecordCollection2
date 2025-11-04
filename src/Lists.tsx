@@ -24,7 +24,6 @@ import {
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
-import VisibilityIcon from "@mui/icons-material/Visibility";
 import FavoriteIcon from "@mui/icons-material/Favorite";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
@@ -152,6 +151,10 @@ export default function Lists() {
     open: boolean;
     list: ListSummary | null;
   }>({ open: false, list: null });
+  const [hasMoreMyLists, setHasMoreMyLists] = useState(true);
+  const [hasMorePopularLists, setHasMorePopularLists] = useState(true);
+  const [loadingMoreMine, setLoadingMoreMine] = useState(false);
+  const [loadingMorePopular, setLoadingMorePopular] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -224,72 +227,129 @@ export default function Lists() {
     setSnackbar((prev) => ({ ...prev, open: false }));
   }, []);
 
-  const loadMine = useCallback(
-    async () => {
-      // Always fetch from server (no cache on Lists page)
-      setLoadingMine(true);
-      try {
-        const response = await fetch(apiUrl("/api/lists/mine"), {
+  const loadMine = useCallback(async () => {
+    // Always fetch from server (no cache on Lists page)
+    setLoadingMine(true);
+    try {
+      const response = await fetch(
+        apiUrl("/api/lists/mine?limit=10&offset=0"),
+        {
           credentials: "include",
-        });
-        if (!response.ok) {
-          const problem = await response.json().catch(() => ({}));
-          throw new Error(problem.error || "Failed to load your lists");
         }
-        const data = await response.json();
-        const lists: ListSummary[] = Array.isArray(data?.lists)
-          ? data.lists.map((entry: any) => ({
-              id: Number(entry?.id) || 0,
-              name: typeof entry?.name === "string" ? entry.name : "",
-              description:
-                typeof entry?.description === "string" &&
-                entry.description.trim()
-                  ? entry.description.trim()
-                  : null,
-              isPrivate:
-                entry?.isPrivate === true || Number(entry?.isPrivate) === 1,
-              likes: Number(entry?.likes) >= 0 ? Math.trunc(entry.likes) : 0,
-              pictureUrl:
-                typeof entry?.pictureUrl === "string" && entry.pictureUrl.trim()
-                  ? entry.pictureUrl
-                  : null,
-              created:
-                typeof entry?.created === "string" && entry.created.trim()
-                  ? entry.created.trim()
-                  : null,
-              recordCount:
-                Number(entry?.recordCount) >= 0
-                  ? Math.trunc(entry.recordCount)
-                  : 0,
-            }))
-          : [];
-        setMyLists(lists);
-
-        // Update cache with just names and IDs for MasterRecord page
-        const cacheEntries = lists.map((list) => ({
-          id: list.id,
-          name: list.name,
-        }));
-        setCachedUserLists(cacheEntries);
-      } catch (error) {
-        console.error(error);
-        showMessage(
-          error instanceof Error ? error.message : "Failed to load your lists",
-          "error"
-        );
-      } finally {
-        setLoadingMine(false);
+      );
+      if (!response.ok) {
+        const problem = await response.json().catch(() => ({}));
+        throw new Error(problem.error || "Failed to load your lists");
       }
-    },
-    [showMessage]
-  );
+      const data = await response.json();
+      const lists: ListSummary[] = Array.isArray(data?.lists)
+        ? data.lists.map((entry: any) => ({
+            id: Number(entry?.id) || 0,
+            name: typeof entry?.name === "string" ? entry.name : "",
+            description:
+              typeof entry?.description === "string" && entry.description.trim()
+                ? entry.description.trim()
+                : null,
+            isPrivate:
+              entry?.isPrivate === true || Number(entry?.isPrivate) === 1,
+            likes: Number(entry?.likes) >= 0 ? Math.trunc(entry.likes) : 0,
+            pictureUrl:
+              typeof entry?.pictureUrl === "string" && entry.pictureUrl.trim()
+                ? entry.pictureUrl
+                : null,
+            created:
+              typeof entry?.created === "string" && entry.created.trim()
+                ? entry.created.trim()
+                : null,
+            recordCount:
+              Number(entry?.recordCount) >= 0
+                ? Math.trunc(entry.recordCount)
+                : 0,
+          }))
+        : [];
+      setMyLists(lists);
+      setHasMoreMyLists(lists.length === 10);
+
+      // Update cache with just names and IDs for MasterRecord page
+      const cacheEntries = lists.map((list) => ({
+        id: list.id,
+        name: list.name,
+      }));
+      setCachedUserLists(cacheEntries);
+    } catch (error) {
+      console.error(error);
+      showMessage(
+        error instanceof Error ? error.message : "Failed to load your lists",
+        "error"
+      );
+    } finally {
+      setLoadingMine(false);
+    }
+  }, [showMessage]);
+
+  const loadMoreMine = useCallback(async () => {
+    if (loadingMoreMine || !hasMoreMyLists) return;
+    setLoadingMoreMine(true);
+    try {
+      const offset = myLists.length;
+      const response = await fetch(
+        apiUrl(`/api/lists/mine?limit=10&offset=${offset}`),
+        {
+          credentials: "include",
+        }
+      );
+      if (!response.ok) {
+        const problem = await response.json().catch(() => ({}));
+        throw new Error(problem.error || "Failed to load more lists");
+      }
+      const data = await response.json();
+      const newLists: ListSummary[] = Array.isArray(data?.lists)
+        ? data.lists.map((entry: any) => ({
+            id: Number(entry?.id) || 0,
+            name: typeof entry?.name === "string" ? entry.name : "",
+            description:
+              typeof entry?.description === "string" && entry.description.trim()
+                ? entry.description.trim()
+                : null,
+            isPrivate:
+              entry?.isPrivate === true || Number(entry?.isPrivate) === 1,
+            likes: Number(entry?.likes) >= 0 ? Math.trunc(entry.likes) : 0,
+            pictureUrl:
+              typeof entry?.pictureUrl === "string" && entry.pictureUrl.trim()
+                ? entry.pictureUrl
+                : null,
+            created:
+              typeof entry?.created === "string" && entry.created.trim()
+                ? entry.created.trim()
+                : null,
+            recordCount:
+              Number(entry?.recordCount) >= 0
+                ? Math.trunc(entry.recordCount)
+                : 0,
+          }))
+        : [];
+      setMyLists((prev) => [...prev, ...newLists]);
+      setHasMoreMyLists(newLists.length === 10);
+    } catch (error) {
+      console.error(error);
+      showMessage(
+        error instanceof Error ? error.message : "Failed to load more lists",
+        "error"
+      );
+    } finally {
+      setLoadingMoreMine(false);
+    }
+  }, [myLists.length, loadingMoreMine, hasMoreMyLists, showMessage]);
 
   const loadPopular = useCallback(async () => {
     setLoadingPopular(true);
     try {
-      const response = await fetch(apiUrl("/api/lists/popular"), {
-        credentials: "include",
-      });
+      const response = await fetch(
+        apiUrl("/api/lists/popular?limit=10&offset=0"),
+        {
+          credentials: "include",
+        }
+      );
       if (!response.ok) {
         const problem = await response.json().catch(() => ({}));
         throw new Error(problem.error || "Failed to load popular lists");
@@ -337,6 +397,7 @@ export default function Lists() {
           }))
         : [];
       setPopularLists(lists);
+      setHasMorePopularLists(lists.length === 10);
     } catch (error) {
       console.error(error);
       showMessage(
@@ -347,6 +408,83 @@ export default function Lists() {
       setLoadingPopular(false);
     }
   }, [showMessage]);
+
+  const loadMorePopular = useCallback(async () => {
+    if (loadingMorePopular || !hasMorePopularLists) return;
+    setLoadingMorePopular(true);
+    try {
+      const offset = popularLists.length;
+      const response = await fetch(
+        apiUrl(`/api/lists/popular?limit=10&offset=${offset}`),
+        {
+          credentials: "include",
+        }
+      );
+      if (!response.ok) {
+        const problem = await response.json().catch(() => ({}));
+        throw new Error(problem.error || "Failed to load more popular lists");
+      }
+      const data = await response.json();
+      const newLists: PopularList[] = Array.isArray(data?.lists)
+        ? data.lists.map((entry: any) => ({
+            id: Number(entry?.id) || 0,
+            name: typeof entry?.name === "string" ? entry.name : "",
+            description:
+              typeof entry?.description === "string" && entry.description.trim()
+                ? entry.description.trim()
+                : null,
+            isPrivate:
+              entry?.isPrivate === true || Number(entry?.isPrivate) === 1,
+            likes: Number(entry?.likes) >= 0 ? Math.trunc(entry.likes) : 0,
+            pictureUrl:
+              typeof entry?.pictureUrl === "string" && entry.pictureUrl.trim()
+                ? entry.pictureUrl
+                : null,
+            created:
+              typeof entry?.created === "string" && entry.created.trim()
+                ? entry.created.trim()
+                : null,
+            recordCount:
+              Number(entry?.recordCount) >= 0
+                ? Math.trunc(entry.recordCount)
+                : 0,
+            owner: entry?.owner
+              ? {
+                  username: String(entry.owner?.username ?? ""),
+                  displayName:
+                    typeof entry.owner?.displayName === "string" &&
+                    entry.owner.displayName.trim()
+                      ? entry.owner.displayName.trim()
+                      : null,
+                  profilePicUrl:
+                    typeof entry.owner?.profilePicUrl === "string" &&
+                    entry.owner.profilePicUrl.trim()
+                      ? entry.owner.profilePicUrl
+                      : null,
+                }
+              : null,
+            likedByCurrentUser: entry?.likedByCurrentUser === true,
+          }))
+        : [];
+      setPopularLists((prev) => [...prev, ...newLists]);
+      setHasMorePopularLists(newLists.length === 10);
+    } catch (error) {
+      console.error(error);
+      showMessage(
+        error instanceof Error
+          ? error.message
+          : "Failed to load more popular lists",
+        "error"
+      );
+    } finally {
+      setLoadingMorePopular(false);
+    }
+  }, [
+    popularLists.length,
+    loadingMorePopular,
+    hasMorePopularLists,
+    showMessage,
+  ]);
 
   useEffect(() => {
     void loadMine();
@@ -641,7 +779,7 @@ export default function Lists() {
             src={imageUrl}
             variant="rounded"
             alt={name}
-            sx={{ width: 96, height: 96, borderRadius: 2 }}
+            sx={{ width: 80, height: 80, borderRadius: 2 }}
           />
         );
       }
@@ -649,8 +787,8 @@ export default function Lists() {
         <Avatar
           variant="rounded"
           sx={{
-            width: 96,
-            height: 96,
+            width: 80,
+            height: 80,
             borderRadius: 2,
             bgcolor: "grey.800",
           }}
@@ -681,19 +819,8 @@ export default function Lists() {
           profilePicUrl={profilePicUrl ?? undefined}
           searchPlaceholder="Search..."
         />
-        <Box
-          sx={{
-            flex: 1,
-            overflowY: { xs: "auto", md: "auto" },
-            mt: 1,
-            px: 1,
-          }}
-        >
-          <Box
-            maxWidth={860}
-            mx="auto"
-            sx={{ height: { md: "100%" }, pb: { xs: 4, sm: 0 } }}
-          >
+        <Box sx={{ flex: 1, overflowY: "auto", pb: 3, px: 1 }}>
+          <Box maxWidth={860} mx="auto" sx={{ mt: 1 }}>
             <Paper
               variant="outlined"
               sx={{
@@ -720,7 +847,6 @@ export default function Lists() {
                       xs: "minmax(0, 1fr)",
                       md: "minmax(0, 1fr) minmax(0, 1fr)",
                     },
-                    gridAutoRows: "min-content",
                   }}
                 >
                   <Box
@@ -733,10 +859,11 @@ export default function Lists() {
                     <Paper
                       sx={{
                         p: 2,
-                        height: "100%",
+                        maxHeight: { xs: 400, md: 763 },
                         display: "flex",
                         flexDirection: "column",
                         minWidth: 0,
+                        overflow: "hidden",
                       }}
                     >
                       <Box>
@@ -744,7 +871,15 @@ export default function Lists() {
                           Popular lists
                         </Typography>
                       </Box>
-                      <Box sx={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
+                      <Box
+                        sx={{
+                          flex: 1,
+                          overflowY: "auto",
+                          minHeight: 0,
+                          display: "flex",
+                          flexDirection: "column",
+                        }}
+                      >
                         {loadingPopular ? (
                           <Box display="flex" justifyContent="center" py={4}>
                             <CircularProgress />
@@ -754,116 +889,140 @@ export default function Lists() {
                             No public lists yet.
                           </Typography>
                         ) : (
-                          <Stack spacing={2}>
-                            {popularLists.map((list) => {
-                              const liked = list.likedByCurrentUser === true;
-                              const likeBusy = likeBusyIds.has(list.id);
-                              const isOwner = list.owner?.username === username;
-                              return (
-                                <Paper
-                                  key={list.id}
-                                  variant="outlined"
-                                  sx={{ p: 2 }}
-                                >
-                                  <Stack direction="row" spacing={2}>
-                                    {renderListPicture(
-                                      list.pictureUrl,
-                                      list.name
-                                    )}
-                                    <Box
-                                      sx={{
-                                        ml: { xs: 2, md: 0 },
-                                        minWidth: 0,
-                                        flex: 1,
-                                      }}
-                                    >
-                                      <Typography
-                                        variant="subtitle1"
-                                        fontWeight={700}
-                                        noWrap
-                                      >
-                                        {list.name}
-                                      </Typography>
-                                      {list.owner && (
-                                        <Typography
-                                          variant="body2"
-                                          color="text.secondary"
-                                          noWrap
-                                        >
-                                          by{" "}
-                                          {list.owner.displayName ??
-                                            list.owner.username}
-                                        </Typography>
-                                      )}
-                                      <Stack
-                                        direction="row"
-                                        spacing={1}
-                                        alignItems="center"
-                                        mt={1}
-                                        flexWrap="wrap"
-                                      >
-                                        <Chip
-                                          size="small"
-                                          label={`${list.recordCount} records`}
-                                        />
-                                        <Chip
-                                          size="small"
-                                          label={
-                                            list.likes === 1
-                                              ? "1 like"
-                                              : `${list.likes} likes`
-                                          }
-                                        />
-                                      </Stack>
-                                      <Stack
-                                        direction="row"
-                                        spacing={1}
-                                        alignItems="center"
-                                        mt={1.5}
-                                      >
-                                        {!isOwner && (
-                                          <Tooltip
-                                            title={liked ? "Unlike" : "Like"}
-                                          >
-                                            <span>
-                                              <IconButton
-                                                color={
-                                                  liked ? "error" : "default"
-                                                }
-                                                size="small"
-                                                onClick={() =>
-                                                  void handleToggleLike(
-                                                    list.id,
-                                                    liked
-                                                  )
-                                                }
-                                                disabled={likeBusy}
-                                              >
-                                                {liked ? (
-                                                  <FavoriteIcon />
-                                                ) : (
-                                                  <FavoriteBorderIcon />
-                                                )}
-                                              </IconButton>
-                                            </span>
-                                          </Tooltip>
+                          <>
+                            <Stack spacing={2}>
+                              {popularLists.map((list) => {
+                                const liked = list.likedByCurrentUser === true;
+                                const likeBusy = likeBusyIds.has(list.id);
+                                const isOwner =
+                                  list.owner?.username === username;
+                                return (
+                                  <Paper
+                                    key={list.id}
+                                    variant="outlined"
+                                    sx={{
+                                      p: 0,
+                                      overflow: "hidden",
+                                      cursor: "pointer",
+                                      "&:hover": {
+                                        bgcolor: "action.hover",
+                                      },
+                                    }}
+                                    onClick={() =>
+                                      navigate(`/lists/${list.id}`)
+                                    }
+                                  >
+                                    <Box sx={{ p: 2 }}>
+                                      <Stack direction="row" spacing={2}>
+                                        {renderListPicture(
+                                          list.pictureUrl,
+                                          list.name
                                         )}
-                                        <Button
-                                          variant="text"
-                                          size="small"
-                                          onClick={() =>
-                                            navigate(`/lists/${list.id}`)
-                                          }
+                                        <Box
+                                          sx={{
+                                            ml: { xs: 2, md: 0 },
+                                            minWidth: 0,
+                                            flex: 1,
+                                          }}
                                         >
-                                          View
-                                        </Button>
+                                          <Stack
+                                            direction="row"
+                                            justifyContent={"space-between"}
+                                          >
+                                            <Typography
+                                              variant="subtitle1"
+                                              fontWeight={700}
+                                              noWrap
+                                            >
+                                              {list.name}
+                                            </Typography>
+                                            {!isOwner && (
+                                              <Tooltip
+                                                title={
+                                                  liked ? "Unlike" : "Like"
+                                                }
+                                              >
+                                                <span>
+                                                  <IconButton
+                                                    color={
+                                                      liked
+                                                        ? "error"
+                                                        : "default"
+                                                    }
+                                                    size="small"
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      void handleToggleLike(
+                                                        list.id,
+                                                        liked
+                                                      );
+                                                    }}
+                                                    disabled={likeBusy}
+                                                  >
+                                                    {liked ? (
+                                                      <FavoriteIcon />
+                                                    ) : (
+                                                      <FavoriteBorderIcon />
+                                                    )}
+                                                  </IconButton>
+                                                </span>
+                                              </Tooltip>
+                                            )}
+                                          </Stack>
+                                          {list.owner && (
+                                            <Typography
+                                              variant="body2"
+                                              color="text.secondary"
+                                              noWrap
+                                            >
+                                              by{" "}
+                                              {list.owner.displayName ??
+                                                list.owner.username}
+                                            </Typography>
+                                          )}
+                                          <Stack
+                                            direction="row"
+                                            spacing={1}
+                                            alignItems="center"
+                                            mt={1}
+                                            flexWrap="wrap"
+                                          >
+                                            <Chip
+                                              size="small"
+                                              label={`${list.recordCount} records`}
+                                            />
+                                            <Chip
+                                              size="small"
+                                              label={
+                                                list.likes === 1
+                                                  ? "1 like"
+                                                  : `${list.likes} likes`
+                                              }
+                                            />
+                                          </Stack>
+                                        </Box>
                                       </Stack>
                                     </Box>
-                                  </Stack>
-                                </Paper>
-                              );
-                            })}
-                          </Stack>
+                                  </Paper>
+                                );
+                              })}
+                            </Stack>
+                            {hasMorePopularLists && (
+                              <Box sx={{ pt: 2, pb: 1, textAlign: "center" }}>
+                                <Button
+                                  variant="outlined"
+                                  onClick={() => void loadMorePopular()}
+                                  disabled={loadingMorePopular}
+                                >
+                                  {loadingMorePopular ? (
+                                    <CircularProgress size={24} />
+                                  ) : (
+                                    "Load More"
+                                  )}
+                                </Button>
+                              </Box>
+                            )}
+                          </>
                         )}
                       </Box>
                     </Paper>
@@ -876,27 +1035,23 @@ export default function Lists() {
                       minWidth: 0,
                     }}
                   >
-                    <Typography variant="h6" sx={{ mb: 1, fontWeight: 700 }}>
-                      Create a new list
-                    </Typography>
                     <Paper sx={{ p: 2, mb: 2 }}>
-                      <Stack
-                        direction={{ xs: "column", sm: "row" }}
-                        spacing={2}
-                        mb={2}
-                      >
+                      <Typography variant="h6" sx={{ mb: 1, fontWeight: 700 }}>
+                        Create a new list
+                      </Typography>
+                      <Stack direction={"row"} spacing={2} mb={2}>
                         {createPicturePreview ? (
                           <Avatar
                             src={createPicturePreview}
                             variant="rounded"
-                            sx={{ width: 96, height: 96, borderRadius: 2 }}
+                            sx={{ width: 80, height: 80, borderRadius: 2 }}
                           />
                         ) : (
                           <Avatar
                             variant="rounded"
                             sx={{
-                              width: 96,
-                              height: 96,
+                              width: 80,
+                              height: 80,
                               borderRadius: 2,
                               bgcolor: "grey.800",
                             }}
@@ -908,6 +1063,7 @@ export default function Lists() {
                           <Button
                             variant="outlined"
                             component="label"
+                            size="small"
                             startIcon={<PhotoCameraIcon />}
                             disabled={saving}
                           >
@@ -926,18 +1082,21 @@ export default function Lists() {
                           {createPicturePreview && (
                             <Button
                               variant="text"
+                              size="small"
                               onClick={() => handleClearCreatePicture()}
                               disabled={saving}
                             >
                               Remove Image
                             </Button>
                           )}
-                          <Typography variant="body2" color="text.secondary">
-                            JPG, PNG, WEBP, or AVIF (3 MB)
-                          </Typography>
+                          {!createPicturePreview && (
+                            <Typography variant="body2" color="text.secondary">
+                              JPG, PNG, WEBP, or AVIF (3 MB)
+                            </Typography>
+                          )}
                         </Stack>
                       </Stack>
-                      <Stack spacing={2}>
+                      <Stack spacing={0.75}>
                         <TextField
                           label="List name"
                           value={createForm.name}
@@ -949,7 +1108,7 @@ export default function Lists() {
                             }))
                           }
                           required
-                          sx={{ mb: 2 }}
+                          sx={{ pb: 1 }}
                         />
                         <TextField
                           label="Description"
@@ -999,125 +1158,165 @@ export default function Lists() {
                     <Typography variant="h6" fontWeight={700} mb={1}>
                       My lists
                     </Typography>
-                    {loadingMine ? (
-                      <Box display="flex" justifyContent="center" py={4}>
-                        <CircularProgress />
-                      </Box>
-                    ) : sortedMyLists.length === 0 ? (
-                      <Paper sx={{ p: 2 }}>
-                        <Typography color="text.secondary">
-                          You have not created any lists yet.
-                        </Typography>
-                      </Paper>
-                    ) : (
-                      <Stack spacing={2}>
-                        {sortedMyLists.map((list) => {
-                          return (
-                            <Paper key={list.id} sx={{ p: 2 }}>
-                              <Stack
-                                direction={{ xs: "row", sm: "row" }}
-                                spacing={2}
-                              >
-                                {renderListPicture(list.pictureUrl, list.name)}
-                                <Box flex={1} minWidth={0}>
-                                  <Stack direction={"column"}>
-                                    <Typography variant="h6" fontWeight={700}>
-                                      {list.name}
-                                    </Typography>
-                                    {list.description && (
-                                      <Typography color="text.secondary">
-                                        {list.description}
-                                      </Typography>
-                                    )}
-                                    <Stack
-                                      direction="row"
-                                      spacing={0.01}
-                                      mt={1}
-                                      flexWrap="wrap"
-                                      sx={{ gap: 1 }}
-                                    >
-                                      <Chip
-                                        size="small"
-                                        color={
-                                          list.isPrivate ? "default" : "primary"
-                                        }
-                                        icon={
-                                          list.isPrivate ? (
-                                            <LockIcon fontSize="small" />
-                                          ) : (
-                                            <PublicIcon fontSize="small" />
-                                          )
-                                        }
-                                        label={
-                                          list.isPrivate ? "Private" : "Public"
-                                        }
-                                      />
-                                      <Chip
-                                        size="small"
-                                        icon={<FavoriteIcon fontSize="small" />}
-                                        label={
-                                          list.likes === 1
-                                            ? "1 like"
-                                            : `${list.likes} likes`
-                                        }
-                                      />
-                                      <Chip
-                                        size="small"
-                                        label={
-                                          list.recordCount === 0
-                                            ? "No records"
-                                            : list.recordCount === 1
-                                            ? `${list.recordCount} record`
-                                            : `${list.recordCount} records`
-                                        }
-                                        sx={{ mt: 3 }}
-                                      />
+                    <Box
+                      sx={{
+                        maxHeight: 335,
+                        overflowY: "auto",
+                        display: "flex",
+                        flexDirection: "column",
+                      }}
+                    >
+                      {loadingMine ? (
+                        <Box display="flex" justifyContent="center" py={4}>
+                          <CircularProgress />
+                        </Box>
+                      ) : sortedMyLists.length === 0 ? (
+                        <Paper sx={{ p: 2 }}>
+                          <Typography color="text.secondary">
+                            You have not created any lists yet.
+                          </Typography>
+                        </Paper>
+                      ) : (
+                        <>
+                          <Stack spacing={2}>
+                            {sortedMyLists.map((list) => {
+                              return (
+                                <Paper
+                                  key={list.id}
+                                  sx={{
+                                    p: 0,
+                                    overflow: "hidden",
+                                    cursor: "pointer",
+                                    "&:hover": {
+                                      bgcolor: "action.hover",
+                                    },
+                                  }}
+                                  onClick={() => navigate(`/lists/${list.id}`)}
+                                >
+                                  <Box sx={{ p: 2 }}>
+                                    <Stack direction="row" spacing={2}>
+                                      {renderListPicture(
+                                        list.pictureUrl,
+                                        list.name
+                                      )}
+                                      <Box flex={1} minWidth={0}>
+                                        <Stack direction={"column"}>
+                                          <Stack
+                                            direction={"row"}
+                                            justifyContent="space-between"
+                                          >
+                                            <Typography
+                                              variant="h6"
+                                              fontWeight={700}
+                                            >
+                                              {list.name}
+                                            </Typography>
+                                            <Stack direction={"row"}>
+                                              <Box>
+                                                <IconButton
+                                                  size="small"
+                                                  color="primary"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleOpenEdit(list);
+                                                  }}
+                                                >
+                                                  <EditIcon />
+                                                </IconButton>
+                                              </Box>
+                                              <Box>
+                                                <IconButton
+                                                  size="small"
+                                                  color="error"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleOpenDeleteConfirmation(
+                                                      list
+                                                    );
+                                                  }}
+                                                  disabled={saving}
+                                                  sx={{ ml: 0.5 }}
+                                                >
+                                                  <DeleteIcon />
+                                                </IconButton>
+                                              </Box>
+                                            </Stack>
+                                          </Stack>
+                                          <Stack
+                                            direction="row"
+                                            spacing={0.01}
+                                            mt={1}
+                                            flexWrap="wrap"
+                                            sx={{ gap: 1 }}
+                                          >
+                                            <Chip
+                                              size="small"
+                                              color={
+                                                list.isPrivate
+                                                  ? "default"
+                                                  : "primary"
+                                              }
+                                              icon={
+                                                list.isPrivate ? (
+                                                  <LockIcon fontSize="small" />
+                                                ) : (
+                                                  <PublicIcon fontSize="small" />
+                                                )
+                                              }
+                                              label={
+                                                list.isPrivate
+                                                  ? "Private"
+                                                  : "Public"
+                                              }
+                                            />
+                                            <Chip
+                                              size="small"
+                                              label={
+                                                list.recordCount === 0
+                                                  ? "No records"
+                                                  : list.recordCount === 1
+                                                  ? `${list.recordCount} record`
+                                                  : `${list.recordCount} records`
+                                              }
+                                            />
+                                            <Chip
+                                              size="small"
+                                              icon={
+                                                <FavoriteIcon fontSize="small" />
+                                              }
+                                              label={
+                                                list.likes === 1
+                                                  ? "1 like"
+                                                  : `${list.likes} likes`
+                                              }
+                                            />
+                                          </Stack>
+                                        </Stack>
+                                      </Box>
                                     </Stack>
-                                  </Stack>
-                                  <Stack
-                                    direction={"row"}
-                                    spacing={0.01}
-                                    flexWrap="wrap"
-                                    sx={{ mt: 2, gap: 1 }}
-                                  >
-                                    <Button
-                                      variant="contained"
-                                      size="small"
-                                      startIcon={<VisibilityIcon />}
-                                      onClick={() =>
-                                        navigate(`/lists/${list.id}`)
-                                      }
-                                    >
-                                      View
-                                    </Button>
-                                    <Button
-                                      variant="outlined"
-                                      size="small"
-                                      startIcon={<EditIcon />}
-                                      onClick={() => handleOpenEdit(list)}
-                                    >
-                                      Edit
-                                    </Button>
-                                    <Button
-                                      variant="text"
-                                      size="small"
-                                      color="error"
-                                      startIcon={<DeleteIcon />}
-                                      onClick={() =>
-                                        handleOpenDeleteConfirmation(list)
-                                      }
-                                      disabled={saving}
-                                    >
-                                      Delete
-                                    </Button>
-                                  </Stack>
-                                </Box>
-                              </Stack>
-                            </Paper>
-                          );
-                        })}
-                      </Stack>
-                    )}
+                                  </Box>
+                                </Paper>
+                              );
+                            })}
+                          </Stack>
+                          {hasMoreMyLists && (
+                            <Box sx={{ pt: 2, pb: 1, textAlign: "center" }}>
+                              <Button
+                                variant="outlined"
+                                onClick={() => void loadMoreMine()}
+                                disabled={loadingMoreMine}
+                              >
+                                {loadingMoreMine ? (
+                                  <CircularProgress size={24} />
+                                ) : (
+                                  "Load More"
+                                )}
+                              </Button>
+                            </Box>
+                          )}
+                        </>
+                      )}
+                    </Box>
                   </Box>
                 </Box>
               </Box>

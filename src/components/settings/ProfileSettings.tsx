@@ -21,7 +21,7 @@ import VisibilityOff from "@mui/icons-material/VisibilityOff";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
-import placeholderCover from "../../assets/missingImg.jpg";
+import ImageNotSupportedIcon from "@mui/icons-material/ImageNotSupported";
 import { loadCollectionRecords } from "../../collectionRecords";
 import {
   loadProfileHighlights,
@@ -900,72 +900,86 @@ export default function ProfileSettings({
             </Typography>
           ) : (
             <Stack spacing={2}>
-              {highlightRecords.map((record, index) => (
-                <Paper
-                  key={record.id}
-                  variant="outlined"
-                  sx={{
-                    p: 2,
-                    borderRadius: 2,
-                  }}
-                >
-                  <Box display="flex" alignItems="center" gap={2}>
-                    <Avatar
-                      variant="rounded"
-                      src={record.cover || placeholderCover}
-                      alt={record.record}
-                      sx={{ width: 64, height: 64 }}
-                    >
-                      {record.record?.charAt(0) ?? ""}
-                    </Avatar>
-                    <Box flex={1} minWidth={0}>
-                      <Typography
-                        variant="overline"
-                        color="text.secondary"
-                        sx={{ lineHeight: 1 }}
+              {highlightRecords.map((record, index) => {
+                const coverUrl =
+                  typeof record.cover === "string" && record.cover.trim()
+                    ? record.cover.trim()
+                    : "";
+                return (
+                  <Paper
+                    key={record.id}
+                    variant="outlined"
+                    sx={{
+                      p: 2,
+                      borderRadius: 2,
+                    }}
+                  >
+                    <Box display="flex" alignItems="center" gap={2}>
+                      <Avatar
+                        variant="rounded"
+                        src={coverUrl || undefined}
+                        alt={record.record}
+                        sx={{ width: 64, height: 64, bgcolor: "grey.800" }}
                       >
-                        Highlight {index + 1}
-                      </Typography>
-                      <Typography variant="subtitle1" noWrap>
-                        {record.record}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" noWrap>
-                        {record.artist}
-                      </Typography>
+                        {!coverUrl && (
+                          <ImageNotSupportedIcon
+                            sx={{ fontSize: 24, color: "text.secondary" }}
+                          />
+                        )}
+                      </Avatar>
+                      <Box flex={1} minWidth={0}>
+                        <Typography
+                          variant="overline"
+                          color="text.secondary"
+                          sx={{ lineHeight: 1 }}
+                        >
+                          Highlight {index + 1}
+                        </Typography>
+                        <Typography variant="subtitle1" noWrap>
+                          {record.record}
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          noWrap
+                        >
+                          {record.artist}
+                        </Typography>
+                      </Box>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <IconButton
+                          size="small"
+                          onClick={() => handleMoveHighlight(index, -1)}
+                          disabled={index === 0 || savingHighlights}
+                          aria-label="Move highlight up"
+                        >
+                          <ArrowUpwardIcon fontSize="small" />
+                        </IconButton>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleMoveHighlight(index, 1)}
+                          disabled={
+                            index === highlightRecords.length - 1 ||
+                            savingHighlights
+                          }
+                          aria-label="Move highlight down"
+                        >
+                          <ArrowDownwardIcon fontSize="small" />
+                        </IconButton>
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={() => handleRemoveHighlight(record.id)}
+                          disabled={savingHighlights}
+                          aria-label="Remove highlight"
+                        >
+                          <DeleteOutlineIcon fontSize="small" />
+                        </IconButton>
+                      </Stack>
                     </Box>
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <IconButton
-                        size="small"
-                        onClick={() => handleMoveHighlight(index, -1)}
-                        disabled={index === 0 || savingHighlights}
-                        aria-label="Move highlight up"
-                      >
-                        <ArrowUpwardIcon fontSize="small" />
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        onClick={() => handleMoveHighlight(index, 1)}
-                        disabled={
-                          index === highlightRecords.length - 1 ||
-                          savingHighlights
-                        }
-                        aria-label="Move highlight down"
-                      >
-                        <ArrowDownwardIcon fontSize="small" />
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        color="error"
-                        onClick={() => handleRemoveHighlight(record.id)}
-                        disabled={savingHighlights}
-                        aria-label="Remove highlight"
-                      >
-                        <DeleteOutlineIcon fontSize="small" />
-                      </IconButton>
-                    </Stack>
-                  </Box>
-                </Paper>
-              ))}
+                  </Paper>
+                );
+              })}
             </Stack>
           )}
         </Box>
@@ -974,7 +988,6 @@ export default function ProfileSettings({
           direction={{ xs: "column", sm: "row" }}
           spacing={2}
           sx={{ mt: 3 }}
-          alignItems={{ xs: "stretch", sm: "center" }}
         >
           <Button
             variant="contained"

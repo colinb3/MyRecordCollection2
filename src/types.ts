@@ -138,10 +138,35 @@ export interface CommunityFeedOwner {
   profilePicUrl: string | null;
 }
 
-export interface CommunityFeedEntry {
+export interface CommunityFeedListPreviewRecord {
+  id: number;
+  name: string;
+  cover: string | null;
+}
+
+export interface CommunityFeedRecordEntry {
+  type: 'record';
   owner: CommunityFeedOwner;
   record: Record;
 }
+
+export interface CommunityFeedListEntry {
+  type: 'list';
+  owner: CommunityFeedOwner;
+  list: {
+    id: number;
+    name: string;
+    description: string | null;
+    picture: string | null;
+    recordCount: number;
+    created: string;
+  };
+  previewRecords: CommunityFeedListPreviewRecord[];
+}
+
+export type CommunityFeedEntry =
+  | CommunityFeedRecordEntry
+  | CommunityFeedListEntry;
 
 export interface MasterReviewEntry {
   recordId: number;

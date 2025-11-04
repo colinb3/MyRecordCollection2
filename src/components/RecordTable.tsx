@@ -1,11 +1,12 @@
 import { useMemo } from "react";
 import { DataGrid, type GridColDef } from "@mui/x-data-grid";
+import Box from "@mui/material/Box";
+import ImageNotSupportedIcon from "@mui/icons-material/ImageNotSupported";
 import {
   type Record,
   type ColumnVisibilityMap,
   type RecordTableSortPreference,
 } from "../types";
-import placeholderCover from "../assets/missingImg.jpg";
 import { formatLocalDate } from "../dateUtils";
 
 // Clean column definitions with wrapping via cellClassName
@@ -16,20 +17,42 @@ const columns: GridColDef[] = [
     width: 110,
     sortable: false,
     renderCell: (params) => {
-      const src =
-        (params.row.cover === "" && placeholderCover) || params.row.cover;
       const title = params.row.record ?? "cover";
+      const coverUrl =
+        typeof params.row.cover === "string" && params.row.cover.trim()
+          ? params.row.cover.trim()
+          : "";
       return (
-        <img
-          src={src}
-          alt={title}
-          style={{
-            maxWidth: 100,
-            maxHeight: 100,
-            objectFit: "cover",
-            borderRadius: 6,
+        <Box
+          sx={{
+            width: 100,
+            height: 100,
+            borderRadius: 1,
+            overflow: "hidden",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            bgcolor: coverUrl ? undefined : "grey.900",
           }}
-        />
+        >
+          {coverUrl ? (
+            <Box
+              component="img"
+              src={coverUrl}
+              alt={title}
+              sx={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+              }}
+            />
+          ) : (
+            <ImageNotSupportedIcon
+              sx={{ fontSize: 32, color: "text.secondary" }}
+              aria-label={`${title} cover unavailable`}
+            />
+          )}
+        </Box>
       );
     },
   },

@@ -30,7 +30,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import TopBar from "./components/TopBar";
 import { darkTheme } from "./theme";
 import apiUrl from "./api";
-import placeholderCover from "./assets/missingImg.jpg";
+import ImageNotSupportedIcon from "@mui/icons-material/ImageNotSupported";
 import {
   clearUserInfoCache,
   getCachedUserInfo,
@@ -517,11 +517,9 @@ export default function MasterReviews() {
     }
   }, [navigate, fromMasterPath, safeMasterId]);
 
-  const coverSrc =
-    album?.cover && album.cover.trim() ? album.cover : placeholderCover;
+  const coverUrl = album?.cover && album.cover.trim() ? album.cover.trim() : "";
   const title = album?.record || "Master Reviews";
   const subtitle = album?.artist ? `by ${album.artist}` : "";
-
   return (
     <ThemeProvider theme={darkTheme}>
       <CssBaseline />
@@ -531,6 +529,7 @@ export default function MasterReviews() {
           height: "100vh",
           display: "flex",
           flexDirection: "column",
+          minHeight: "100vh",
         }}
       >
         <TopBar
@@ -576,18 +575,41 @@ export default function MasterReviews() {
                   alignItems={{ xs: "flex-start" }}
                 >
                   <Box
-                    component="img"
-                    src={coverSrc}
-                    alt={album?.record ?? "Album cover"}
                     sx={{
                       width: { xs: 125, sm: 150, md: 175 },
                       height: { xs: 125, sm: 150, md: 175 },
                       borderRadius: 2,
-                      objectFit: "cover",
-                      boxShadow: 2,
                       bgcolor: "grey.900",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      overflow: "hidden",
+                      position: "relative",
+                      boxShadow: 2,
                     }}
-                  />
+                  >
+                    {coverUrl ? (
+                      <Box
+                        component="img"
+                        src={coverUrl}
+                        alt={album?.record || "Album cover"}
+                        sx={{
+                          position: "absolute",
+                          inset: 0,
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                        }}
+                      />
+                    ) : (
+                      <ImageNotSupportedIcon
+                        sx={{
+                          fontSize: { xs: 48, md: 64 },
+                          color: "text.secondary",
+                        }}
+                      />
+                    )}
+                  </Box>
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Typography variant="h5" fontWeight={600} gutterBottom>
                       {title}
