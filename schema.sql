@@ -8,7 +8,7 @@ CREATE TABLE User (
     password VARCHAR(255) NOT NULL,
     bio TINYTEXT DEFAULT NULL,
     profilePic VARCHAR(255) DEFAULT NULL,
-    created DATETIME NOT NULL
+    created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE Admin (
@@ -48,7 +48,7 @@ CREATE TABLE Record (
 CREATE TABLE LikedReview (
     userUuid CHAR(36) NOT NULL,
     recordId INT NOT NULL,
-    created DATETIME NOT NULL,
+    created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (userUuid, recordId),
     FOREIGN KEY (userUuid) REFERENCES User(uuid) ON DELETE CASCADE,
     FOREIGN KEY (recordId) REFERENCES Record(id) ON DELETE CASCADE
@@ -58,14 +58,14 @@ CREATE TABLE Tag (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(50) NOT NULL,
     userUuid CHAR(36),
-    created DATETIME NOT NULL,
+    created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (userUuid) REFERENCES User(uuid) ON DELETE CASCADE
 );
 
 CREATE TABLE Tagged (
     recordId INT,
     tagId INT,
-    created DATETIME NOT NULL,
+    created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (recordId, tagId),
     FOREIGN KEY (recordId) REFERENCES Record(id) ON DELETE CASCADE,
     FOREIGN KEY (tagId) REFERENCES Tag(id) ON DELETE CASCADE
@@ -81,7 +81,7 @@ CREATE TABLE UserSettings (
 CREATE TABLE Follows (
     userUuid CHAR(36) NOT NULL,
     followsUuid CHAR(36) NOT NULL,
-    created DATETIME NOT NULL,
+    created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (userUuid, followsUuid),
     FOREIGN KEY (userUuid) REFERENCES User(uuid) ON DELETE CASCADE,
     FOREIGN KEY (followsUuid) REFERENCES User(uuid) ON DELETE CASCADE
@@ -123,7 +123,7 @@ CREATE INDEX idx_listrecord_list_order ON ListRecord(listId, sortOrder);
 CREATE TABLE ListLike (
     userUuid CHAR(36) NOT NULL,
     listId INT NOT NULL,
-    created DATETIME NOT NULL,
+    created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (userUuid, listId),
     FOREIGN KEY (userUuid) REFERENCES User(uuid) ON DELETE CASCADE,
     FOREIGN KEY (listId) REFERENCES List(id) ON DELETE CASCADE
@@ -135,7 +135,7 @@ CREATE TABLE Master (
     id INT PRIMARY KEY,
     artist VARCHAR(255),
     cover VARCHAR(255),
-    created DATETIME NOT NULL,
+    created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     name VARCHAR(255) NOT NULL,
     release_year YEAR,
     rating0 INT DEFAULT 0,

@@ -64,7 +64,6 @@ import { optimizeProfileImageFile } from "./profileImageOptimizer";
 import { formatLocalDate } from "./dateUtils";
 import LockIcon from "@mui/icons-material/Lock";
 import PublicIcon from "@mui/icons-material/Public";
-import { alignSelf } from "@mui/system";
 
 interface OwnerInfo {
   username: string;
