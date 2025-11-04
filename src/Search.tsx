@@ -833,7 +833,7 @@ export default function Search() {
                               <ListItemAvatar>
                                 <Avatar
                                   variant="rounded"
-                                  src={coverUrl || undefined}
+                                  src={apiUrl(coverUrl) || undefined}
                                   alt={list.name}
                                   sx={{
                                     width: 90,

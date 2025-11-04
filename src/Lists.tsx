@@ -47,6 +47,7 @@ import {
   removeCachedList,
   clearUserListsCache,
 } from "./userLists";
+import { optimizeProfileImageFile } from "./profileImageOptimizer";
 
 interface OwnerInfo {
   username: string;
@@ -164,29 +165,74 @@ export default function Lists() {
     };
   }, [createPicturePreview]);
 
-  const handleCreatePictureChange = useCallback((file: File | null) => {
-    setCreatePictureFile(file);
-    setCreatePicturePreview((prev) => {
-      if (prev) {
-        URL.revokeObjectURL(prev);
-      }
-      return file ? URL.createObjectURL(file) : null;
-    });
+  const handleCreatePictureChange = useCallback(async (file: File | null) => {
+    if (!file) {
+      setCreatePictureFile(null);
+      setCreatePicturePreview((prev) => {
+        if (prev) {
+          URL.revokeObjectURL(prev);
+        }
+        return null;
+      });
+      return;
+    }
+    try {
+      const optimized = await optimizeProfileImageFile(file);
+      setCreatePictureFile(optimized);
+      setCreatePicturePreview((prev) => {
+        if (prev) {
+          URL.revokeObjectURL(prev);
+        }
+        return URL.createObjectURL(optimized);
+      });
+    } catch (error) {
+      console.error("Failed to optimize image:", error);
+      // Fall back to original file on error
+      setCreatePictureFile(file);
+      setCreatePicturePreview((prev) => {
+        if (prev) {
+          URL.revokeObjectURL(prev);
+        }
+        return URL.createObjectURL(file);
+      });
+    }
   }, []);
 
   const handleClearCreatePicture = useCallback(() => {
     handleCreatePictureChange(null);
   }, [handleCreatePictureChange]);
 
-  const handleEditPictureChange = useCallback((file: File | null) => {
-    setEditPictureFile(file);
-    setEditPicturePreview((prev) => {
-      if (prev) {
-        URL.revokeObjectURL(prev);
-      }
-      return file ? URL.createObjectURL(file) : null;
-    });
-    if (file) {
+  const handleEditPictureChange = useCallback(async (file: File | null) => {
+    if (!file) {
+      setEditPictureFile(null);
+      setEditPicturePreview((prev) => {
+        if (prev) {
+          URL.revokeObjectURL(prev);
+        }
+        return null;
+      });
+      return;
+    }
+    try {
+      const optimized = await optimizeProfileImageFile(file);
+      setEditPictureFile(optimized);
+      setEditPicturePreview((prev) => {
+        if (prev) {
+          URL.revokeObjectURL(prev);
+        }
+        return URL.createObjectURL(optimized);
+      });
+      setRemovePictureFlag(false);
+    } catch (error) {
+      console.error("Failed to optimize image:", error);
+      // Fall back to original file on error
+      setEditPictureFile(file);
+      setEditPicturePreview((prev) => {
+        if (prev) {
+          URL.revokeObjectURL(prev);
+        }
+        return URL.createObjectURL(file);
+      });
       setRemovePictureFlag(false);
     }
   }, []);

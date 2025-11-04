@@ -1057,7 +1057,9 @@ export default function MasterRecord() {
             artist: artistForList,
             cover: coverForList,
             releaseYear: releaseYearForList,
-            rating: Number.isFinite(Number(rating)) ? Math.trunc(Number(rating)) : null,
+            rating: Number.isFinite(Number(rating))
+              ? Math.trunc(Number(rating))
+              : null,
           }),
         });
         if (!response.ok) {

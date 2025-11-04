@@ -60,6 +60,7 @@ import {
 import { clearRecordTablePreferencesCache } from "./preferences";
 import { clearCommunityCaches } from "./communityUsers";
 import { setUserId } from "./analytics";
+import { optimizeProfileImageFile } from "./profileImageOptimizer";
 
 interface OwnerInfo {
   username: string;
@@ -605,15 +606,37 @@ export default function ListDetail() {
     setRemovePictureFlag(false);
   }, []);
 
-  const handleEditPictureChange = useCallback((file: File | null) => {
-    setEditPictureFile(file);
-    setEditPicturePreview((prev) => {
-      if (prev) {
-        URL.revokeObjectURL(prev);
-      }
-      return file ? URL.createObjectURL(file) : null;
-    });
-    if (file) {
+  const handleEditPictureChange = useCallback(async (file: File | null) => {
+    if (!file) {
+      setEditPictureFile(null);
+      setEditPicturePreview((prev) => {
+        if (prev) {
+          URL.revokeObjectURL(prev);
+        }
+        return null;
+      });
+      return;
+    }
+    try {
+      const optimized = await optimizeProfileImageFile(file);
+      setEditPictureFile(optimized);
+      setEditPicturePreview((prev) => {
+        if (prev) {
+          URL.revokeObjectURL(prev);
+        }
+        return URL.createObjectURL(optimized);
+      });
+      setRemovePictureFlag(false);
+    } catch (error) {
+      console.error("Failed to optimize image:", error);
+      // Fall back to original file on error
+      setEditPictureFile(file);
+      setEditPicturePreview((prev) => {
+        if (prev) {
+          URL.revokeObjectURL(prev);
+        }
+        return URL.createObjectURL(file);
+      });
       setRemovePictureFlag(false);
     }
   }, []);
@@ -834,19 +857,8 @@ export default function ListDetail() {
           profilePicUrl={profilePicUrl ?? undefined}
           searchPlaceholder="Search..."
         />
-        <Box
-          sx={{
-            flex: 1,
-            overflowY: { xs: "auto", md: "auto" },
-            mt: 1,
-            px: 1,
-          }}
-        >
-          <Box
-            maxWidth={860}
-            mx="auto"
-            sx={{ height: { md: "100%" }, pb: { xs: 4, sm: 0 } }}
-          >
+        <Box sx={{ flex: 1, overflowY: "auto", pb: 3, px: 1 }}>
+          <Box maxWidth={860} mx="auto" sx={{ mt: 1 }}>
             <Paper
               variant="outlined"
               sx={{
