@@ -108,7 +108,9 @@ export default function FindRecordSidebar({
       target.value = "";
       try {
         target.blur();
-      } catch {}
+      } catch {
+        // ignore if blur fails
+      }
     }
   };
 

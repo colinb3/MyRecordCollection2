@@ -31,14 +31,9 @@ import TopBar from "./components/TopBar";
 import { darkTheme } from "./theme";
 import apiUrl from "./api";
 import ImageNotSupportedIcon from "@mui/icons-material/ImageNotSupported";
-import {
-  clearUserInfoCache,
-  getCachedUserInfo,
-  loadUserInfo,
-} from "./userInfo";
-import { clearRecordTablePreferencesCache } from "./preferences";
-import { clearCommunityCaches } from "./communityUsers";
+import { getCachedUserInfo, loadUserInfo } from "./userInfo";
 import { setUserId } from "./analytics";
+import { performLogout } from "./logout";
 import { formatLocalDateTime } from "./dateUtils";
 import type { MasterReviewEntry } from "./types";
 
@@ -110,10 +105,6 @@ export default function MasterReviews() {
   const locationState =
     (location.state as ReviewsLocationState | undefined) ?? {};
   const cachedUser = getCachedUserInfo();
-  const fromMasterPath =
-    typeof locationState.fromMaster?.path === "string"
-      ? locationState.fromMaster.path
-      : null;
 
   const safeMasterId = useMemo(() => {
     if (!masterIdParam) return null;
@@ -475,47 +466,13 @@ export default function MasterReviews() {
   }, []);
 
   const handleLogout = useCallback(async () => {
-    await fetch(apiUrl("/api/logout"), {
-      method: "POST",
-      credentials: "include",
-    });
-    clearRecordTablePreferencesCache();
-    clearCommunityCaches();
-    clearUserInfoCache();
-    try {
-      setUserId(undefined);
-    } catch {
-      /* ignore */
-    }
-    navigate("/login");
+    await performLogout(navigate);
   }, [navigate]);
 
   const handleBack = useCallback(() => {
-    if (fromMasterPath) {
-      // When navigating back to the master page, preserve the original state
-      // (album, query, fromCollection) so the master page's back button can
-      // correctly return to the originating page (e.g., a record or profile).
-      navigate(fromMasterPath, {
-        state: {
-          album: locationState.album,
-          query: locationState.query,
-          fromCollection: locationState.fromCollection,
-        },
-      });
-      return;
-    }
-    if (safeMasterId) {
-      navigate(`/master/${safeMasterId}`, {
-        state: {
-          album: locationState.album,
-          query: locationState.query,
-          fromCollection: locationState.fromCollection,
-        },
-      });
-    } else {
-      navigate("/search");
-    }
-  }, [navigate, fromMasterPath, safeMasterId]);
+    // Simply use browser history for consistent back navigation
+    navigate(-1);
+  }, [navigate]);
 
   const coverUrl = album?.cover && album.cover.trim() ? album.cover.trim() : "";
   const title = album?.record || "Master Reviews";

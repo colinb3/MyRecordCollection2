@@ -69,8 +69,10 @@ export default function MoveRecordDialog({
       } else {
         onMoved(selected, data.message);
       }
-    } catch (e: any) {
-      setError(e.message || "Failed to move record");
+    } catch (e: unknown) {
+      const errorMessage =
+        e instanceof Error ? e.message : "Failed to move record";
+      setError(errorMessage);
     } finally {
       setSubmitting(false);
     }

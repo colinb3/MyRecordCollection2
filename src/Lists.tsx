@@ -34,20 +34,10 @@ import { useNavigate } from "react-router-dom";
 import TopBar from "./components/TopBar";
 import apiUrl from "./api";
 import { darkTheme } from "./theme";
-import {
-  getCachedUserInfo,
-  loadUserInfo,
-  clearUserInfoCache,
-} from "./userInfo";
-import { clearRecordTablePreferencesCache } from "./preferences";
-import { clearCommunityCaches } from "./communityUsers";
-import { setUserId } from "./analytics";
-import {
-  setCachedUserLists,
-  removeCachedList,
-  clearUserListsCache,
-} from "./userLists";
+import { getCachedUserInfo, loadUserInfo } from "./userInfo";
+import { setCachedUserLists, removeCachedList } from "./userLists";
 import { optimizeProfileImageFile } from "./profileImageOptimizer";
+import { performLogout } from "./logout";
 
 interface OwnerInfo {
   username: string;
@@ -92,20 +82,7 @@ export default function Lists() {
   const navigate = useNavigate();
 
   const handleLogout = useCallback(async () => {
-    await fetch(apiUrl("/api/logout"), {
-      method: "POST",
-      credentials: "include",
-    });
-    clearRecordTablePreferencesCache();
-    clearUserInfoCache();
-    clearCommunityCaches();
-    clearUserListsCache();
-    try {
-      setUserId(undefined);
-    } catch {
-      /* ignore analytics cleanup */
-    }
-    navigate("/login");
+    await performLogout(navigate);
   }, [navigate]);
   const [loadingMine, setLoadingMine] = useState(true);
   const [loadingPopular, setLoadingPopular] = useState(true);
@@ -289,7 +266,8 @@ export default function Lists() {
       }
       const data = await response.json();
       const lists: ListSummary[] = Array.isArray(data?.lists)
-        ? data.lists.map((entry: any) => ({
+        ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          data.lists.map((entry: any) => ({
             id: Number(entry?.id) || 0,
             name: typeof entry?.name === "string" ? entry.name : "",
             description:
@@ -350,7 +328,8 @@ export default function Lists() {
       }
       const data = await response.json();
       const newLists: ListSummary[] = Array.isArray(data?.lists)
-        ? data.lists.map((entry: any) => ({
+        ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          data.lists.map((entry: any) => ({
             id: Number(entry?.id) || 0,
             name: typeof entry?.name === "string" ? entry.name : "",
             description:
@@ -402,7 +381,8 @@ export default function Lists() {
       }
       const data = await response.json();
       const lists: PopularList[] = Array.isArray(data?.lists)
-        ? data.lists.map((entry: any) => ({
+        ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          data.lists.map((entry: any) => ({
             id: Number(entry?.id) || 0,
             name: typeof entry?.name === "string" ? entry.name : "",
             description:
@@ -472,7 +452,8 @@ export default function Lists() {
       }
       const data = await response.json();
       const newLists: PopularList[] = Array.isArray(data?.lists)
-        ? data.lists.map((entry: any) => ({
+        ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          data.lists.map((entry: any) => ({
             id: Number(entry?.id) || 0,
             name: typeof entry?.name === "string" ? entry.name : "",
             description:
@@ -1390,8 +1371,10 @@ export default function Lists() {
           maxWidth="sm"
           fullWidth
         >
-          <DialogTitle>Edit list</DialogTitle>
-          <DialogContent dividers>
+          <DialogTitle sx={{ bgcolor: "background.paper" }}>
+            Edit list
+          </DialogTitle>
+          <DialogContent dividers sx={{ bgcolor: "background.paper" }}>
             <Stack direction={"row"} spacing={2} alignItems="center" mb={1}>
               {editPicturePreview ? (
                 <Avatar
@@ -1512,7 +1495,7 @@ export default function Lists() {
               />
             </Stack>
           </DialogContent>
-          <DialogActions>
+          <DialogActions sx={{ bgcolor: "background.paper" }}>
             <Button onClick={handleCloseEdit}>Cancel</Button>
             <Button
               variant="contained"

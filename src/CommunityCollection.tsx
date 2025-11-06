@@ -16,24 +16,16 @@ import FilterListAltIcon from "@mui/icons-material/FilterListAlt";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import TopBar from "./components/TopBar";
 import { darkTheme } from "./theme";
-import {
-  clearUserInfoCache,
-  getCachedUserInfo,
-  loadUserInfo,
-} from "./userInfo";
-import { clearRecordTablePreferencesCache } from "./preferences";
+import { getCachedUserInfo, loadUserInfo } from "./userInfo";
 import { setUserId } from "./analytics";
-import { clearProfileHighlightsCache } from "./profileHighlights";
-import { clearCollectionRecordsCache } from "./collectionRecords";
 import RecordTable from "./components/RecordTable";
 import type { PublicUserProfile, Record as MrcRecord, Filters } from "./types";
 import {
-  clearCommunityCaches,
   loadPublicUserCollection,
   loadPublicUserProfile,
 } from "./communityUsers";
-import apiUrl from "./api";
 import FilterSidebar from "./components/FilterSidebar";
+import { performLogout } from "./logout";
 
 const MIN_RELEASE_YEAR = 1901;
 const MAX_RELEASE_YEAR = 2100;
@@ -176,21 +168,7 @@ export default function CommunityCollection() {
   }, [targetUsername, activeTableName]);
 
   const handleLogout = useCallback(async () => {
-    await fetch(apiUrl("/api/logout"), {
-      method: "POST",
-      credentials: "include",
-    });
-    clearRecordTablePreferencesCache();
-    clearCollectionRecordsCache();
-    clearProfileHighlightsCache();
-    clearCommunityCaches();
-    clearUserInfoCache();
-    try {
-      setUserId(undefined);
-    } catch {
-      /* ignore */
-    }
-    navigate("/login");
+    await performLogout(navigate);
   }, [navigate]);
 
   const handleFilterChange = useCallback((updated: Partial<Filters>) => {

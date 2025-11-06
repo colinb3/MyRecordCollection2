@@ -28,15 +28,11 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import TopBar from "./components/TopBar";
 import { darkTheme } from "./theme";
 import { setUserId } from "./analytics";
-import {
-  clearUserInfoCache,
-  getCachedUserInfo,
-  loadUserInfo,
-} from "./userInfo";
-import { clearRecordTablePreferencesCache } from "./preferences";
-import { clearCommunityCaches, searchCommunityUsers } from "./communityUsers";
+import { getCachedUserInfo, loadUserInfo } from "./userInfo";
+import { searchCommunityUsers } from "./communityUsers";
 import type { CommunityUserSummary } from "./types";
 import { formatLocalDate } from "./dateUtils";
+import { performLogout } from "./logout";
 
 interface AlbumResult {
   name: string;
@@ -142,19 +138,7 @@ export default function Search() {
   );
 
   const handleLogout = useCallback(async () => {
-    await fetch(apiUrl("/api/logout"), {
-      method: "POST",
-      credentials: "include",
-    });
-    clearRecordTablePreferencesCache();
-    clearUserInfoCache();
-    clearCommunityCaches();
-    try {
-      setUserId(undefined);
-    } catch {
-      /* ignore analytics cleanup */
-    }
-    navigate("/login");
+    await performLogout(navigate);
   }, [navigate]);
 
   const [recordResults, setRecordResults] = useState<AlbumResult[]>([]);
@@ -273,7 +257,8 @@ export default function Search() {
       }
       const data = await response.json();
       const lists: ListSearchResult[] = Array.isArray(data?.lists)
-        ? data.lists.map((entry: any) => ({
+        ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          data.lists.map((entry: any) => ({
             id: Number(entry?.id) || 0,
             name: typeof entry?.name === "string" ? entry.name : "",
             description:

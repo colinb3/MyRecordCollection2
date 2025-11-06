@@ -48,22 +48,16 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useNavigate, useParams, useLocation } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import TopBar from "./components/TopBar";
 import apiUrl from "./api";
 import { darkTheme } from "./theme";
-import {
-  getCachedUserInfo,
-  loadUserInfo,
-  clearUserInfoCache,
-} from "./userInfo";
-import { clearRecordTablePreferencesCache } from "./preferences";
-import { clearCommunityCaches } from "./communityUsers";
-import { setUserId } from "./analytics";
+import { getCachedUserInfo, loadUserInfo } from "./userInfo";
 import { optimizeProfileImageFile } from "./profileImageOptimizer";
 import { formatLocalDate } from "./dateUtils";
 import LockIcon from "@mui/icons-material/Lock";
 import PublicIcon from "@mui/icons-material/Public";
+import { performLogout } from "./logout";
 
 interface OwnerInfo {
   username: string;
@@ -235,7 +229,6 @@ function SortableRecordItem({
 }
 
 export default function ListDetail() {
-  const location = useLocation();
   const cachedUser = getCachedUserInfo();
   const [username, setUsername] = useState<string>(cachedUser?.username ?? "");
   const [displayName, setDisplayName] = useState<string>(
@@ -250,19 +243,7 @@ export default function ListDetail() {
   const listId = Number(params.listId);
 
   const handleLogout = useCallback(async () => {
-    await fetch(apiUrl("/api/logout"), {
-      method: "POST",
-      credentials: "include",
-    });
-    clearRecordTablePreferencesCache();
-    clearUserInfoCache();
-    clearCommunityCaches();
-    try {
-      setUserId(undefined);
-    } catch {
-      /* ignore analytics cleanup */
-    }
-    navigate("/login");
+    await performLogout(navigate);
   }, [navigate]);
 
   const [loading, setLoading] = useState(true);
@@ -326,6 +307,7 @@ export default function ListDetail() {
   }, []);
 
   const parseList = useCallback(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (input: any): ListDetailData | null => {
       if (!input) return null;
       const id = Number(input.id) || listId;
@@ -377,46 +359,50 @@ export default function ListDetail() {
     [listId]
   );
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const parseRecords = useCallback((input: any): ListRecordEntry[] => {
     if (!Array.isArray(input)) return [];
-    return input
-      .map((row: any): ListRecordEntry | null => {
-        const id = Number(row?.id);
-        if (!Number.isInteger(id) || id <= 0) {
-          return null;
-        }
-        const masterId = Number(row?.masterId);
-        const rating = Number(row?.rating);
-        const releaseYear = Number(row?.releaseYear);
-        return {
-          id,
-          name: typeof row?.name === "string" ? row.name : "Unknown record",
-          artist:
-            typeof row?.artist === "string" && row.artist.trim()
-              ? row.artist.trim()
-              : null,
-          cover:
-            typeof row?.cover === "string" && row.cover.trim()
-              ? row.cover.trim()
-              : null,
-          rating:
-            Number.isFinite(rating) && rating >= 0 && rating <= 10
-              ? Math.trunc(rating)
-              : null,
-          releaseYear:
-            Number.isInteger(releaseYear) && releaseYear >= 1000
-              ? releaseYear
-              : null,
-          masterId:
-            Number.isInteger(masterId) && masterId > 0 ? masterId : null,
-          added:
-            typeof row?.added === "string" && row.added.trim()
-              ? row.added.trim()
-              : null,
-          isCustom: row?.isCustom === true || Number(row?.isCustom) === 1,
-        };
-      })
-      .filter((entry): entry is ListRecordEntry => entry !== null);
+    return (
+      input
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .map((row: any): ListRecordEntry | null => {
+          const id = Number(row?.id);
+          if (!Number.isInteger(id) || id <= 0) {
+            return null;
+          }
+          const masterId = Number(row?.masterId);
+          const rating = Number(row?.rating);
+          const releaseYear = Number(row?.releaseYear);
+          return {
+            id,
+            name: typeof row?.name === "string" ? row.name : "Unknown record",
+            artist:
+              typeof row?.artist === "string" && row.artist.trim()
+                ? row.artist.trim()
+                : null,
+            cover:
+              typeof row?.cover === "string" && row.cover.trim()
+                ? row.cover.trim()
+                : null,
+            rating:
+              Number.isFinite(rating) && rating >= 0 && rating <= 10
+                ? Math.trunc(rating)
+                : null,
+            releaseYear:
+              Number.isInteger(releaseYear) && releaseYear >= 1000
+                ? releaseYear
+                : null,
+            masterId:
+              Number.isInteger(masterId) && masterId > 0 ? masterId : null,
+            added:
+              typeof row?.added === "string" && row.added.trim()
+                ? row.added.trim()
+                : null,
+            isCustom: row?.isCustom === true || Number(row?.isCustom) === 1,
+          };
+        })
+        .filter((entry): entry is ListRecordEntry => entry !== null)
+    );
   }, []);
 
   const loadList = useCallback(async () => {
@@ -805,27 +791,11 @@ export default function ListDetail() {
   const handleNavigateToMaster = useCallback(
     (masterId: number | null) => {
       if (!masterId || !Number.isInteger(masterId) || masterId <= 0) return;
-      const originPath = `${location.pathname}${location.search}${location.hash}`;
-      const locState = (location.state as any) ?? {};
 
-      const fromCollectionState: any = {
-        path: originPath,
-        title: list?.name ?? undefined,
-        tableName: undefined,
-        // propagate any upstream origin so back navigation can continue
-        fromPath: locState?.fromPath ?? undefined,
-      };
-
-      navigate(`/master/${masterId}`, {
-        state: {
-          masterId,
-          fromCollection: fromCollectionState,
-          // also propagate an overall fromPath if present
-          fromPath: locState?.fromPath ?? undefined,
-        },
-      });
+      // Just navigate - browser history will handle the back button
+      navigate(`/master/${masterId}`);
     },
-    [location, navigate, list]
+    [navigate]
   );
 
   if (!Number.isInteger(listId) || listId <= 0) {
@@ -858,7 +828,7 @@ export default function ListDetail() {
         }}
       >
         <TopBar
-          title="List"
+          title="Lists"
           onLogout={handleLogout}
           username={username}
           displayName={displayName}
@@ -1162,8 +1132,10 @@ export default function ListDetail() {
           maxWidth="sm"
           fullWidth
         >
-          <DialogTitle>Edit list</DialogTitle>
-          <DialogContent dividers>
+          <DialogTitle sx={{ bgcolor: "background.paper" }}>
+            Edit list
+          </DialogTitle>
+          <DialogContent dividers sx={{ bgcolor: "background.paper" }}>
             <Stack direction={"row"} spacing={2} alignItems="center" mb={1}>
               {editPicturePreview ? (
                 <Avatar
@@ -1284,7 +1256,7 @@ export default function ListDetail() {
               />
             </Stack>
           </DialogContent>
-          <DialogActions>
+          <DialogActions sx={{ bgcolor: "background.paper" }}>
             <Button onClick={handleCloseEdit}>Cancel</Button>
             <Button
               variant="contained"

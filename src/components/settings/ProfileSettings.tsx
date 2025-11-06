@@ -345,7 +345,7 @@ export default function ProfileSettings({
           tags: [...record.tags],
         })),
       });
-    } catch (error) {
+    } catch {
       setHighlightError("Network error");
     } finally {
       setSavingHighlights(false);
@@ -468,7 +468,7 @@ export default function ProfileSettings({
           profilePicUrl: nextProfilePic ?? null,
         });
       }
-    } catch (err) {
+    } catch {
       setProfileError("Network error");
     } finally {
       setProfileLoading(false);
@@ -570,7 +570,7 @@ export default function ProfileSettings({
         bio: bioValue.trim().length > 0 ? bioValue.trim() : null,
         profilePicUrl: null,
       });
-    } catch (error) {
+    } catch {
       setProfilePicError("Failed to remove profile picture");
     } finally {
       setProfilePicUploading(false);
@@ -650,7 +650,7 @@ export default function ProfileSettings({
       setCurrentPasswordError(null);
       setNewPasswordError(null);
       setConfirmPasswordError(null);
-    } catch (err) {
+    } catch {
       setPasswordAlert("Network error");
     } finally {
       setPasswordLoading(false);

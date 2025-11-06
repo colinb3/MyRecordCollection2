@@ -1181,7 +1181,7 @@ export default function CollectionSettings() {
                     });
                     setParsedRecords([]);
                   }
-                } catch (err) {
+                } catch {
                   setSnackbar({
                     open: true,
                     message: "Network error clearing collection",
@@ -1217,7 +1217,7 @@ export default function CollectionSettings() {
                     });
                     updateTagsCache([]);
                   }
-                } catch (err) {
+                } catch {
                   setSnackbar({
                     open: true,
                     message: "Network error clearing tags",
@@ -1253,7 +1253,7 @@ export default function CollectionSettings() {
                       severity: "success",
                     });
                   }
-                } catch (err) {
+                } catch {
                   setSnackbar({
                     open: true,
                     message: "Network error clearing wishlist",

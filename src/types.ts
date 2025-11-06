@@ -141,6 +141,7 @@ export interface CommunityFeedOwner {
 export interface CommunityFeedListPreviewRecord {
   id: number;
   name: string;
+  artist: string;
   cover: string | null;
 }
 
@@ -160,6 +161,8 @@ export interface CommunityFeedListEntry {
     picture: string | null;
     recordCount: number;
     created: string;
+    likes: number;
+    likedByCurrentUser: boolean;
   };
   previewRecords: CommunityFeedListPreviewRecord[];
 }

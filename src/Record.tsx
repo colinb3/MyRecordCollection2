@@ -33,14 +33,9 @@ import TopBar from "./components/TopBar";
 import { darkTheme } from "./theme";
 import ImageNotSupportedIcon from "@mui/icons-material/ImageNotSupported";
 import apiUrl from "./api";
-import {
-  clearUserInfoCache,
-  getCachedUserInfo,
-  loadUserInfo,
-} from "./userInfo";
-import { loadUserTags, clearTagsCache, updateTagsCache } from "./userTags";
+import { getCachedUserInfo, loadUserInfo } from "./userInfo";
+import { loadUserTags, updateTagsCache } from "./userTags";
 import { setUserId } from "./analytics";
-import { clearRecordTablePreferencesCache } from "./preferences";
 import { clearCollectionRecordsCache } from "./collectionRecords";
 import { clearCommunityCaches } from "./communityUsers";
 import { clearProfileHighlightsCache } from "./profileHighlights";
@@ -48,6 +43,7 @@ import type { Record as MrcRecord, RecordOwnerInfo } from "./types";
 import EditRecordDialog from "./components/EditRecordDialog";
 import MoveRecordDialog from "./components/MoveRecordDialog";
 import { formatLocalDate } from "./dateUtils";
+import { performLogout } from "./logout";
 
 const DEFAULT_COLLECTION_NAME = "My Collection";
 
@@ -199,51 +195,17 @@ export default function RecordDetails() {
   }, [isValidRecordId, recordIdNumber, ownerUsername]);
 
   const handleLogout = useCallback(async () => {
-    await fetch(apiUrl("/api/logout"), {
-      method: "POST",
-      credentials: "include",
-    });
-    clearRecordTablePreferencesCache();
-    clearCollectionRecordsCache();
-    clearProfileHighlightsCache();
-    clearCommunityCaches();
-    clearUserInfoCache();
-    clearTagsCache();
-    try {
-      setUserId(undefined);
-    } catch {
-      /* ignore analytics cleanup */
-    }
-    navigate("/login");
+    await performLogout(navigate);
   }, [navigate]);
 
   const handleBack = useCallback(() => {
-    const locState = (location.state as any) ?? {};
-    // If a fromPath was provided by the caller, go back there first
-    if (typeof locState.fromPath === "string" && locState.fromPath) {
-      navigate(locState.fromPath);
-      return;
-    }
-    if (ownerUsername) {
-      navigate(`/community/${encodeURIComponent(ownerUsername)}/collection`);
-      return;
-    }
-    navigate("/mycollection");
-  }, [navigate, ownerUsername]);
+    // Simply use browser history for consistent back navigation
+    navigate(-1);
+  }, [navigate]);
 
   const handleOpenMasterRecord = useCallback(() => {
     if (!record) return;
     const masterId = record.masterId ?? null;
-    const originPath = `${location.pathname}${location.search}${location.hash}`;
-    const locState = (location.state as any) ?? {};
-    const ownerDisplay = owner?.displayName?.trim()
-      ? owner.displayName
-      : ownerUsername
-      ? `@${ownerUsername}`
-      : null;
-    const fromTitle = ownerDisplay
-      ? `${ownerDisplay}'s Collection`
-      : record.collectionName || record.tableName || DEFAULT_COLLECTION_NAME;
 
     const albumPayload = {
       id: `record-${record.id}`,
@@ -252,37 +214,23 @@ export default function RecordDetails() {
       cover: record.cover ?? "",
     };
 
-    const fromCollectionState = {
-      path: originPath,
-      title: fromTitle,
-      tableName: record.collectionName ?? record.tableName,
-      // propagate any upstream origin so back navigation can return all the way
-      // to the original page (e.g., Activity or Profile)
-      fromPath: locState?.fromPath ?? undefined,
-    };
-
     if (masterId) {
+      // Navigate to master, passing album for display
       navigate(`/master/${masterId}`, {
         state: {
           album: albumPayload,
-          masterId,
-          query: record.record,
-          fromCollection: fromCollectionState,
-          // also pass along any original fromPath at top-level for convenience
-          fromPath: locState?.fromPath ?? undefined,
         },
       });
     } else {
+      // Navigate to search if no masterId
       navigate("/search", {
         state: {
           album: albumPayload,
           query: `${record.artist} ${record.record}`.trim(),
-          fromCollection: fromCollectionState,
-          fromPath: locState?.fromPath ?? undefined,
         },
       });
     }
-  }, [location, navigate, owner, ownerUsername, record]);
+  }, [navigate, record]);
 
   const handleOpenOwnerProfile = useCallback(() => {
     if (!ownerUsername) return;

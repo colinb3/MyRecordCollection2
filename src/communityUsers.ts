@@ -10,6 +10,10 @@ import type {
 
 type AnyObject = { [key: string]: unknown };
 
+interface ApiError extends Error {
+  status?: number;
+}
+
 function isObject(value: unknown): value is AnyObject {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
@@ -173,9 +177,11 @@ function normalizeFeedEntry(raw: AnyObject): CommunityFeedEntry | null {
           typeof previewObject.cover === "string" && previewObject.cover.trim()
             ? previewObject.cover.trim()
             : null;
+        const artist = typeof previewObject.artist === "string" ? previewObject.artist : "";
         return {
           id: Number.isInteger(previewId) && previewId > 0 ? previewId : 0,
           name,
+          artist,
           cover,
         };
       })
@@ -183,6 +189,7 @@ function normalizeFeedEntry(raw: AnyObject): CommunityFeedEntry | null {
         (item): item is {
           id: number;
           name: string;
+          artist: string;
           cover: string | null;
         } => item !== null
       );
@@ -201,6 +208,8 @@ function normalizeFeedEntry(raw: AnyObject): CommunityFeedEntry | null {
           : null,
         recordCount: Number(listObject.recordCount) || 0,
         created: typeof listObject.created === 'string' ? listObject.created : '',
+        likes: Number(listObject.likes) || 0,
+        likedByCurrentUser: Boolean(listObject.likedByCurrentUser),
       },
       previewRecords,
     };
@@ -267,9 +276,9 @@ export async function searchCommunityUsers(
         const message = await res
           .json()
           .catch(() => ({}))
-          .then((data: any) => data?.error || "Failed to search users");
-        const error = new Error(message);
-        (error as any).status = res.status;
+          .then((data: AnyObject) => (typeof data?.error === 'string' ? data.error : "Failed to search users"));
+        const error: ApiError = new Error(message);
+        error.status = res.status;
         throw error;
       }
       const data = (await res.json().catch(() => [])) as unknown[];
@@ -325,9 +334,9 @@ export async function loadActivityFeed(
         const message = await res
           .json()
           .catch(() => ({}))
-          .then((data: any) => data?.error || "Failed to load activity");
-        const error = new Error(message);
-        (error as any).status = res.status;
+          .then((data: AnyObject) => (typeof data?.error === 'string' ? data.error : "Failed to load activity"));
+        const error: ApiError = new Error(message);
+        error.status = res.status;
         throw error;
       }
 
@@ -362,8 +371,8 @@ export async function loadPublicUserProfile(
 ): Promise<PublicUserProfile> {
   const key = username.trim().toLowerCase();
   if (!key) {
-    const error = new Error("Username is required");
-    (error as any).status = 400;
+    const error: ApiError = new Error("Username is required");
+    error.status = 400;
     throw error;
   }
   if (!forceRefresh) {
@@ -390,9 +399,9 @@ export async function loadPublicUserProfile(
         const message = await res
           .json()
           .catch(() => ({}))
-          .then((data: any) => data?.error || "Failed to load user profile");
-        const error = new Error(message);
-        (error as any).status = res.status;
+          .then((data: AnyObject) => (typeof data?.error === 'string' ? data.error : "Failed to load user profile"));
+        const error: ApiError = new Error(message);
+        error.status = res.status;
         throw error;
       }
       const data = (await res.json().catch(() => ({}))) as Record<
@@ -480,8 +489,8 @@ async function performFollowRequest(
 ): Promise<FollowActionResult> {
   const trimmed = username.trim();
   if (!trimmed) {
-    const error = new Error("Username is required");
-    (error as any).status = 400;
+    const error: ApiError = new Error("Username is required");
+    error.status = 400;
     throw error;
   }
 
@@ -494,9 +503,9 @@ async function performFollowRequest(
     const message = await res
       .json()
       .catch(() => ({}))
-      .then((data: any) => data?.error || "Failed to update follow status");
-    const error = new Error(message);
-    (error as any).status = res.status;
+      .then((data: AnyObject) => (typeof data?.error === 'string' ? data.error : "Failed to update follow status"));
+    const error: ApiError = new Error(message);
+    error.status = res.status;
     throw error;
   }
 
@@ -537,8 +546,8 @@ export async function loadPublicUserCollection(
 ): Promise<MrcRecord[]> {
   const normalizedUser = username.trim().toLowerCase();
   if (!normalizedUser) {
-    const error = new Error("Username is required");
-    (error as any).status = 400;
+    const error: ApiError = new Error("Username is required");
+    error.status = 400;
     throw error;
   }
   const tableKey = tableName?.trim() || "";
@@ -572,9 +581,9 @@ export async function loadPublicUserCollection(
         const message = await res
           .json()
           .catch(() => ({}))
-          .then((data: any) => data?.error || "Failed to load collection");
-        const error = new Error(message);
-        (error as any).status = res.status;
+          .then((data: AnyObject) => (typeof data?.error === 'string' ? data.error : "Failed to load collection"));
+        const error: ApiError = new Error(message);
+        error.status = res.status;
         throw error;
       }
       const data = await res.json().catch(() => []);
@@ -597,8 +606,8 @@ export async function loadPublicUserCollection(
 export async function loadUserFollows(username: string): Promise<UserFollowLists> {
   const normalizedUser = username.trim().toLowerCase();
   if (!normalizedUser) {
-    const error = new Error("Username is required");
-    (error as any).status = 400;
+    const error: ApiError = new Error("Username is required");
+    error.status = 400;
     throw error;
   }
 
@@ -622,9 +631,9 @@ export async function loadUserFollows(username: string): Promise<UserFollowLists
         const message = await res
           .json()
           .catch(() => ({}))
-          .then((data: any) => data?.error || "Failed to load follows");
-        const error = new Error(message);
-        (error as any).status = res.status;
+          .then((data: AnyObject) => (typeof data?.error === 'string' ? data.error : "Failed to load follows"));
+        const error: ApiError = new Error(message);
+        error.status = res.status;
         throw error;
       }
 

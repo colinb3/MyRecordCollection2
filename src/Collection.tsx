@@ -25,20 +25,15 @@ import {
   createDefaultRecordTablePreferences,
 } from "./types";
 import {
-  clearRecordTablePreferencesCache,
   getCachedRecordTablePreferences,
   loadRecordTablePreferences,
 } from "./preferences";
-import {
-  clearUserInfoCache,
-  getCachedUserInfo,
-  loadUserInfo,
-} from "./userInfo";
-import { loadUserTags, clearTagsCache } from "./userTags";
-import { clearCommunityCaches } from "./communityUsers";
+import { getCachedUserInfo, loadUserInfo } from "./userInfo";
+import { loadUserTags } from "./userTags";
 import { useNavigate } from "react-router-dom";
 import { useLocation } from "react-router-dom";
 import { setUserId } from "./analytics";
+import { performLogout } from "./logout";
 
 // Import Components
 import TopBar from "./components/TopBar";
@@ -49,6 +44,10 @@ import ManageTagsDialog from "./components/ManageTagsDialog";
 interface CollectionProps {
   tableName: string;
   title?: string;
+}
+
+interface CollectionLocationState {
+  message?: string;
 }
 
 const MIN_RELEASE_YEAR = 1901;
@@ -113,8 +112,7 @@ export default function Collection({ tableName, title }: CollectionProps) {
 
   const navigateToRecordDetails = useCallback(
     (record: Record) => {
-      const originPath = `${location.pathname}${location.search}${location.hash}`;
-      navigate(`/record/${record.id}`, { state: { fromPath: originPath } });
+      navigate(`/record/${record.id}`);
     },
     [navigate]
   );
@@ -253,33 +251,21 @@ export default function Collection({ tableName, title }: CollectionProps) {
 
   // If navigated here with a message (e.g., after adding a record from FindRecord), show snackbar
   useEffect(() => {
-    if (
-      location &&
-      (location as any).state &&
-      (location as any).state.message
-    ) {
-      const msg = (location as any).state.message;
+    const state = location?.state as CollectionLocationState | undefined;
+    if (state?.message) {
+      const msg = state.message;
       setSnackbar({ open: true, message: msg, severity: "success" });
       // Clear history state so reloads/back navigation won't re-show the message
       try {
         window.history.replaceState({}, document.title);
-      } catch {}
+      } catch {
+        // ignore if replaceState is not available
+      }
     }
   }, [location]);
 
   const handleLogout = async () => {
-    await fetch(apiUrl("/api/logout"), {
-      method: "POST",
-      credentials: "include",
-    });
-    clearRecordTablePreferencesCache();
-    clearUserInfoCache();
-    clearTagsCache();
-    clearCommunityCaches();
-    try {
-      setUserId(undefined);
-    } catch {}
-    navigate("/login");
+    await performLogout(navigate);
   };
 
   // Handler for selecting a record in the table
@@ -347,7 +333,7 @@ export default function Collection({ tableName, title }: CollectionProps) {
                   isCustom: true,
                   tags: [],
                   tableName,
-                } as any;
+                };
 
                 const res = await fetch(apiUrl("/api/records/create"), {
                   method: "POST",
@@ -385,10 +371,7 @@ export default function Collection({ tableName, title }: CollectionProps) {
                 setFilteredRecords((prev) => [created, ...prev]);
                 setSelectedRecord(created);
                 // Navigate to the record details page
-                const originPath = `${location.pathname}${location.search}${location.hash}`;
-                navigate(`/record/${created.id}`, {
-                  state: { fromPath: originPath },
-                });
+                navigate(`/record/${created.id}`);
               } catch (err) {
                 console.error("Failed to create record", err);
                 setSnackbar({

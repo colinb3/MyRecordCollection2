@@ -89,7 +89,7 @@ export default function EditRecordDialog({
   };
 
   // Handler for the Autocomplete tags input
-  const handleTagsChange = (_: any, newValue: string[]) => {
+  const handleTagsChange = (_: unknown, newValue: string[]) => {
     if (editedRecord) {
       setEditedRecord({ ...editedRecord, tags: newValue });
     }

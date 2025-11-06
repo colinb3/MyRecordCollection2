@@ -19,22 +19,11 @@ import {
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import TopBar from "./components/TopBar";
 import { darkTheme } from "./theme";
-import {
-  clearUserInfoCache,
-  getCachedUserInfo,
-  loadUserInfo,
-} from "./userInfo";
-import { clearRecordTablePreferencesCache } from "./preferences";
-import { clearCollectionRecordsCache } from "./collectionRecords";
-import { clearProfileHighlightsCache } from "./profileHighlights";
-import {
-  clearCommunityCaches,
-  loadUserFollows,
-  loadPublicUserProfile,
-} from "./communityUsers";
+import { getCachedUserInfo, loadUserInfo } from "./userInfo";
+import { loadUserFollows, loadPublicUserProfile } from "./communityUsers";
 import type { CommunityUserSummary } from "./types";
-import apiUrl from "./api";
 import { setUserId } from "./analytics";
+import { performLogout } from "./logout";
 
 const TAB_VALUES = ["followers", "following"] as const;
 type FollowTab = (typeof TAB_VALUES)[number];
@@ -140,21 +129,7 @@ export default function CommunityFollows() {
   }, [targetUsername]);
 
   const handleLogout = useCallback(async () => {
-    await fetch(apiUrl("/api/logout"), {
-      method: "POST",
-      credentials: "include",
-    });
-    clearRecordTablePreferencesCache();
-    clearCollectionRecordsCache();
-    clearProfileHighlightsCache();
-    clearCommunityCaches();
-    clearUserInfoCache();
-    try {
-      setUserId(undefined);
-    } catch {
-      /* ignore */
-    }
-    navigate("/login");
+    await performLogout(navigate);
   }, [navigate]);
 
   const handleTabChange = useCallback(

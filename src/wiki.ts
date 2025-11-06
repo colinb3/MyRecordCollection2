@@ -127,7 +127,7 @@ export async function wikiGenres(name: string, artist: string, release = false):
     }
 
     return tags;
-  } catch (err) {
+  } catch {
     // console.error('wikiGenres error', err);
     return tags;
   }

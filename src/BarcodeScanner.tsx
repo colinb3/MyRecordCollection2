@@ -16,6 +16,7 @@ import TopBar from "./components/TopBar";
 import { darkTheme } from "./theme";
 import apiUrl from "./api";
 import { getCachedUserInfo, loadUserInfo } from "./userInfo";
+import { performLogout } from "./logout";
 
 interface BarcodeSearchResponse {
   status?: string;
@@ -86,6 +87,10 @@ export default function BarcodeScanner() {
   const fallbackControlsRef = useRef<ZXingControls | null>(null);
   const scanningActiveRef = useRef(false);
   const detectionTimerRef = useRef<number | null>(null);
+
+  const handleLogout = useCallback(async () => {
+    await performLogout(navigate);
+  }, [navigate]);
 
   const stopScanner = useCallback(() => {
     scanningActiveRef.current = false;
@@ -506,6 +511,7 @@ export default function BarcodeScanner() {
             username={username}
             displayName={displayName}
             profilePicUrl={profilePicUrl}
+            onLogout={handleLogout}
           />
         </Box>
         <Box

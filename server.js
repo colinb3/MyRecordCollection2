@@ -1856,21 +1856,23 @@ app.get("/api/activity", requireAuth, async (req, res) => {
       [recordRows] = await pool.query(
         `SELECT 'record' as activityType, r.id, r.name as record, r.artist, r.cover, r.rating,
                 r.release_year as 'release', r.added as timestamp, r.tableId, r.isCustom as isCustom,
-                r.masterId as masterId, r.review as review,
-                u.username, u.displayName, u.profilePic, t.name as tableName
+                r.masterId as masterId, r.review as review, r.reviewLikes,
+                u.username, u.displayName, u.profilePic, t.name as tableName,
+                EXISTS(SELECT 1 FROM LikedReview lr WHERE lr.userUuid = ? AND lr.recordId = r.id) as viewerHasLikedReview
            FROM Record r
            JOIN Follows f ON f.followsUuid = r.userUuid
            JOIN User u ON u.uuid = r.userUuid
            JOIN RecTable t ON r.tableId = t.id
           WHERE f.userUuid = ? AND t.isPrivate = 0`,
-        [req.userUuid]
+        [req.userUuid, req.userUuid]
       );
       // Get lists from followed users
       [listRows] = await pool.query(
         `SELECT 'list' as activityType, l.id, l.name as listName, l.description, l.picture,
-                l.created as timestamp,
+                l.created as timestamp, l.likes,
                 u.username, u.displayName, u.profilePic,
-                COALESCE(stats.recordCount, 0) as recordCount
+                COALESCE(stats.recordCount, 0) as recordCount,
+                EXISTS(SELECT 1 FROM ListLike ll WHERE ll.userUuid = ? AND ll.listId = l.id) as likedByCurrentUser
            FROM List l
            JOIN Follows f ON f.followsUuid = l.userUuid
            JOIN User u ON u.uuid = l.userUuid
@@ -1878,15 +1880,16 @@ app.get("/api/activity", requireAuth, async (req, res) => {
              SELECT listId, COUNT(*) AS recordCount FROM ListRecord GROUP BY listId
            ) stats ON stats.listId = l.id
           WHERE f.userUuid = ? AND l.isPrivate = 0 AND COALESCE(stats.recordCount, 0) > 0`,
-        [req.userUuid]
+        [req.userUuid, req.userUuid]
       );
     } else {
       // Get user's own records
       [recordRows] = await pool.query(
         `SELECT 'record' as activityType, r.id, r.name as record, r.artist, r.cover, r.rating,
                 r.release_year as 'release', r.added as timestamp, r.tableId, r.isCustom as isCustom,
-                r.masterId as masterId, r.review as review,
-                u.username, u.displayName, u.profilePic, t.name as tableName
+                r.masterId as masterId, r.review as review, r.reviewLikes,
+                u.username, u.displayName, u.profilePic, t.name as tableName,
+                FALSE as viewerHasLikedReview
            FROM Record r
            JOIN User u ON u.uuid = r.userUuid
            LEFT JOIN RecTable t ON r.tableId = t.id
@@ -1896,9 +1899,10 @@ app.get("/api/activity", requireAuth, async (req, res) => {
       // Get user's own lists
       [listRows] = await pool.query(
         `SELECT 'list' as activityType, l.id, l.name as listName, l.description, l.picture,
-                l.created as timestamp,
+                l.created as timestamp, l.likes,
                 u.username, u.displayName, u.profilePic,
-                COALESCE(stats.recordCount, 0) as recordCount
+                COALESCE(stats.recordCount, 0) as recordCount,
+                FALSE as likedByCurrentUser
            FROM List l
            JOIN User u ON u.uuid = l.userUuid
            LEFT JOIN (
@@ -1941,7 +1945,7 @@ app.get("/api/activity", requireAuth, async (req, res) => {
     const previewRecordsByListId = new Map();
     if (listIds.length > 0) {
       const [previewRows] = await pool.query(
-        `SELECT lr.listId, lr.id, lr.name, lr.cover
+        `SELECT lr.listId, lr.id, lr.name, lr.cover, lr.artist
            FROM ListRecord lr
           WHERE lr.listId IN (?)
           ORDER BY lr.listId ASC, lr.sortOrder ASC, lr.added DESC, lr.id DESC`,
@@ -1962,6 +1966,7 @@ app.get("/api/activity", requireAuth, async (req, res) => {
           existing.push({
             id: Number.isInteger(recordIdValue) && recordIdValue > 0 ? recordIdValue : 0,
             name: typeof row.name === 'string' ? row.name : '',
+            artist: typeof row.artist === 'string' ? row.artist : '',
             cover:
               typeof row.cover === 'string' && row.cover.trim()
                 ? row.cover.trim()
@@ -2007,6 +2012,8 @@ app.get("/api/activity", requireAuth, async (req, res) => {
             ),
             recordCount: row.recordCount,
             created: row.timestamp,
+            likes: normalizeNonNegativeInt(row.likes),
+            likedByCurrentUser: Boolean(row.likedByCurrentUser),
           },
           previewRecords: previews,
         };
@@ -2046,6 +2053,8 @@ app.get("/api/activity", requireAuth, async (req, res) => {
         added,
         tags,
         tableId: row.tableId,
+        reviewLikes: normalizeNonNegativeInt(row.reviewLikes),
+        viewerHasLikedReview: Boolean(row.viewerHasLikedReview),
       };
 
       if (cover) {
@@ -2722,6 +2731,7 @@ app.get('/api/records/:id', async (req, res) => {
 
 app.post('/api/records/:id/review/like', requireAuth, async (req, res) => {
   const recordId = Number.parseInt(req.params.id, 10);
+  console.log('Liking review for record ID: ', recordId);
   if (!Number.isInteger(recordId) || recordId <= 0) {
     return res.status(400).json({ error: 'Invalid record ID' });
   }
@@ -2768,6 +2778,7 @@ app.post('/api/records/:id/review/like', requireAuth, async (req, res) => {
 
 app.delete('/api/records/:id/review/like', requireAuth, async (req, res) => {
   const recordId = Number.parseInt(req.params.id, 10);
+  console.log('Removing review like from record ID: ', recordId);
   if (!Number.isInteger(recordId) || recordId <= 0) {
     return res.status(400).json({ error: 'Invalid record ID' });
   }
@@ -4216,6 +4227,10 @@ app.post('/api/lists/:listId/like', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'List not found' });
     }
     const listRow = listRows[0];
+    if (listRow.userUuid === req.userUuid) {
+      await connection.rollback();
+      return res.status(400).json({ error: "You can't like your own list" });
+    }
     if (Number(listRow.isPrivate) === 1 && listRow.userUuid !== req.userUuid) {
       await connection.rollback();
       return res.status(403).json({ error: 'List is private' });

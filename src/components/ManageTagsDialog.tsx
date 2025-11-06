@@ -106,7 +106,9 @@ export default function ManageTagsDialog({
     setLoading(true);
     try {
       // Prefer sending tagId when available to avoid ambiguity with case-insensitive DB collations
-      const payload: any = { newName: renameValue };
+      const payload: { newName: string; tagId?: number; oldName?: string } = {
+        newName: renameValue,
+      };
       if (tagMap && Object.prototype.hasOwnProperty.call(tagMap, renaming)) {
         payload.tagId = tagMap[renaming];
       } else {
@@ -159,7 +161,7 @@ export default function ManageTagsDialog({
           }
         }
         setTagMap(map);
-      } catch (err) {
+      } catch {
         // ignore errors - fallback to name-based rename
         setTagMap(null);
       }

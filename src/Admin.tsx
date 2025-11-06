@@ -37,15 +37,10 @@ import SecurityIcon from "@mui/icons-material/Security";
 import TopBar from "./components/TopBar";
 import { darkTheme } from "./theme";
 import apiUrl from "./api";
-import {
-  clearUserInfoCache,
-  getCachedUserInfo,
-  loadUserInfo,
-} from "./userInfo";
-import { clearRecordTablePreferencesCache } from "./preferences";
-import { clearCommunityCaches } from "./communityUsers";
+import { getCachedUserInfo, loadUserInfo } from "./userInfo";
 import { setUserId } from "./analytics";
 import type { AdminPermissions } from "./types";
+import { performLogout } from "./logout";
 
 const USERS_PAGE_SIZE = 25;
 const RECORDS_PAGE_SIZE = 25;
@@ -2596,19 +2591,7 @@ export default function Admin() {
   }, [navigate]);
 
   const handleLogout = useCallback(async () => {
-    await fetch(apiUrl("/api/logout"), {
-      method: "POST",
-      credentials: "include",
-    });
-    clearRecordTablePreferencesCache();
-    clearUserInfoCache();
-    clearCommunityCaches();
-    try {
-      setUserId(undefined);
-    } catch {
-      /* ignore analytics errors */
-    }
-    navigate("/login", { replace: true });
+    await performLogout(navigate);
   }, [navigate]);
 
   const tabContent = useMemo(() => {

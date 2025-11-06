@@ -14,7 +14,7 @@ const columns: GridColDef[] = [
   {
     field: "cover",
     headerName: "",
-    width: 110,
+    width: 116,
     sortable: false,
     renderCell: (params) => {
       const title = params.row.record ?? "cover";
@@ -25,6 +25,7 @@ const columns: GridColDef[] = [
       return (
         <Box
           sx={{
+            ml: -0.5,
             width: 100,
             height: 100,
             borderRadius: 1,
@@ -157,14 +158,15 @@ export default function RecordTable({
   defaultSort,
   loading = false,
 }: RecordTableProps) {
-  const handleRowClick = (params: any) => {
+  const handleRowClick = (params: { row: Record }) => {
     onSelect?.(params.row as Record);
   };
 
-  const getRowClassName = (params: any) =>
+  const getRowClassName = (params: { id: number | string }) =>
     params.id == selectedId ? "selected-row" : "";
 
   const gridInitialState = useMemo(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const state: any = {};
 
     if (defaultSort) {
@@ -202,7 +204,7 @@ export default function RecordTable({
       loading={loading}
       initialState={gridInitialState}
       density="comfortable"
-      rowHeight={90}
+      rowHeight={89}
       getRowId={(row) => row.id}
       onRowClick={handleRowClick}
       getRowClassName={getRowClassName}

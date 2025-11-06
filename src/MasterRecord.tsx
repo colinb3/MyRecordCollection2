@@ -32,21 +32,12 @@ import { darkTheme } from "./theme";
 import { setUserId } from "./analytics";
 import ImageNotSupportedIcon from "@mui/icons-material/ImageNotSupported";
 import FindRecordSidebar from "./components/FindRecordSidebar";
-import {
-  clearUserInfoCache,
-  getCachedUserInfo,
-  loadUserInfo,
-} from "./userInfo";
-import { loadUserTags, clearTagsCache } from "./userTags";
-import { clearRecordTablePreferencesCache } from "./preferences";
-import { clearCommunityCaches } from "./communityUsers";
+import { getCachedUserInfo, loadUserInfo } from "./userInfo";
+import { loadUserTags } from "./userTags";
 import { wikiGenres } from "./wiki";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import {
-  clearUserListsCache,
-  getCachedUserLists,
-  setCachedUserLists,
-} from "./userLists";
+import { getCachedUserLists, setCachedUserLists } from "./userLists";
+import { performLogout } from "./logout";
 
 interface RecordListItem {
   id: string;
@@ -95,10 +86,6 @@ const WISHLIST_COLLECTION_NAME = "Wishlist";
 const LISTENED_COLLECTION_NAME = "Listened";
 
 function RatingsHistogram({ counts }: { counts: number[] }) {
-  if (!Array.isArray(counts) || counts.length === 0) {
-    return null;
-  }
-
   const [width, setWidth] = useState(window.innerWidth);
 
   useEffect(() => {
@@ -106,6 +93,10 @@ function RatingsHistogram({ counts }: { counts: number[] }) {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  if (!Array.isArray(counts) || counts.length === 0) {
+    return null;
+  }
 
   const maxValue = counts.reduce(
     (max, current) =>
@@ -155,8 +146,9 @@ function RatingsHistogram({ counts }: { counts: number[] }) {
                   height: `${barHeight}px`,
                   bgcolor: "primary.main",
                   borderRadius: 1,
-                  transition: "height 0.2s ease",
+                  transition: "0.2s ease",
                   mt: 0.5,
+                  ":hover": { bgcolor: "primary.dark" },
                 }}
               />
               <Typography
@@ -182,15 +174,6 @@ export default function MasterRecord() {
   const locationState = (location.state as LocationState | undefined) ?? {};
   const initialAlbum = locationState.album ?? null;
   const fromCollection = locationState.fromCollection;
-  const fromCollectionPath =
-    typeof fromCollection?.path === "string"
-      ? fromCollection.path.trim() || null
-      : null;
-  const fromScanner =
-    locationState.fromScanner === true ||
-    searchParams.get("origin") === "scanner";
-  const searchQuery =
-    typeof locationState.query === "string" ? locationState.query.trim() : "";
   const suggestedReleaseYear =
     typeof locationState.suggestedReleaseYear === "number" &&
     Number.isInteger(locationState.suggestedReleaseYear)
@@ -437,21 +420,7 @@ export default function MasterRecord() {
   }, [album]);
 
   const handleLogout = useCallback(async () => {
-    await fetch(apiUrl("/api/logout"), {
-      method: "POST",
-      credentials: "include",
-    });
-    clearRecordTablePreferencesCache();
-    clearUserInfoCache();
-    clearTagsCache();
-    clearCommunityCaches();
-    clearUserListsCache();
-    try {
-      setUserId(undefined);
-    } catch {
-      /* ignore analytics cleanup */
-    }
-    navigate("/login");
+    await performLogout(navigate);
   }, [navigate]);
 
   const handleToggleTag = useCallback((tag: string) => {
@@ -1112,68 +1081,19 @@ export default function MasterRecord() {
     if (!resolvedMasterId) {
       return;
     }
-    const originPath = `${location.pathname}${location.search}${location.hash}`;
+
+    // Just navigate - browser history will handle the back button
     navigate(`/master/${resolvedMasterId}/reviews`, {
       state: {
-        album,
-        query: searchQuery,
-        fromCollection,
-        fromMaster: { path: originPath },
+        album, // Keep album for display purposes
       },
     });
-  }, [
-    album,
-    fromCollection,
-    location.pathname,
-    location.search,
-    location.hash,
-    masterInfo,
-    masterIdOverride,
-    navigate,
-    searchQuery,
-  ]);
+  }, [album, masterInfo, masterIdOverride, navigate]);
 
   const handleBack = useCallback(() => {
-    if (fromScanner) {
-      navigate("/scan");
-      return;
-    }
-    if (fromCollectionPath) {
-      // If we arrived at the master via a collection/list navigation (i.e. the
-      // location state contains a `fromCollection` object), prefer going back
-      // in history to avoid pushing a duplicate list entry. If there is no
-      // in-memory history entry (for example a direct link to the master),
-      // fall back to navigating to the list path.
-      const locState = locationState as any;
-      if (locState && locState.fromCollection) {
-        // Go back one step in the browser history which should return to the
-        // originating list page without adding a new history entry.
-        navigate(-1);
-        return;
-      }
-
-      // Preserve any upstream origin (fromPath) when navigating back to the
-      // collection/record so that subsequent back actions can continue to
-      // return the user to the original page (e.g., Activity or Profile).
-      const upstreamFromPath =
-        (locationState.fromCollection as any)?.fromPath ??
-        (locationState as any)?.fromPath;
-      navigate(fromCollectionPath, {
-        state: {
-          album: locationState.album,
-          query: locationState.query,
-          fromCollection: locationState.fromCollection,
-          fromPath: upstreamFromPath,
-        },
-      });
-      return;
-    }
-    if (searchQuery) {
-      navigate(`/search?tab=records&q=${encodeURIComponent(searchQuery)}`);
-    } else {
-      navigate("/search");
-    }
-  }, [navigate, fromScanner, fromCollectionPath, searchQuery]);
+    // Simply use browser history for consistent back navigation
+    navigate(-1);
+  }, [navigate]);
 
   const promptRecordRemoval = useCallback(
     (
@@ -1414,6 +1334,8 @@ export default function MasterRecord() {
                   ) : (
                     <Box
                       sx={{
+                        minWidth: { xs: 150, sm: 175, md: 200 },
+                        minHeight: { xs: 150, sm: 175, md: 200 },
                         width: { xs: 150, sm: 175, md: 200 },
                         height: { xs: 150, sm: 175, md: 200 },
                         borderRadius: 2,

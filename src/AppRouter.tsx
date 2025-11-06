@@ -260,7 +260,7 @@ function RouteTracker() {
         if (mod?.trackPage) {
           mod.trackPage(location.pathname + location.search + location.hash);
         }
-      } catch (e) {
+      } catch {
         /* ignore analytics errors */
       }
     })();

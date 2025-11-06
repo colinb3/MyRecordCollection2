@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useState,
+  useRef,
   type MouseEvent,
   type SyntheticEvent,
 } from "react";
@@ -22,28 +23,26 @@ import {
   ButtonBase,
   Stack,
   ListItem,
+  Tooltip,
+  IconButton,
 } from "@mui/material";
 import ImageNotSupportedIcon from "@mui/icons-material/ImageNotSupported";
+import FavoriteIcon from "@mui/icons-material/Favorite";
+import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import TopBar from "./components/TopBar";
 import { darkTheme } from "./theme";
-import {
-  clearUserInfoCache,
-  getCachedUserInfo,
-  loadUserInfo,
-} from "./userInfo";
-import { clearRecordTablePreferencesCache } from "./preferences";
+import { getCachedUserInfo, loadUserInfo } from "./userInfo";
 import { setUserId } from "./analytics";
-import { clearProfileHighlightsCache } from "./profileHighlights";
-import { clearCollectionRecordsCache } from "./collectionRecords";
 import type {
   CommunityFeedEntry,
   CommunityFeedListPreviewRecord,
 } from "./types";
-import { clearCommunityCaches, loadActivityFeed } from "./communityUsers";
+import { loadActivityFeed } from "./communityUsers";
 import apiUrl from "./api";
 import { Grid } from "@mui/system";
 import { formatRelativeTime } from "./dateUtils";
+import { performLogout } from "./logout";
 
 type ActivityView = "friends" | "you";
 type FeedStatus = "idle" | "loading" | "error" | "ready";
@@ -197,26 +196,31 @@ export default function Activity() {
             : prev
         );
       }
+      try {
+        requestAnimationFrame(() => {
+          try {
+            if (listRef && listRef.current) {
+              // Use smooth scrolling so the transition feels natural.
+              try {
+                listRef.current.scrollTo({ top: 0, behavior: "smooth" });
+              } catch {
+                // Fallback if scrollTo with options isn't supported.
+                listRef.current.scrollTop = 0;
+              }
+            }
+          } catch {
+            /* ignore DOM errors */
+          }
+        });
+      } catch {
+        /* ignore if requestAnimationFrame not available */
+      }
     },
     [updateSearchParams, setYouFeed]
   );
 
   const handleLogout = useCallback(async () => {
-    await fetch(apiUrl("/api/logout"), {
-      method: "POST",
-      credentials: "include",
-    });
-    clearRecordTablePreferencesCache();
-    clearCollectionRecordsCache();
-    clearProfileHighlightsCache();
-    clearCommunityCaches();
-    clearUserInfoCache();
-    try {
-      setUserId(undefined);
-    } catch {
-      /* ignore */
-    }
-    navigate("/login");
+    await performLogout(navigate);
   }, [navigate]);
 
   const handleOwnerClick = useCallback(
@@ -304,8 +308,7 @@ export default function Activity() {
             entry.record.id
           }`;
 
-      const originPath = `${location.pathname}${location.search}${location.hash}`;
-      navigate(targetPath, { state: { fromPath: originPath } });
+      navigate(targetPath);
     },
     [navigate, username, location]
   );
@@ -316,25 +319,117 @@ export default function Activity() {
         return;
       }
 
-      const ownerUsername = entry.owner.username;
-      const normalizedOwner = ownerUsername.toLowerCase();
-      const normalizedViewer = (username ?? "").toLowerCase();
-      const isOwnList =
-        normalizedOwner.length > 0 && normalizedOwner === normalizedViewer;
+      const targetPath = `/lists/${entry.list.id}`;
 
-      const targetPath = isOwnList
-        ? `/lists/${entry.list.id}`
-        : `/community/${encodeURIComponent(ownerUsername)}/lists/${
-            entry.list.id
-          }`;
-
-      const originPath = `${location.pathname}${location.search}${location.hash}`;
-      navigate(targetPath, { state: { fromPath: originPath } });
+      navigate(targetPath);
     },
     [navigate, username, location]
   );
 
   const isFriendsView = activeView === "friends";
+
+  const handleToggleRecordLike = useCallback(
+    async (event: MouseEvent, recordId: number, currentlyLiked: boolean) => {
+      event.stopPropagation();
+      event.preventDefault();
+
+      try {
+        const method = currentlyLiked ? "DELETE" : "POST";
+        const res = await fetch(
+          apiUrl(`/api/records/${recordId}/review/like`),
+          {
+            method,
+            credentials: "include",
+          }
+        );
+
+        if (!res.ok) {
+          console.error("Failed to toggle record like", res.status);
+          return;
+        }
+
+        // Update the feed state
+        const updateFeed = (prev: ActivityFeedState) => {
+          const updatedEntries = prev.entries.map((entry) => {
+            if (entry.type === "record" && entry.record.id === recordId) {
+              const currentLikes = entry.record.reviewLikes ?? 0;
+              return {
+                ...entry,
+                record: {
+                  ...entry.record,
+                  viewerHasLikedReview: !currentlyLiked,
+                  reviewLikes: currentlyLiked
+                    ? Math.max(0, currentLikes - 1)
+                    : currentLikes + 1,
+                },
+              };
+            }
+            return entry;
+          });
+          return { ...prev, entries: updatedEntries };
+        };
+
+        if (isFriendsView) {
+          setFriendsFeed(updateFeed);
+        } else {
+          setYouFeed(updateFeed);
+        }
+      } catch (error) {
+        console.error("Error toggling record like", error);
+      }
+    },
+    [isFriendsView]
+  );
+
+  const handleToggleListLike = useCallback(
+    async (event: MouseEvent, listId: number, currentlyLiked: boolean) => {
+      event.stopPropagation();
+      event.preventDefault();
+
+      try {
+        const method = currentlyLiked ? "DELETE" : "POST";
+        const res = await fetch(apiUrl(`/api/lists/${listId}/like`), {
+          method,
+          credentials: "include",
+        });
+
+        if (!res.ok) {
+          console.error("Failed to toggle list like", res.status);
+          return;
+        }
+
+        // Update the feed state
+        const updateFeed = (prev: ActivityFeedState) => {
+          const updatedEntries = prev.entries.map((entry) => {
+            if (entry.type === "list" && entry.list.id === listId) {
+              const currentLikes = entry.list.likes ?? 0;
+              return {
+                ...entry,
+                list: {
+                  ...entry.list,
+                  likedByCurrentUser: !currentlyLiked,
+                  likes: currentlyLiked
+                    ? Math.max(0, currentLikes - 1)
+                    : currentLikes + 1,
+                },
+              };
+            }
+            return entry;
+          });
+          return { ...prev, entries: updatedEntries };
+        };
+
+        if (isFriendsView) {
+          setFriendsFeed(updateFeed);
+        } else {
+          setYouFeed(updateFeed);
+        }
+      } catch (error) {
+        console.error("Error toggling list like", error);
+      }
+    },
+    [isFriendsView]
+  );
   const currentFeed = isFriendsView ? friendsFeed : youFeed;
   const currentStatus = currentFeed.status;
   const currentEntries = currentFeed.entries;
@@ -367,6 +462,8 @@ export default function Activity() {
     }
     return apiUrl(trimmed);
   }, []);
+
+  const listRef = useRef<HTMLUListElement | null>(null);
 
   return (
     <ThemeProvider theme={darkTheme}>
@@ -471,6 +568,7 @@ export default function Activity() {
                 )}
                 {currentStatus === "ready" && currentEntries.length > 0 && (
                   <List
+                    ref={listRef}
                     disablePadding
                     sx={{
                       height: "100%",
@@ -490,6 +588,14 @@ export default function Activity() {
                       const avatarInitial = avatarSource
                         .charAt(0)
                         .toUpperCase();
+
+                      // Check if this is the viewer's own content
+                      const normalizedOwner =
+                        entry.owner.username.toLowerCase();
+                      const normalizedViewer = (username ?? "").toLowerCase();
+                      const isOwnContent =
+                        normalizedOwner.length > 0 &&
+                        normalizedOwner === normalizedViewer;
 
                       // Type-specific rendering
                       if (entry.type === "record") {
@@ -722,9 +828,59 @@ export default function Activity() {
                                 {entry.record.review && (
                                   <>
                                     <Divider sx={{ my: 0.5 }} />
-                                    <Typography variant="body1">
-                                      {entry.record.review}
-                                    </Typography>
+                                    <Box
+                                      sx={{
+                                        display: "flex",
+                                        alignItems: "flex-start",
+                                        gap: 1,
+                                      }}
+                                    >
+                                      <Typography
+                                        variant="body1"
+                                        sx={{ flex: 1 }}
+                                      >
+                                        {entry.record.review}
+                                      </Typography>
+                                      <Box
+                                        sx={{
+                                          display: "flex",
+                                          alignItems: "center",
+                                          gap: 0.1,
+                                        }}
+                                      >
+                                        <IconButton
+                                          size="small"
+                                          disabled={isOwnContent}
+                                          onClick={(e) =>
+                                            handleToggleRecordLike(
+                                              e,
+                                              entry.record.id,
+                                              entry.record
+                                                .viewerHasLikedReview ?? false
+                                            )
+                                          }
+                                          sx={{
+                                            color: entry.record
+                                              .viewerHasLikedReview
+                                              ? "error.main"
+                                              : "text.secondary",
+                                          }}
+                                        >
+                                          {entry.record.viewerHasLikedReview ? (
+                                            <FavoriteIcon fontSize="small" />
+                                          ) : (
+                                            <FavoriteBorderIcon fontSize="small" />
+                                          )}
+                                        </IconButton>
+                                        <Typography
+                                          variant="caption"
+                                          color="text.secondary"
+                                          sx={{ pt: 0.5 }}
+                                        >
+                                          {entry.record.reviewLikes ?? 0}
+                                        </Typography>
+                                      </Box>
+                                    </Box>
                                   </>
                                 )}
                               </Box>
@@ -899,21 +1055,63 @@ export default function Activity() {
                                   minWidth: 0,
                                 }}
                               >
-                                <Typography
-                                  variant="h6"
-                                  component="div"
-                                  sx={{
-                                    fontWeight: 600,
-                                    lineHeight: 1.2,
-                                    overflow: "hidden",
-                                    textOverflow: "ellipsis",
-                                    display: "-webkit-box",
-                                    WebkitLineClamp: 2,
-                                    WebkitBoxOrient: "vertical",
-                                  }}
+                                <Stack
+                                  direction={"row"}
+                                  justifyContent={"space-between"}
                                 >
-                                  {entry.list.name}
-                                </Typography>
+                                  <Typography
+                                    variant="h6"
+                                    component="div"
+                                    sx={{
+                                      fontWeight: 600,
+                                      lineHeight: 1.2,
+                                      overflow: "hidden",
+                                      textOverflow: "ellipsis",
+                                      display: "-webkit-box",
+                                      WebkitLineClamp: 2,
+                                      WebkitBoxOrient: "vertical",
+                                    }}
+                                  >
+                                    {entry.list.name}
+                                  </Typography>
+                                  <Box
+                                    sx={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: 0.1,
+                                    }}
+                                  >
+                                    <IconButton
+                                      size="small"
+                                      disabled={isOwnContent}
+                                      onClick={(e) =>
+                                        handleToggleListLike(
+                                          e,
+                                          entry.list.id,
+                                          entry.list.likedByCurrentUser ?? false
+                                        )
+                                      }
+                                      sx={{
+                                        color: entry.list.likedByCurrentUser
+                                          ? "error.main"
+                                          : "text.secondary",
+                                      }}
+                                    >
+                                      {entry.list.likedByCurrentUser ? (
+                                        <FavoriteIcon fontSize="small" />
+                                      ) : (
+                                        <FavoriteBorderIcon fontSize="small" />
+                                      )}
+                                    </IconButton>
+                                    <Typography
+                                      variant="caption"
+                                      color="text.secondary"
+                                      sx={{ pt: 0.5 }}
+                                    >
+                                      {entry.list.likes ?? 0}
+                                    </Typography>
+                                  </Box>
+                                </Stack>
                                 {entry.list.description && (
                                   <Typography
                                     variant="body2"
@@ -953,27 +1151,39 @@ export default function Activity() {
                                           ? `${entry.list.id}-${preview.id}`
                                           : `${entry.list.id}-preview-${index}`;
                                       return (
-                                        <Avatar
+                                        <Tooltip
+                                          title={
+                                            `${preview.name} - ${preview.artist}` ||
+                                            "N/A"
+                                          }
                                           key={previewKey}
-                                          variant="rounded"
-                                          src={previewSrc}
-                                          alt={preview.name || "List record"}
-                                          sx={{
-                                            width: { xs: 40, sm: 55, md: 70 },
-                                            height: { xs: 40, sm: 55, md: 70 },
-                                            borderRadius: 1,
-                                            bgcolor: previewSrc
-                                              ? "transparent"
-                                              : "grey.800",
-                                            boxShadow: previewSrc ? 1 : 0,
-                                          }}
                                         >
-                                          {!previewSrc && (
-                                            <ImageNotSupportedIcon
-                                              sx={{ fontSize: 24 }}
-                                            />
-                                          )}
-                                        </Avatar>
+                                          <Avatar
+                                            key={previewKey}
+                                            variant="rounded"
+                                            src={previewSrc}
+                                            alt={preview.name || "List record"}
+                                            sx={{
+                                              width: { xs: 40, sm: 55, md: 70 },
+                                              height: {
+                                                xs: 40,
+                                                sm: 55,
+                                                md: 70,
+                                              },
+                                              borderRadius: 1,
+                                              bgcolor: previewSrc
+                                                ? "transparent"
+                                                : "grey.800",
+                                              boxShadow: previewSrc ? 1 : 0,
+                                            }}
+                                          >
+                                            {!previewSrc && (
+                                              <ImageNotSupportedIcon
+                                                sx={{ fontSize: 24 }}
+                                              />
+                                            )}
+                                          </Avatar>
+                                        </Tooltip>
                                       );
                                     })}
                                   </Stack>

@@ -205,142 +205,156 @@ export default function TopBar({
               paper: { onMouseLeave: handleMenuClose },
             }}
           >
-            {username ? (
-              <>
-                <MenuItem
-                  disabled
-                  sx={{
-                    "&.Mui-disabled": {
-                      opacity: 0.85,
-                    },
-                  }}
-                >
-                  Hello, {displayName || username}
-                </MenuItem>
-                <MenuItem
-                  onClick={() => {
-                    const trimmedUsername = (username || "").trim();
-                    if (trimmedUsername) {
-                      navigate(
-                        `/community/${encodeURIComponent(trimmedUsername)}`
-                      );
-                    } else {
-                      navigate("/activity");
-                    }
-                    handleMenuClose();
-                  }}
-                >
-                  <ListItemIcon>
-                    <AccountCircle />
-                  </ListItemIcon>
-                  <ListItemText>Profile</ListItemText>
-                </MenuItem>
-                <MenuItem
-                  onClick={() => {
-                    navigate("/activity");
-                    handleMenuClose();
-                  }}
-                >
-                  <ListItemIcon>
-                    <PeopleAltIcon />
-                  </ListItemIcon>
-                  <ListItemText>Activity</ListItemText>
-                </MenuItem>
-                <MenuItem onClick={() => navigate("/lists")}>
-                  <ListItemIcon>
-                    <ListAltIcon />
-                  </ListItemIcon>
-                  <ListItemText>Lists</ListItemText>
-                </MenuItem>
-                <Divider sx={{ my: 0.5 }} />
-                <MenuItem onClick={() => navigate("/mycollection")}>
-                  <ListItemIcon>
-                    <LibraryMusicIcon />
-                  </ListItemIcon>
-                  <ListItemText>My Collection</ListItemText>
-                </MenuItem>
-                <MenuItem onClick={() => navigate("/listened")}>
-                  <ListItemIcon>
-                    <HeadphonesIcon />
-                  </ListItemIcon>
-                  <ListItemText>Listened</ListItemText>
-                </MenuItem>
-                <MenuItem onClick={() => navigate("/wishlist")}>
-                  <ListItemIcon>
-                    <FavoriteIcon />
-                  </ListItemIcon>
-                  <ListItemText>Wishlist</ListItemText>
-                </MenuItem>
-                <Divider />
-                <MenuItem
-                  onClick={() => {
-                    navigate("/settings");
-                    handleMenuClose();
-                  }}
-                >
-                  <ListItemIcon>
-                    <SettingsIcon />
-                  </ListItemIcon>
-                  <ListItemText>Settings</ListItemText>
-                </MenuItem>
-                {canAdmin && (
+            {username
+              ? [
                   <MenuItem
+                    key="greeting"
+                    disabled
+                    sx={{
+                      "&.Mui-disabled": {
+                        opacity: 0.85,
+                      },
+                    }}
+                  >
+                    Hello, {displayName || username}
+                  </MenuItem>,
+                  <MenuItem
+                    key="profile"
                     onClick={() => {
-                      navigate("/admin");
+                      const trimmedUsername = (username || "").trim();
+                      if (trimmedUsername) {
+                        navigate(
+                          `/community/${encodeURIComponent(trimmedUsername)}`
+                        );
+                      } else {
+                        navigate("/activity");
+                      }
                       handleMenuClose();
                     }}
                   >
                     <ListItemIcon>
-                      <AdminPanelSettingsIcon />
+                      <AccountCircle />
                     </ListItemIcon>
-                    <ListItemText>Admin Panel</ListItemText>
-                  </MenuItem>
-                )}
-                {onLogout && (
-                  <MenuItem onClick={handleLogoutClick}>
+                    <ListItemText>Profile</ListItemText>
+                  </MenuItem>,
+                  <MenuItem
+                    key="activity"
+                    onClick={() => {
+                      navigate("/activity");
+                      handleMenuClose();
+                    }}
+                  >
                     <ListItemIcon>
-                      <LogoutIcon />
+                      <PeopleAltIcon />
                     </ListItemIcon>
-                    <ListItemText>Logout</ListItemText>
-                  </MenuItem>
-                )}
-              </>
-            ) : (
-              <>
-                <MenuItem
-                  onClick={() => {
-                    // preserve current location so we can return after sign-in
-                    if (location.pathname === "/login") {
-                      navigate("/login");
-                    } else {
-                      const next = encodeURIComponent(
-                        `${location.pathname}${location.search || ""}${
-                          location.hash || ""
-                        }`
-                      );
-                      navigate(`/login?next=${next}`);
-                    }
-                    handleMenuClose();
-                  }}
-                >
-                  <ListItemIcon>
-                    <LoginIcon />
-                  </ListItemIcon>
-                  <ListItemText>Sign In</ListItemText>
-                </MenuItem>
-                <MenuItem
-                  onClick={() => {
-                    navigate("/register");
-                    handleMenuClose();
-                  }}
-                >
-                  <ListItemIcon>
-                    <PersonAddIcon />
-                  </ListItemIcon>
-                  <ListItemText>Register</ListItemText>
-                </MenuItem>
-              </>
-            )}
+                    <ListItemText>Activity</ListItemText>
+                  </MenuItem>,
+                  <MenuItem key="lists" onClick={() => navigate("/lists")}>
+                    <ListItemIcon>
+                      <ListAltIcon />
+                    </ListItemIcon>
+                    <ListItemText>Lists</ListItemText>
+                  </MenuItem>,
+                  <Divider key="divider1" />,
+                  <MenuItem
+                    key="collection"
+                    onClick={() => navigate("/mycollection")}
+                  >
+                    <ListItemIcon>
+                      <LibraryMusicIcon />
+                    </ListItemIcon>
+                    <ListItemText>My Collection</ListItemText>
+                  </MenuItem>,
+                  <MenuItem
+                    key="listened"
+                    onClick={() => navigate("/listened")}
+                  >
+                    <ListItemIcon>
+                      <HeadphonesIcon />
+                    </ListItemIcon>
+                    <ListItemText>Listened</ListItemText>
+                  </MenuItem>,
+                  <MenuItem
+                    key="wishlist"
+                    onClick={() => navigate("/wishlist")}
+                  >
+                    <ListItemIcon>
+                      <FavoriteIcon />
+                    </ListItemIcon>
+                    <ListItemText>Wishlist</ListItemText>
+                  </MenuItem>,
+                  <Divider key="divider2" />,
+                  <MenuItem
+                    key="settings"
+                    onClick={() => {
+                      navigate("/settings");
+                      handleMenuClose();
+                    }}
+                  >
+                    <ListItemIcon>
+                      <SettingsIcon />
+                    </ListItemIcon>
+                    <ListItemText>Settings</ListItemText>
+                  </MenuItem>,
+                  canAdmin && (
+                    <MenuItem
+                      key="admin"
+                      onClick={() => {
+                        navigate("/admin");
+                        handleMenuClose();
+                      }}
+                    >
+                      <ListItemIcon>
+                        <AdminPanelSettingsIcon />
+                      </ListItemIcon>
+                      <ListItemText>Admin Panel</ListItemText>
+                    </MenuItem>
+                  ),
+                  onLogout && (
+                    <MenuItem key="logout" onClick={handleLogoutClick}>
+                      <ListItemIcon>
+                        <LogoutIcon />
+                      </ListItemIcon>
+                      <ListItemText>Logout</ListItemText>
+                    </MenuItem>
+                  ),
+                ].filter(Boolean)
+              : [
+                  <MenuItem
+                    key="signin"
+                    onClick={() => {
+                      // preserve current location so we can return after sign-in
+                      if (location.pathname === "/login") {
+                        navigate("/login");
+                      } else {
+                        const next = encodeURIComponent(
+                          `${location.pathname}${location.search || ""}${
+                            location.hash || ""
+                          }`
+                        );
+                        navigate(`/login?next=${next}`);
+                      }
+                      handleMenuClose();
+                    }}
+                  >
+                    <ListItemIcon>
+                      <LoginIcon />
+                    </ListItemIcon>
+                    <ListItemText>Sign In</ListItemText>
+                  </MenuItem>,
+                  <MenuItem
+                    key="register"
+                    onClick={() => {
+                      navigate("/register");
+                      handleMenuClose();
+                    }}
+                  >
+                    <ListItemIcon>
+                      <PersonAddIcon />
+                    </ListItemIcon>
+                    <ListItemText>Register</ListItemText>
+                  </MenuItem>,
+                ]}
           </Menu>
         </Box>
       </Box>

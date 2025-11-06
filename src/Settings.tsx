@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import apiUrl from "./api";
 import {
   ThemeProvider,
   CssBaseline,
@@ -11,18 +10,12 @@ import {
 } from "@mui/material";
 import Grid from "@mui/material/Grid";
 import { setUserId } from "./analytics";
-import {
-  clearUserInfoCache,
-  getCachedUserInfo,
-  loadUserInfo,
-  setCachedUserInfo,
-} from "./userInfo";
-import { clearRecordTablePreferencesCache } from "./preferences";
-import { clearCommunityCaches } from "./communityUsers";
+import { getCachedUserInfo, loadUserInfo, setCachedUserInfo } from "./userInfo";
 import { useNavigate, useLocation } from "react-router-dom";
 import { darkTheme } from "./theme";
 import { useMediaQuery } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
+import { performLogout } from "./logout";
 
 // Import Components
 import TopBar from "./components/TopBar";
@@ -89,19 +82,7 @@ export default function Settings() {
   }, [navigate]);
 
   const handleLogout = async () => {
-    await fetch(apiUrl("/api/logout"), {
-      method: "POST",
-      credentials: "include",
-    });
-    clearRecordTablePreferencesCache();
-    clearUserInfoCache();
-    clearCommunityCaches();
-    try {
-      setUserId(undefined);
-    } catch {
-      /* ignore */
-    }
-    navigate("/login");
+    await performLogout(navigate);
   };
 
   const currentContent = useMemo(() => {

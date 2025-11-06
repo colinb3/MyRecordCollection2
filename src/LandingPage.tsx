@@ -15,17 +15,7 @@ import { useNavigate } from "react-router-dom";
 import "./LandingPage.css";
 import { darkTheme } from "./theme";
 import TopBar from "./components/TopBar";
-import {
-  loadUserInfo,
-  getCachedUserInfo,
-  clearUserInfoCache,
-} from "./userInfo";
-import { clearRecordTablePreferencesCache } from "./preferences";
-import { clearCollectionRecordsCache } from "./collectionRecords";
-import { clearCommunityCaches } from "./communityUsers";
-import { clearProfileHighlightsCache } from "./profileHighlights";
-import { clearTagsCache } from "./userTags";
-import { setUserId } from "./analytics";
+import { loadUserInfo, getCachedUserInfo } from "./userInfo";
 import icon from "./assets/icon.png";
 import collectionViewImg from "./assets/collectionview.png";
 import editViewImg from "./assets/editview.png";
@@ -39,7 +29,7 @@ import FavoriteIcon from "@mui/icons-material/Favorite";
 import LocalOfferIcon from "@mui/icons-material/LocalOffer";
 import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
 import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
-import apiUrl from "./api";
+import { performLogout } from "./logout";
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -133,27 +123,7 @@ export default function LandingPage() {
   }, []);
 
   const handleLogout = async () => {
-    try {
-      await fetch(apiUrl("/api/logout"), {
-        method: "POST",
-        credentials: "include",
-      });
-    } catch {
-      /* ignore network errors on logout */
-    }
-    // Clear caches and analytics similar to other pages
-    clearRecordTablePreferencesCache();
-    clearCollectionRecordsCache();
-    clearProfileHighlightsCache();
-    clearCommunityCaches();
-    clearUserInfoCache();
-    clearTagsCache();
-    try {
-      setUserId(undefined);
-    } catch {
-      /* ignore analytics cleanup errors */
-    }
-    navigate("/login");
+    await performLogout(navigate);
   };
 
   useEffect(() => {
@@ -393,7 +363,9 @@ export default function LandingPage() {
                   if (e.detail && e.detail > 0) {
                     try {
                       (e.currentTarget as HTMLElement).blur();
-                    } catch {}
+                    } catch {
+                      // ignore if blur fails
+                    }
                   }
                 }}
                 sx={{
@@ -417,7 +389,9 @@ export default function LandingPage() {
                   if (e.detail && e.detail > 0) {
                     try {
                       (e.currentTarget as HTMLElement).blur();
-                    } catch {}
+                    } catch {
+                      // ignore if blur fails
+                    }
                   }
                 }}
                 sx={{

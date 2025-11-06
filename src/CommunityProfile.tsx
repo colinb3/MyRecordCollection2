@@ -20,25 +20,17 @@ import Grid from "@mui/material/Grid";
 import { useNavigate, useParams } from "react-router-dom";
 import TopBar from "./components/TopBar";
 import { darkTheme } from "./theme";
-import {
-  clearUserInfoCache,
-  getCachedUserInfo,
-  loadUserInfo,
-} from "./userInfo";
-import { clearRecordTablePreferencesCache } from "./preferences";
+import { getCachedUserInfo, loadUserInfo } from "./userInfo";
 import { setUserId } from "./analytics";
-import { clearProfileHighlightsCache } from "./profileHighlights";
-import { clearCollectionRecordsCache } from "./collectionRecords";
 import RecordPreviewGrid from "./components/RecordPreviewGrid";
 import type { PublicUserProfile } from "./types";
 import {
-  clearCommunityCaches,
-  followUser,
   loadPublicUserProfile,
+  followUser,
   unfollowUser,
 } from "./communityUsers";
-import apiUrl from "./api";
 import SettingsIcon from "@mui/icons-material/Settings";
+import { performLogout } from "./logout";
 
 const OWN_PREVIEW_LIMIT = 3;
 const WISHLIST_COLLECTION_NAME = "Wishlist";
@@ -242,21 +234,7 @@ export default function CommunityProfile() {
   }, [profile?.joinedDate]);
 
   const handleLogout = useCallback(async () => {
-    await fetch(apiUrl("/api/logout"), {
-      method: "POST",
-      credentials: "include",
-    });
-    clearRecordTablePreferencesCache();
-    clearCollectionRecordsCache();
-    clearProfileHighlightsCache();
-    clearCommunityCaches();
-    clearUserInfoCache();
-    try {
-      setUserId(undefined);
-    } catch {
-      /* ignore */
-    }
-    navigate("/login");
+    await performLogout(navigate);
   }, [navigate]);
 
   const handleOpenProfileSettings = useCallback(() => {

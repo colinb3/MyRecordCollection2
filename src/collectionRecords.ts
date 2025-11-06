@@ -4,7 +4,8 @@ import type { Record as MrcRecord } from "./types";
 export const DEFAULT_COLLECTION_NAME = "My Collection";
 
 function cloneRecord(record: MrcRecord): MrcRecord {
-  const { collectionName: _ignored, ...rest } = record;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { collectionName: _, ...rest } = record;
   return {
     ...rest,
     tags: [...record.tags],
@@ -127,6 +128,18 @@ export function normalizeApiRecord(raw: unknown): MrcRecord | null {
     normalized.review = review;
   } else if (source.review === null) {
     normalized.review = null;
+  }
+
+  // Include review likes and viewer like status
+  const reviewLikesRaw = Number(source.reviewLikes);
+  if (Number.isInteger(reviewLikesRaw) && reviewLikesRaw >= 0) {
+    normalized.reviewLikes = reviewLikesRaw;
+  }
+
+  if (typeof source.viewerHasLikedReview === "boolean") {
+    normalized.viewerHasLikedReview = source.viewerHasLikedReview;
+  } else if (source.viewerHasLikedReview === 1 || source.viewerHasLikedReview === 0) {
+    normalized.viewerHasLikedReview = Boolean(source.viewerHasLikedReview);
   }
 
   return normalized;

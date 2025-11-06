@@ -8,7 +8,8 @@ let cachedHighlights: ProfileHighlights | null = null;
 let inFlight: Promise<ProfileHighlights | null> | null = null;
 
 function cloneRecord(record: MrcRecord): MrcRecord {
-  const { collectionName, ...rest } = record;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { collectionName: _, ...rest } = record;
   return {
     ...rest,
     tags: [...record.tags],
