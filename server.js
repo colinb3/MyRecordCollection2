@@ -493,7 +493,6 @@ function mapListRecordRow(row) {
     releaseYear: Number.isInteger(releaseYearValue) ? releaseYearValue : null,
     masterId: Number.isInteger(masterIdValue) && masterIdValue > 0 ? masterIdValue : null,
     added: row?.added ? formatUtcDateTime(row.added) : null,
-    isCustom: Number(row?.isCustom) === 1,
   };
 }
 
@@ -2731,7 +2730,7 @@ app.get('/api/records/:id', async (req, res) => {
 
 app.post('/api/records/:id/review/like', requireAuth, async (req, res) => {
   const recordId = Number.parseInt(req.params.id, 10);
-  console.log('Liking review for record ID: ', recordId);
+  console.log('Liking review for record ID:', recordId);
   if (!Number.isInteger(recordId) || recordId <= 0) {
     return res.status(400).json({ error: 'Invalid record ID' });
   }
@@ -2778,7 +2777,7 @@ app.post('/api/records/:id/review/like', requireAuth, async (req, res) => {
 
 app.delete('/api/records/:id/review/like', requireAuth, async (req, res) => {
   const recordId = Number.parseInt(req.params.id, 10);
-  console.log('Removing review like from record ID: ', recordId);
+  console.log('Removing review like from record ID:', recordId);
   if (!Number.isInteger(recordId) || recordId <= 0) {
     return res.status(400).json({ error: 'Invalid record ID' });
   }
@@ -3974,7 +3973,7 @@ app.get('/api/lists/:listId', async (req, res) => {
     }
     const [recordRows] = await pool.query(
       `SELECT id, added, artist, cover, name, rating, release_year AS releaseYear,
-              masterId, isCustom, sortOrder
+              masterId, sortOrder
          FROM ListRecord
         WHERE listId = ?
         ORDER BY sortOrder ASC, added DESC` ,
@@ -4086,16 +4085,16 @@ app.post('/api/lists/:listId/records', requireAuth, async (req, res) => {
     );
     const nextSortOrder = sortOrderRows?.[0]?.nextOrder || 1;
 
+
     const [result] = await pool.execute(
-      `INSERT INTO ListRecord (added, artist, cover, name, rating, release_year, isCustom, userUuid, listId, masterId, reviewLikes, sortOrder)
-       VALUES (UTC_TIMESTAMP(), ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
+      `INSERT INTO ListRecord (added, artist, cover, name, rating, release_year, userUuid, listId, masterId, reviewLikes, sortOrder)
+       VALUES (UTC_TIMESTAMP(), ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
       [
         artist,
         cover,
         recordName,
         ratingValue,
         releaseYearValue,
-        masterId ? 0 : 1,
         req.userUuid,
         listId,
         masterId,
@@ -4105,7 +4104,7 @@ app.post('/api/lists/:listId/records', requireAuth, async (req, res) => {
 
     const newId = Number(result?.insertId);
     const [rows] = await pool.query(
-      `SELECT id, added, artist, cover, name, rating, release_year AS releaseYear, masterId, isCustom
+      `SELECT id, added, artist, cover, name, rating, release_year AS releaseYear, masterId
          FROM ListRecord
         WHERE id = ? AND listId = ? AND userUuid = ?
         LIMIT 1`,

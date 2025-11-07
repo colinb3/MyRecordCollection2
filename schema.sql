@@ -107,7 +107,6 @@ CREATE TABLE ListRecord (
     name VARCHAR(255) NOT NULL,
     rating TINYINT,
     release_year YEAR,
-    isCustom BOOLEAN NOT NULL DEFAULT FALSE,
     sortOrder INT DEFAULT 0,
     userUuid CHAR(36),
     listId INT,

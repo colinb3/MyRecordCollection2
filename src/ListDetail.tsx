@@ -88,7 +88,6 @@ interface ListRecordEntry {
   releaseYear: number | null;
   masterId: number | null;
   added: string | null;
-  isCustom: boolean;
   sortOrder?: number;
 }
 
@@ -148,8 +147,10 @@ function SortableRecordItem({
     <Paper ref={setNodeRef} style={style} variant="outlined">
       <Stack direction="row" alignItems="center">
         <ButtonBase
-          onClick={handleMasterNavigate}
-          disabled={!canViewMaster}
+          component={canViewMaster ? "button" : "div"}
+          onClick={canViewMaster ? handleMasterNavigate : undefined}
+          tabIndex={canViewMaster ? 0 : -1}
+          aria-disabled={!canViewMaster}
           sx={{
             flex: 1,
             display: "flex",
@@ -177,6 +178,9 @@ function SortableRecordItem({
                 alignItems: "center",
                 color: "text.secondary",
                 touchAction: "none",
+                // Ensure the drag handle receives pointer events even when
+                // the parent ButtonBase is disabled so dragging still works.
+                pointerEvents: "auto",
               }}
             >
               <DragIndicatorIcon />
@@ -205,7 +209,7 @@ function SortableRecordItem({
           {actionStackVisible && (
             <Stack spacing={1} alignItems="center">
               <Tooltip title="Remove from list">
-                <span>
+                <span style={{ pointerEvents: "auto", display: "inline-flex" }}>
                   <IconButton
                     color="error"
                     onClick={(e) => {
@@ -398,7 +402,7 @@ export default function ListDetail() {
               typeof row?.added === "string" && row.added.trim()
                 ? row.added.trim()
                 : null,
-            isCustom: row?.isCustom === true || Number(row?.isCustom) === 1,
+            // isCustom column was removed from ListRecord; determine custom status by absence of masterId when needed
           };
         })
         .filter((entry): entry is ListRecordEntry => entry !== null)
