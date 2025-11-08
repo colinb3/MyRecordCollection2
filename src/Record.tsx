@@ -971,7 +971,7 @@ export default function RecordDetails() {
                                 title={`${record?.record || "Record"} by ${
                                   record?.artist || "Unknown Artist"
                                 }`}
-                                text={`Check out this record: ${
+                                text={`Check out my record: ${
                                   record?.record || "Record"
                                 } by ${record?.artist || "Unknown Artist"}`}
                               />

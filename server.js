@@ -1200,6 +1200,7 @@ app.get("/api/records/master-info", async (req, res) => {
           artist: null,
           userCollections,
           userLists,
+          inDb: false,
         });
       }
 
@@ -1213,6 +1214,7 @@ app.get("/api/records/master-info", async (req, res) => {
         const num = Number(value);
         return Number.isFinite(num) && num >= 0 ? num : 0;
       });
+      console.log("Master found in DB");
 
       return res.json({
         masterId: row.id,
@@ -1224,6 +1226,7 @@ app.get("/api/records/master-info", async (req, res) => {
         artist: typeof row.artist === "string" ? row.artist : null,
         userCollections,
         userLists,
+        inDb: true,
       });
     } catch (error) {
       console.error("Failed to load master info", error);
@@ -1265,6 +1268,7 @@ app.get("/api/records/master-info", async (req, res) => {
         artist,
         userCollections,
         userLists,
+        inDb: false,
       });
     }
 
@@ -1307,6 +1311,7 @@ app.get("/api/records/master-info", async (req, res) => {
       artist,
       userCollections,
       userLists,
+      inDb: !!ratingAveRow,
     });
   } catch (error) {
     console.error("Failed to load master info", error);

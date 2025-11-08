@@ -38,6 +38,7 @@ import { wikiGenres } from "./wiki";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { getCachedUserLists, setCachedUserLists } from "./userLists";
 import { performLogout } from "./logout";
+import ShareButton from "./components/ShareButton";
 
 interface RecordListItem {
   id: string;
@@ -67,6 +68,8 @@ interface MasterInfo {
   ratingCounts: number[] | null;
   userCollections: UserCollectionEntry[];
   userLists: UserListEntry[];
+  // indicates whether the master exists in the local server DB
+  inDb?: boolean;
 }
 
 interface UserCollectionEntry {
@@ -634,6 +637,7 @@ export default function MasterRecord() {
               : null,
           userCollections: userCollectionsValue,
           userLists: userListsValue,
+          inDb: data?.inDb === true,
         };
 
         // Update cache with list names (minimal cache for fast loading)
@@ -1307,14 +1311,29 @@ export default function MasterRecord() {
                   flexDirection: "column",
                 }}
               >
-                <Button
-                  startIcon={<ArrowBackIcon />}
-                  onClick={handleBack}
-                  variant="outlined"
-                  sx={{ alignSelf: "flex-start", mb: 1.5 }}
-                >
-                  Back
-                </Button>
+                <Stack direction={"row"} justifyContent="space-between">
+                  <Button
+                    startIcon={<ArrowBackIcon />}
+                    onClick={handleBack}
+                    variant="outlined"
+                    sx={{ alignSelf: "flex-start", mb: 1.5 }}
+                  >
+                    Back
+                  </Button>
+                  <Box>
+                    {masterInfo?.inDb ? (
+                      <ShareButton
+                        url={`${window.location.origin}/master/${masterInfo.masterId}`}
+                        title={`${album?.record || "Record"} by ${
+                          album?.artist || "Unknown Artist"
+                        }`}
+                        text={`Check out this record: ${
+                          album?.record || "Record"
+                        } by ${album?.artist || "Unknown Artist"}`}
+                      />
+                    ) : null}
+                  </Box>
+                </Stack>
                 <Stack direction={{ xs: "row", md: "column" }}>
                   {fromCollection && (masterLoading || !masterInfo) ? (
                     <Box
