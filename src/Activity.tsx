@@ -364,6 +364,8 @@ export default function Activity() {
                 },
               };
             }
+            // Update liked-review entries - skip since they don't have like data
+            // Only update regular record entries
             return entry;
           });
           return { ...prev, entries: updatedEntries };
@@ -414,6 +416,8 @@ export default function Activity() {
                 },
               };
             }
+            // Update liked-list entries - skip since they don't have like data
+            // Only update regular list entries
             return entry;
           });
           return { ...prev, entries: updatedEntries };
@@ -577,6 +581,309 @@ export default function Activity() {
                     }}
                   >
                     {currentEntries.map((entry: CommunityFeedEntry) => {
+                      // Handle liked-review activity
+                      if (entry.type === "liked-review") {
+                        const likerDisplayName =
+                          typeof entry.liker.displayName === "string"
+                            ? entry.liker.displayName.trim()
+                            : "";
+                        const likerDisplay =
+                          likerDisplayName || entry.liker.username;
+                        const likerInitial = likerDisplay
+                          .charAt(0)
+                          .toUpperCase();
+
+                        const ownerDisplayName =
+                          typeof entry.reviewOwner.displayName === "string"
+                            ? entry.reviewOwner.displayName.trim()
+                            : "";
+                        const ownerDisplay =
+                          ownerDisplayName || entry.reviewOwner.username;
+
+                        const likedDate = entry.likedAt
+                          ? formatRelativeTime(entry.likedAt) ?? entry.likedAt
+                          : null;
+
+                        return (
+                          <ListItemButton
+                            key={`${entry.liker.username}-liked-review-${entry.record.id}`}
+                            onClick={() =>
+                              navigate(
+                                `/community/${encodeURIComponent(
+                                  entry.reviewOwner.username
+                                )}/record/${entry.record.id}`
+                              )
+                            }
+                            sx={{
+                              borderRadius: 1,
+                              mb: 1,
+                              px: { xs: 1, sm: 2 },
+                              py: 1.5,
+                              alignItems: "flex-start",
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                display: "flex",
+                                width: "100%",
+                                gap: 1,
+                              }}
+                            >
+                              <Avatar
+                                src={entry.liker.profilePicUrl ?? undefined}
+                                alt={likerDisplay}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handleOwnerClick(event, entry.liker.username);
+                                }}
+                                sx={{
+                                  width: 40,
+                                  height: 40,
+                                  bgcolor: "grey.700",
+                                  cursor: "pointer",
+                                  flexShrink: 0,
+                                  mx: 0.5,
+                                  "&:hover": {
+                                    opacity: 0.8,
+                                  },
+                                }}
+                              >
+                                {!entry.liker.profilePicUrl && likerInitial}
+                              </Avatar>
+                              <Box
+                                sx={{
+                                  flex: 1,
+                                  minWidth: 0,
+                                }}
+                              >
+                                <Typography
+                                  component="div"
+                                  sx={{
+                                    wordBreak: "break-word",
+                                    overflowWrap: "break-word",
+                                    pt: 1,
+                                  }}
+                                >
+                                  <Box
+                                    component="span"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      handleOwnerClick(
+                                        event,
+                                        entry.liker.username
+                                      );
+                                    }}
+                                    sx={{
+                                      fontWeight: 700,
+                                      cursor: "pointer",
+                                      borderRadius: 1,
+                                      px: 0.5,
+                                      py: 0.25,
+                                      mx: -0.5,
+                                      "&:hover": {
+                                        bgcolor: "action.hover",
+                                      },
+                                    }}
+                                  >
+                                    {likerDisplay}
+                                  </Box>{" "}
+                                  liked{" "}
+                                  <Box
+                                    component="span"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      handleOwnerClick(
+                                        event,
+                                        entry.reviewOwner.username
+                                      );
+                                    }}
+                                    sx={{
+                                      fontWeight: 700,
+                                      cursor: "pointer",
+                                      borderRadius: 1,
+                                      px: 0.5,
+                                      py: 0.25,
+                                      mx: -0.5,
+                                      "&:hover": {
+                                        bgcolor: "action.hover",
+                                      },
+                                    }}
+                                  >
+                                    {ownerDisplay}'s
+                                  </Box>{" "}
+                                  review of {entry.record.name} -{" "}
+                                  {entry.record.artist || "Unknown Artist"}
+                                </Typography>
+                              </Box>
+                              {likedDate && (
+                                <Typography
+                                  variant="body2"
+                                  color="text.secondary"
+                                  sx={{
+                                    flexShrink: 0,
+                                    whiteSpace: "nowrap",
+                                    pt: 1.25,
+                                  }}
+                                >
+                                  {likedDate}
+                                </Typography>
+                              )}
+                            </Box>
+                          </ListItemButton>
+                        );
+                      }
+
+                      // Handle liked-list activity
+                      if (entry.type === "liked-list") {
+                        const likerDisplayName =
+                          typeof entry.liker.displayName === "string"
+                            ? entry.liker.displayName.trim()
+                            : "";
+                        const likerDisplay =
+                          likerDisplayName || entry.liker.username;
+                        const likerInitial = likerDisplay
+                          .charAt(0)
+                          .toUpperCase();
+
+                        const ownerDisplayName =
+                          typeof entry.listOwner.displayName === "string"
+                            ? entry.listOwner.displayName.trim()
+                            : "";
+                        const ownerDisplay =
+                          ownerDisplayName || entry.listOwner.username;
+
+                        const likedDate = entry.likedAt
+                          ? formatRelativeTime(entry.likedAt) ?? entry.likedAt
+                          : null;
+
+                        return (
+                          <ListItemButton
+                            key={`${entry.liker.username}-liked-list-${entry.list.id}`}
+                            onClick={() => navigate(`/lists/${entry.list.id}`)}
+                            sx={{
+                              borderRadius: 1,
+                              mb: 1,
+                              px: { xs: 1, sm: 2 },
+                              py: 1.5,
+                              alignItems: "flex-start",
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                display: "flex",
+                                width: "100%",
+                                gap: 1,
+                              }}
+                            >
+                              <Avatar
+                                src={entry.liker.profilePicUrl ?? undefined}
+                                alt={likerDisplay}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handleOwnerClick(event, entry.liker.username);
+                                }}
+                                sx={{
+                                  width: 40,
+                                  height: 40,
+                                  bgcolor: "grey.700",
+                                  cursor: "pointer",
+                                  flexShrink: 0,
+                                  mx: 0.5,
+                                  "&:hover": {
+                                    opacity: 0.8,
+                                  },
+                                }}
+                              >
+                                {!entry.liker.profilePicUrl && likerInitial}
+                              </Avatar>
+                              <Box
+                                sx={{
+                                  flex: 1,
+                                  minWidth: 0,
+                                  pt: 1,
+                                }}
+                              >
+                                <Typography
+                                  component="div"
+                                  sx={{
+                                    wordBreak: "break-word",
+                                    overflowWrap: "break-word",
+                                  }}
+                                >
+                                  <Box
+                                    component="span"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      handleOwnerClick(
+                                        event,
+                                        entry.liker.username
+                                      );
+                                    }}
+                                    sx={{
+                                      fontWeight: 700,
+                                      cursor: "pointer",
+                                      borderRadius: 1,
+                                      px: 0.5,
+                                      py: 0.25,
+                                      mx: -0.5,
+                                      "&:hover": {
+                                        bgcolor: "action.hover",
+                                      },
+                                    }}
+                                  >
+                                    {likerDisplay}
+                                  </Box>{" "}
+                                  liked{" "}
+                                  <Box
+                                    component="span"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      handleOwnerClick(
+                                        event,
+                                        entry.listOwner.username
+                                      );
+                                    }}
+                                    sx={{
+                                      fontWeight: 700,
+                                      cursor: "pointer",
+                                      borderRadius: 1,
+                                      px: 0.5,
+                                      py: 0.25,
+                                      mx: -0.5,
+                                      "&:hover": {
+                                        bgcolor: "action.hover",
+                                      },
+                                    }}
+                                  >
+                                    {ownerDisplay}'s
+                                  </Box>{" "}
+                                  list:{" "}
+                                  <Box
+                                    component="span"
+                                    sx={{ fontWeight: 700 }}
+                                  >
+                                    {entry.list.name}
+                                  </Box>
+                                </Typography>
+                              </Box>
+                              {likedDate && (
+                                <Typography
+                                  variant="body2"
+                                  color="text.secondary"
+                                  sx={{
+                                    flexShrink: 0,
+                                    whiteSpace: "nowrap",
+                                    pt: 1.25,
+                                  }}
+                                >
+                                  {likedDate}
+                                </Typography>
+                              )}
+                            </Box>
+                          </ListItemButton>
+                        );
+                      }
+
                       const rawDisplayName =
                         typeof entry.owner.displayName === "string"
                           ? entry.owner.displayName.trim()
@@ -1196,9 +1503,7 @@ export default function Activity() {
 
                       return null;
                     })}
-                    {/* Append a load-more row inside the scrollable list so the
-                        button sits at the bottom of the activity content and
-                        scrolls with the entries. */}
+                    {/* Load more button */}
                     {currentEntries.length > 0 && (
                       <ListItem
                         sx={{

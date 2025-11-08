@@ -42,6 +42,7 @@ import { clearProfileHighlightsCache } from "./profileHighlights";
 import type { Record as MrcRecord, RecordOwnerInfo } from "./types";
 import EditRecordDialog from "./components/EditRecordDialog";
 import MoveRecordDialog from "./components/MoveRecordDialog";
+import ShareButton from "./components/ShareButton";
 import { formatLocalDate } from "./dateUtils";
 import { performLogout } from "./logout";
 
@@ -869,7 +870,7 @@ export default function RecordDetails() {
                                   <Stack
                                     direction="row"
                                     alignItems="center"
-                                    spacing={0.5}
+                                    spacing={-0.5}
                                   >
                                     <IconButton
                                       size="small"
@@ -920,8 +921,8 @@ export default function RecordDetails() {
 
                           {showActionRow && (
                             <Stack
-                              direction={{ xs: "column", sm: "row" }}
-                              spacing={1.5}
+                              direction={{ xs: "row", sm: "row" }}
+                              spacing={1}
                               useFlexGap
                               flexWrap="wrap"
                               alignItems={{
@@ -929,53 +930,51 @@ export default function RecordDetails() {
                                 sm: "flex-start",
                               }}
                             >
-                              <Stack
-                                direction={{ xs: "row", sm: "row" }}
-                                spacing={1.5}
-                                useFlexGap
-                                flexWrap="wrap"
-                                alignItems={{
-                                  xs: "stretch",
-                                  sm: "flex-start",
-                                }}
-                              >
-                                {showMasterButton && (
+                              {showMasterButton && (
+                                <Button
+                                  variant="contained"
+                                  color="primary"
+                                  startIcon={<LaunchIcon />}
+                                  onClick={handleOpenMasterRecord}
+                                >
+                                  Master
+                                </Button>
+                              )}
+                              {showOwnerActions && (
+                                <>
                                   <Button
-                                    variant="contained"
-                                    color="primary"
-                                    startIcon={<LaunchIcon />}
-                                    onClick={handleOpenMasterRecord}
+                                    variant="outlined"
+                                    startIcon={<EditOutlinedIcon />}
+                                    onClick={handleOpenEditDialog}
                                   >
-                                    Master
+                                    Edit
                                   </Button>
-                                )}
-                                {showOwnerActions && (
-                                  <>
-                                    <Button
-                                      variant="outlined"
-                                      startIcon={<EditOutlinedIcon />}
-                                      onClick={handleOpenEditDialog}
-                                    >
-                                      Edit
-                                    </Button>
-                                    <Button
-                                      variant="outlined"
-                                      startIcon={<DriveFileMoveOutlinedIcon />}
-                                      onClick={handleOpenMoveDialog}
-                                    >
-                                      Move
-                                    </Button>
-                                    <Button
-                                      variant="outlined"
-                                      color="error"
-                                      startIcon={<DeleteOutlineIcon />}
-                                      onClick={handleRequestDelete}
-                                    >
-                                      Delete
-                                    </Button>
-                                  </>
-                                )}
-                              </Stack>
+                                  <Button
+                                    variant="outlined"
+                                    startIcon={<DriveFileMoveOutlinedIcon />}
+                                    onClick={handleOpenMoveDialog}
+                                  >
+                                    Move
+                                  </Button>
+                                  <Button
+                                    variant="outlined"
+                                    color="error"
+                                    startIcon={<DeleteOutlineIcon />}
+                                    onClick={handleRequestDelete}
+                                  >
+                                    Delete
+                                  </Button>
+                                </>
+                              )}
+                              <ShareButton
+                                size="small"
+                                title={`${record?.record || "Record"} by ${
+                                  record?.artist || "Unknown Artist"
+                                }`}
+                                text={`Check out this record: ${
+                                  record?.record || "Record"
+                                } by ${record?.artist || "Unknown Artist"}`}
+                              />
                             </Stack>
                           )}
                         </Stack>

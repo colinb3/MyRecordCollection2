@@ -26,6 +26,7 @@ import {
 } from "./communityUsers";
 import FilterSidebar from "./components/FilterSidebar";
 import { performLogout } from "./logout";
+import ShareButton from "./components/ShareButton";
 
 const MIN_RELEASE_YEAR = 1901;
 const MAX_RELEASE_YEAR = 2100;
@@ -378,7 +379,8 @@ export default function CommunityCollection() {
                   alignItems: { xs: "stretch" },
                   justifyContent: { xs: "flex-start" },
                   pt: 1.1,
-                  flexWrap: { xs: "nowrap", sm: "nowrap" },
+                  gap: 0.5,
+                  flexWrap: "nowrap",
                 }}
               >
                 <TextField
@@ -389,8 +391,16 @@ export default function CommunityCollection() {
                   InputProps={{ type: "search" }}
                   size="small"
                   sx={{
-                    width: { xs: "100%", sm: 320 },
+                    width: { xs: "100%", sm: 300 },
                   }}
+                />
+                <ShareButton
+                  title={`${
+                    profile?.displayName ?? profile?.username ?? ""
+                  }'s ${activeTableName}`}
+                  text={`Check out ${
+                    profile?.displayName ?? profile?.username ?? ""
+                  }'s ${activeTableName}`}
                 />
               </Box>
               <Box sx={{ flex: 1, minHeight: 0 }}>

@@ -1848,7 +1848,7 @@ app.get("/api/activity", requireAuth, async (req, res) => {
 
   try {
     const pool = await getPool();
-    let recordRows, listRows;
+    let recordRows, listRows, likedReviewRows, likedListRows;
 
     if (scope === "friends") {
       // Get records from followed users
@@ -1881,6 +1881,43 @@ app.get("/api/activity", requireAuth, async (req, res) => {
           WHERE f.userUuid = ? AND l.isPrivate = 0 AND COALESCE(stats.recordCount, 0) > 0`,
         [req.userUuid, req.userUuid]
       );
+      // Get liked reviews from followed users
+      [likedReviewRows] = await pool.query(
+        `SELECT 'liked-review' as activityType, lr.created as timestamp, lr.recordId,
+                r.id, r.name as record, r.artist,
+                liker.username as likerUsername, liker.displayName as likerDisplayName, liker.profilePic as likerProfilePic,
+                owner.username as ownerUsername, owner.displayName as ownerDisplayName
+           FROM LikedReview lr
+           JOIN Follows f ON f.followsUuid = lr.userUuid
+           JOIN User liker ON liker.uuid = lr.userUuid
+           JOIN Record r ON r.id = lr.recordId
+           JOIN User owner ON owner.uuid = r.userUuid
+           JOIN RecTable t ON r.tableId = t.id
+          WHERE f.userUuid = ? AND r.review IS NOT NULL AND r.review != '' AND t.isPrivate = 0`,
+        [req.userUuid]
+      );
+      console.log(`Liked reviews fetched: ${likedReviewRows.length}`);
+      if (likedReviewRows.length > 0) {
+        console.log('Sample liked review:', likedReviewRows[0]);
+      }
+      // Get liked lists from followed users
+      [likedListRows] = await pool.query(
+        `SELECT 'liked-list' as activityType, ll.created as timestamp, ll.listId,
+                l.id, l.name as listName,
+                liker.username as likerUsername, liker.displayName as likerDisplayName, liker.profilePic as likerProfilePic,
+                owner.username as ownerUsername, owner.displayName as ownerDisplayName
+           FROM ListLike ll
+           JOIN Follows f ON f.followsUuid = ll.userUuid
+           JOIN User liker ON liker.uuid = ll.userUuid
+           JOIN List l ON l.id = ll.listId
+           JOIN User owner ON owner.uuid = l.userUuid
+          WHERE f.userUuid = ? AND l.isPrivate = 0`,
+        [req.userUuid]
+      );
+      console.log(`Liked lists fetched: ${likedListRows.length}`);
+      if (likedListRows.length > 0) {
+        console.log('Sample liked list:', likedListRows[0]);
+      }
     } else {
       // Get user's own records
       [recordRows] = await pool.query(
@@ -1910,12 +1947,41 @@ app.get("/api/activity", requireAuth, async (req, res) => {
           WHERE l.userUuid = ? AND COALESCE(stats.recordCount, 0) > 0`,
         [req.userUuid]
       );
+      // Get user's own liked reviews
+      [likedReviewRows] = await pool.query(
+        `SELECT 'liked-review' as activityType, lr.created as timestamp, lr.recordId,
+                r.id, r.name as record, r.artist,
+                viewer.username as likerUsername, viewer.displayName as likerDisplayName, viewer.profilePic as likerProfilePic,
+                owner.username as ownerUsername, owner.displayName as ownerDisplayName
+           FROM LikedReview lr
+           JOIN User viewer ON viewer.uuid = lr.userUuid
+           JOIN Record r ON r.id = lr.recordId
+           JOIN User owner ON owner.uuid = r.userUuid
+           JOIN RecTable t ON r.tableId = t.id
+          WHERE lr.userUuid = ? AND r.review IS NOT NULL AND r.review != '' AND t.isPrivate = 0`,
+        [req.userUuid]
+      );
+      // Get user's own liked lists
+      [likedListRows] = await pool.query(
+        `SELECT 'liked-list' as activityType, ll.created as timestamp, ll.listId,
+                l.id, l.name as listName,
+                viewer.username as likerUsername, viewer.displayName as likerDisplayName, viewer.profilePic as likerProfilePic,
+                owner.username as ownerUsername, owner.displayName as ownerDisplayName
+           FROM ListLike ll
+           JOIN User viewer ON viewer.uuid = ll.userUuid
+           JOIN List l ON l.id = ll.listId
+           JOIN User owner ON owner.uuid = l.userUuid
+          WHERE ll.userUuid = ? AND l.isPrivate = 0`,
+        [req.userUuid]
+      );
     }
 
     // Combine and sort all activity
     const allActivity = [
       ...(Array.isArray(recordRows) ? recordRows : []),
-      ...(Array.isArray(listRows) ? listRows : [])
+      ...(Array.isArray(listRows) ? listRows : []),
+      ...(Array.isArray(likedReviewRows) ? likedReviewRows : []),
+      ...(Array.isArray(likedListRows) ? likedListRows : [])
     ];
     
     allActivity.sort((a, b) => {
@@ -1976,13 +2042,74 @@ app.get("/api/activity", requireAuth, async (req, res) => {
       }
     }
 
-    // Get record IDs for tag fetching
+    // Get record IDs for tag fetching (only for regular record activity, not liked reviews)
     const recordIds = paginatedActivity
       .filter(row => row.activityType === 'record')
       .map(row => row.id);
     const tagsByRecord = recordIds.length > 0 ? await fetchTagsByRecordIds(pool, recordIds) : {};
 
     const feed = paginatedActivity.map((row) => {
+      // Handle liked-review activity
+      if (row.activityType === 'liked-review') {
+        const likerDisplayName =
+          typeof row.likerDisplayName === "string" && row.likerDisplayName.trim()
+            ? row.likerDisplayName.trim()
+            : null;
+        const ownerDisplayName =
+          typeof row.ownerDisplayName === "string" && row.ownerDisplayName.trim()
+            ? row.ownerDisplayName.trim()
+            : null;
+
+        return {
+          type: 'liked-review',
+          liker: {
+            username: row.likerUsername,
+            displayName: likerDisplayName,
+            profilePicUrl: buildProfilePicPublicPath(row.likerProfilePic),
+          },
+          reviewOwner: {
+            username: row.ownerUsername,
+            displayName: ownerDisplayName,
+          },
+          record: {
+            id: row.id,
+            name: row.record,
+            artist: row.artist,
+          },
+          likedAt: row.timestamp,
+        };
+      }
+
+      // Handle liked-list activity
+      if (row.activityType === 'liked-list') {
+        const likerDisplayName =
+          typeof row.likerDisplayName === "string" && row.likerDisplayName.trim()
+            ? row.likerDisplayName.trim()
+            : null;
+        const ownerDisplayName =
+          typeof row.ownerDisplayName === "string" && row.ownerDisplayName.trim()
+            ? row.ownerDisplayName.trim()
+            : null;
+
+        return {
+          type: 'liked-list',
+          liker: {
+            username: row.likerUsername,
+            displayName: likerDisplayName,
+            profilePicUrl: buildProfilePicPublicPath(row.likerProfilePic),
+          },
+          listOwner: {
+            username: row.ownerUsername,
+            displayName: ownerDisplayName,
+          },
+          list: {
+            id: row.id,
+            name: row.listName,
+          },
+          likedAt: row.timestamp,
+        };
+      }
+
       const displayName =
         typeof row.displayName === "string" && row.displayName.trim()
           ? row.displayName.trim()
@@ -2077,6 +2204,7 @@ app.get("/api/activity", requireAuth, async (req, res) => {
       };
     });
 
+    console.log(`Returning ${feed.length} feed items. Activity types: ${feed.map(f => f.type).join(', ')}`);
     res.json(feed);
   } catch (error) {
     console.error("Failed to load activity feed", error);
@@ -3327,13 +3455,17 @@ app.post('/api/tags/clear', requireAuth, async (req, res) => {
 
 // Proxy to Last.fm album.search (requires LASTFM_API_KEY in env)
 app.get('/api/lastfm/album.search', async (req, res) => {
-  console.log("Proxying Last.fm album.search...");
-  const { q } = req.query;
+  const { q, page } = req.query;
+  console.log("Last.fm album.search for query:", q, "and page:", page);
   if (!q || typeof q !== 'string') return res.status(400).json({ error: 'Missing q param' });
   const apiKey = process.env.LASTFM_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'Missing LASTFM_API_KEY on server' });
+  
+  const pageNum = typeof page === 'string' && /^\d+$/.test(page) ? parseInt(page, 10) : 1;
+  const limit = 5;
+  
   try {
-    const url = `https://ws.audioscrobbler.com/2.0/?method=album.search&album=${encodeURIComponent(q)}&api_key=${apiKey}&format=json&limit=10`;
+    const url = `https://ws.audioscrobbler.com/2.0/?method=album.search&album=${encodeURIComponent(q)}&api_key=${apiKey}&format=json&limit=${limit}&page=${pageNum}`;
     const r = await fetch(url);
     if (!r.ok) {
       const body = await r.text();
@@ -3341,7 +3473,32 @@ app.get('/api/lastfm/album.search', async (req, res) => {
       return res.status(502).json({ error: 'Last.fm upstream failure', status: r.status });
     }
     const data = await r.json();
-    res.json(data);
+    
+    // Extract only necessary fields
+    const albums = data?.results?.albummatches?.album || [];
+    const transformedAlbums = Array.isArray(albums) ? albums.map(album => {
+      // Get the largest available image
+      const images = Array.isArray(album.image) ? album.image : [];
+      const largeImage = images.find(img => img.size === 'extralarge') || images.find(img => img.size === 'large') || images.find(img => img.size === 'medium') || {};
+      
+      return {
+        name: album.name || '',
+        artist: album.artist || '',
+        image: largeImage['#text'] || null
+      };
+    }) : [];
+    
+    const totalResults = parseInt(data?.results?.['opensearch:totalResults'] || '0', 10);
+    const startIndex = parseInt(data?.results?.['opensearch:startIndex'] || '0', 10);
+    const itemsPerPage = parseInt(data?.results?.['opensearch:itemsPerPage'] || '0', 10);
+    
+    res.json({
+      albums: transformedAlbums,
+      totalResults,
+      currentPage: pageNum,
+      itemsPerPage,
+      hasMore: startIndex + itemsPerPage < totalResults
+    });
   } catch (err) {
     console.error('Last.fm proxy error', err);
     res.status(500).json({ error: 'Failed to query Last.fm' });
@@ -5419,7 +5576,7 @@ app.get('/api/admin/lists/:listId/records', requireAuth, requireAdmin, async (re
     const pool = await getPool();
     const [rows] = await pool.query(
       `SELECT lr.id, lr.name, lr.artist, lr.cover, lr.rating, lr.release_year AS releaseYear,
-              lr.added, lr.isCustom, lr.masterId, lr.sortOrder
+              lr.added, lr.masterId, lr.sortOrder
          FROM ListRecord lr
         WHERE lr.listId = ?
         ORDER BY lr.sortOrder ASC, lr.added DESC`,

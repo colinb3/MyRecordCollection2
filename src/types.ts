@@ -167,9 +167,40 @@ export interface CommunityFeedListEntry {
   previewRecords: CommunityFeedListPreviewRecord[];
 }
 
+export interface CommunityFeedLikedReviewEntry {
+  type: 'liked-review';
+  liker: CommunityFeedOwner;
+  reviewOwner: {
+    username: string;
+    displayName: string | null;
+  };
+  record: {
+    id: number;
+    name: string;
+    artist: string;
+  };
+  likedAt: string;
+}
+
+export interface CommunityFeedLikedListEntry {
+  type: 'liked-list';
+  liker: CommunityFeedOwner;
+  listOwner: {
+    username: string;
+    displayName: string | null;
+  };
+  list: {
+    id: number;
+    name: string;
+  };
+  likedAt: string;
+}
+
 export type CommunityFeedEntry =
   | CommunityFeedRecordEntry
-  | CommunityFeedListEntry;
+  | CommunityFeedListEntry
+  | CommunityFeedLikedReviewEntry
+  | CommunityFeedLikedListEntry;
 
 export interface MasterReviewEntry {
   recordId: number;

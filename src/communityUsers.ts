@@ -107,6 +107,27 @@ function cloneFeedEntry(entry: CommunityFeedEntry): CommunityFeedEntry {
     };
   }
 
+  if (entry.type === 'liked-review') {
+    return {
+      type: 'liked-review',
+      liker: { ...entry.liker },
+      reviewOwner: { ...entry.reviewOwner },
+      record: { ...entry.record },
+      likedAt: entry.likedAt,
+    };
+  }
+
+  if (entry.type === 'liked-list') {
+    return {
+      type: 'liked-list',
+      liker: { ...entry.liker },
+      listOwner: { ...entry.listOwner },
+      list: { ...entry.list },
+      likedAt: entry.likedAt,
+    };
+  }
+
+  // entry.type === 'list'
   const previews = Array.isArray(entry.previewRecords)
     ? entry.previewRecords.map((preview) => ({ ...preview }))
     : [];
@@ -124,8 +145,144 @@ function cloneFeedEntries(entries: CommunityFeedEntry[]): CommunityFeedEntry[] {
 }
 
 function normalizeFeedEntry(raw: AnyObject): CommunityFeedEntry | null {
-  const ownerRaw = raw.owner;
   const type = typeof raw.type === 'string' ? raw.type : 'record';
+
+  // Handle liked-review entry
+  if (type === 'liked-review') {
+    const likerRaw = raw.liker;
+    const reviewOwnerRaw = raw.reviewOwner;
+    
+    if (!isObject(likerRaw) || !isObject(reviewOwnerRaw)) {
+      return null;
+    }
+
+    const likerObject = likerRaw as AnyObject;
+    const likerUsername =
+      typeof likerObject.username === "string" && likerObject.username.trim()
+        ? likerObject.username.trim()
+        : "";
+    if (!likerUsername) {
+      return null;
+    }
+
+    const ownerObject = reviewOwnerRaw as AnyObject;
+    const ownerUsername =
+      typeof ownerObject.username === "string" && ownerObject.username.trim()
+        ? ownerObject.username.trim()
+        : "";
+    if (!ownerUsername) {
+      return null;
+    }
+
+    const recordRaw = raw.record;
+    if (!isObject(recordRaw)) {
+      return null;
+    }
+
+    const recordObject = recordRaw as AnyObject;
+    const recordId = Number(recordObject.id);
+    const recordName = typeof recordObject.name === 'string' ? recordObject.name : '';
+    const artist = typeof recordObject.artist === 'string' ? recordObject.artist : '';
+
+    if (!Number.isInteger(recordId) || recordId <= 0 || !recordName) {
+      return null;
+    }
+
+    return {
+      type: 'liked-review',
+      liker: {
+        username: likerUsername,
+        displayName:
+          typeof likerObject.displayName === "string" &&
+          likerObject.displayName.trim()
+            ? likerObject.displayName
+            : null,
+        profilePicUrl: normalizeProfilePicUrl(likerObject.profilePicUrl),
+      },
+      reviewOwner: {
+        username: ownerUsername,
+        displayName:
+          typeof ownerObject.displayName === "string" &&
+          ownerObject.displayName.trim()
+            ? ownerObject.displayName
+            : null,
+      },
+      record: {
+        id: recordId,
+        name: recordName,
+        artist: artist,
+      },
+      likedAt: typeof raw.likedAt === 'string' ? raw.likedAt : '',
+    };
+  }
+
+  // Handle liked-list entry
+  if (type === 'liked-list') {
+    const likerRaw = raw.liker;
+    const listOwnerRaw = raw.listOwner;
+    
+    if (!isObject(likerRaw) || !isObject(listOwnerRaw)) {
+      return null;
+    }
+
+    const likerObject = likerRaw as AnyObject;
+    const likerUsername =
+      typeof likerObject.username === "string" && likerObject.username.trim()
+        ? likerObject.username.trim()
+        : "";
+    if (!likerUsername) {
+      return null;
+    }
+
+    const ownerObject = listOwnerRaw as AnyObject;
+    const ownerUsername =
+      typeof ownerObject.username === "string" && ownerObject.username.trim()
+        ? ownerObject.username.trim()
+        : "";
+    if (!ownerUsername) {
+      return null;
+    }
+
+    const listRaw = raw.list;
+    if (!isObject(listRaw)) {
+      return null;
+    }
+    const listObject = listRaw as AnyObject;
+    const listId = Number(listObject.id);
+    const listName = typeof listObject.name === 'string' ? listObject.name : '';
+
+    if (!Number.isInteger(listId) || listId <= 0 || !listName) {
+      return null;
+    }
+    
+    return {
+      type: 'liked-list',
+      liker: {
+        username: likerUsername,
+        displayName:
+          typeof likerObject.displayName === "string" &&
+          likerObject.displayName.trim()
+            ? likerObject.displayName
+            : null,
+        profilePicUrl: normalizeProfilePicUrl(likerObject.profilePicUrl),
+      },
+      listOwner: {
+        username: ownerUsername,
+        displayName:
+          typeof ownerObject.displayName === "string" &&
+          ownerObject.displayName.trim()
+            ? ownerObject.displayName
+            : null,
+      },
+      list: {
+        id: listId,
+        name: listName,
+      },
+      likedAt: typeof raw.likedAt === 'string' ? raw.likedAt : '',
+    };
+  }
+
+  const ownerRaw = raw.owner;
 
   if (!isObject(ownerRaw)) {
     return null;

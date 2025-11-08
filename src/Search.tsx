@@ -22,6 +22,7 @@ import {
   ListItemAvatar,
   Avatar,
   ListItemText,
+  Button,
 } from "@mui/material";
 import ImageNotSupportedIcon from "@mui/icons-material/ImageNotSupported";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -37,9 +38,7 @@ import { performLogout } from "./logout";
 interface AlbumResult {
   name: string;
   artist: string;
-  url: string;
-  listeners?: string;
-  image?: { ["#text"]: string; size: string }[];
+  image: string | null;
 }
 
 interface RecordListItem {
@@ -144,37 +143,83 @@ export default function Search() {
   const [recordResults, setRecordResults] = useState<AlbumResult[]>([]);
   const [recordSearchInput, setRecordSearchInput] = useState(paramQuery);
   const [recordLoading, setRecordLoading] = useState(false);
+  const [recordLoadingMore, setRecordLoadingMore] = useState(false);
   const [recordError, setRecordError] = useState<string | null>(null);
+  const [recordCurrentPage, setRecordCurrentPage] = useState(1);
+  const [recordHasMore, setRecordHasMore] = useState(false);
 
   const handleRecordsSearchSubmit = useCallback(async (value: string) => {
     const trimmed = value.trim();
     if (!trimmed) {
       setRecordResults([]);
       setRecordError(null);
+      setRecordHasMore(false);
+      setRecordCurrentPage(1);
       return;
     }
     setRecordLoading(true);
     setRecordError(null);
+    setRecordCurrentPage(1);
     try {
       const res = await fetch(
-        apiUrl(`/api/lastfm/album.search?q=${encodeURIComponent(trimmed)}`),
+        apiUrl(
+          `/api/lastfm/album.search?q=${encodeURIComponent(trimmed)}&page=1`
+        ),
         { credentials: "include" }
       );
       if (res.ok) {
         const data = await res.json();
-        const albums = data?.results?.albummatches?.album || [];
+        const albums = data?.albums || [];
         setRecordResults(albums);
+        setRecordHasMore(data?.hasMore || false);
+      } else {
+        const problem = await res.json().catch(() => ({}));
+        setRecordError(problem.error || `Search failed (${res.status})`);
+        setRecordHasMore(false);
+      }
+    } catch (error) {
+      console.error(error);
+      setRecordError("Network error searching albums");
+      setRecordHasMore(false);
+    } finally {
+      setRecordLoading(false);
+    }
+  }, []);
+
+  const handleRecordsLoadMore = useCallback(async () => {
+    const trimmed = recordSearchInput.trim();
+    if (!trimmed || recordLoadingMore || !recordHasMore) return;
+
+    setRecordLoadingMore(true);
+    setRecordError(null);
+    const nextPage = recordCurrentPage + 1;
+
+    try {
+      const res = await fetch(
+        apiUrl(
+          `/api/lastfm/album.search?q=${encodeURIComponent(
+            trimmed
+          )}&page=${nextPage}`
+        ),
+        { credentials: "include" }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const albums = data?.albums || [];
+        setRecordResults((prev) => [...prev, ...albums]);
+        setRecordHasMore(data?.hasMore || false);
+        setRecordCurrentPage(nextPage);
       } else {
         const problem = await res.json().catch(() => ({}));
         setRecordError(problem.error || `Search failed (${res.status})`);
       }
     } catch (error) {
       console.error(error);
-      setRecordError("Network error searching albums");
+      setRecordError("Network error loading more albums");
     } finally {
-      setRecordLoading(false);
+      setRecordLoadingMore(false);
     }
-  }, []);
+  }, [recordSearchInput, recordLoadingMore, recordHasMore, recordCurrentPage]);
 
   const handleRecordsClear = useCallback(
     (updateUrl = true) => {
@@ -182,6 +227,9 @@ export default function Search() {
       setRecordResults([]);
       setRecordError(null);
       setRecordLoading(false);
+      setRecordLoadingMore(false);
+      setRecordHasMore(false);
+      setRecordCurrentPage(1);
       if (updateUrl) {
         updateSearchParams("records", "");
       }
@@ -191,17 +239,11 @@ export default function Search() {
 
   const recordItems = useMemo<RecordListItem[]>(() => {
     return recordResults.map((album, index) => {
-      const images = (album.image || []).filter((img) => img["#text"]);
-      const preferredImage =
-        images.find((img) => img.size === "extralarge") ||
-        images.find((img) => img.size === "mega") ||
-        images[images.length - 1] ||
-        images[0];
       return {
         id: `${album.name}-${album.artist}-${index}`,
         record: album.name,
         artist: album.artist,
-        cover: preferredImage?.["#text"] || "",
+        cover: album.image || "",
       };
     });
   }, [recordResults]);
@@ -681,6 +723,23 @@ export default function Search() {
                             </ListItemButton>
                           );
                         })}
+                        {recordHasMore && !recordLoading && (
+                          <Box
+                            sx={{
+                              display: "flex",
+                              justifyContent: "center",
+                              py: 2,
+                            }}
+                          >
+                            <Button
+                              variant="outlined"
+                              onClick={handleRecordsLoadMore}
+                              disabled={recordLoadingMore}
+                            >
+                              {recordLoadingMore ? "Loading..." : "Load More"}
+                            </Button>
+                          </Box>
+                        )}
                       </List>
                     )}
                     {recordLoading && (

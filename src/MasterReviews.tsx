@@ -666,8 +666,8 @@ export default function MasterReviews() {
                           sx={{ p: { xs: 1.75, md: 2.25 }, borderRadius: 2 }}
                         >
                           <Stack
-                            direction={{ xs: "column", sm: "row" }}
-                            alignItems={{ xs: "flex-start", sm: "center" }}
+                            direction={"row"}
+                            alignItems={"center"}
                             justifyContent="space-between"
                             spacing={{ xs: 1, sm: 1.5 }}
                           >
@@ -710,7 +710,7 @@ export default function MasterReviews() {
                               direction="row"
                               alignItems="center"
                               spacing={1}
-                              sx={{ alignSelf: { xs: "flex-end", sm: "auto" } }}
+                              sx={{ alignSelf: "auto" }}
                             >
                               <Typography
                                 variant="body2"
@@ -723,7 +723,7 @@ export default function MasterReviews() {
                               <Stack
                                 direction="row"
                                 alignItems="center"
-                                spacing={0.5}
+                                spacing={-0.5}
                               >
                                 <IconButton
                                   size="small"

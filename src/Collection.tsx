@@ -33,6 +33,7 @@ import { loadUserTags } from "./userTags";
 import { useNavigate } from "react-router-dom";
 import { useLocation } from "react-router-dom";
 import { setUserId } from "./analytics";
+import ShareButton from "./components/ShareButton";
 import { performLogout } from "./logout";
 
 // Import Components
@@ -84,6 +85,17 @@ export default function Collection({ tableName, title }: CollectionProps) {
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
     cachedUserInfo?.profilePicUrl ?? null
   );
+
+  // Get the current collection URL in community format for sharing
+  const getCollectionUrl = useCallback(() => {
+    const baseUrl = window.location.origin;
+    if (!username) {
+      return baseUrl;
+    }
+    return `${baseUrl}/community/${username}/collection?table=${encodeURIComponent(
+      tableName
+    )}`;
+  }, [username, tableName]);
 
   const [selectedRecord, setSelectedRecord] = useState<Record | null>(null);
   // Snackbar for high level notifications
@@ -302,6 +314,7 @@ export default function Collection({ tableName, title }: CollectionProps) {
             mb: 1,
             display: "flex",
             justifyContent: "flex-start",
+            gap: 0.5,
           }}
         >
           <TextField
@@ -318,7 +331,7 @@ export default function Collection({ tableName, title }: CollectionProps) {
             variant="contained"
             color="primary"
             startIcon={<AddIcon />}
-            sx={{ ml: 1, whiteSpace: "nowrap" }}
+            sx={{ whiteSpace: "nowrap" }}
             onClick={async () => {
               if (creating) return;
               setCreating(true);
@@ -386,6 +399,11 @@ export default function Collection({ tableName, title }: CollectionProps) {
           >
             Custom
           </Button>
+          <ShareButton
+            url={getCollectionUrl()}
+            title={title ?? tableName}
+            text={`Check out my ${title ?? tableName}`}
+          />
         </Box>
         <Grid
           container

@@ -30,6 +30,7 @@ import {
   unfollowUser,
 } from "./communityUsers";
 import SettingsIcon from "@mui/icons-material/Settings";
+import ShareButton from "./components/ShareButton";
 import { performLogout } from "./logout";
 
 const OWN_PREVIEW_LIMIT = 3;
@@ -414,16 +415,33 @@ export default function CommunityProfile() {
                     <Typography color="error">{error}</Typography>
                   ) : profile ? (
                     <>
-                      {isViewingOwnProfile && (
-                        <IconButton
-                          color="inherit"
-                          aria-label="Open profile settings"
-                          onClick={handleOpenProfileSettings}
-                          sx={{ position: "absolute", top: 16, right: 16 }}
-                        >
-                          <SettingsIcon />
-                        </IconButton>
-                      )}
+                      <Box
+                        sx={{
+                          position: "absolute",
+                          top: 16,
+                          right: 16,
+                          display: "flex",
+                          gap: 0.5,
+                        }}
+                      >
+                        <ShareButton
+                          title={`${
+                            profile.displayName || profile.username
+                          }'s Profile`}
+                          text={`Check out ${
+                            profile.displayName || profile.username
+                          }'s profile!`}
+                        />
+                        {isViewingOwnProfile && (
+                          <IconButton
+                            color="inherit"
+                            aria-label="Open profile settings"
+                            onClick={handleOpenProfileSettings}
+                          >
+                            <SettingsIcon />
+                          </IconButton>
+                        )}
+                      </Box>
                       <Avatar
                         variant="rounded"
                         sx={{

@@ -31,6 +31,7 @@ import ImageNotSupportedIcon from "@mui/icons-material/ImageNotSupported";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
+import ShareButton from "./components/ShareButton";
 import {
   DndContext,
   closestCenter,
@@ -937,8 +938,12 @@ export default function ListDetail() {
                                 ) : null}
                               </Typography>
                               <Box>
-                                <Stack direction="row" spacing={0.5}>
-                                  {!list.isOwner && (
+                                {!list.isOwner && (
+                                  <Stack
+                                    direction="row"
+                                    spacing={0}
+                                    alignItems="center"
+                                  >
                                     <Tooltip
                                       title={
                                         list.likedByCurrentUser
@@ -967,27 +972,34 @@ export default function ListDetail() {
                                         </IconButton>
                                       </span>
                                     </Tooltip>
-                                  )}
-                                  {list.isOwner && (
-                                    <>
-                                      <IconButton
-                                        size="small"
-                                        color="primary"
-                                        onClick={handleOpenEdit}
-                                      >
-                                        <EditIcon />
-                                      </IconButton>
-                                      <IconButton
-                                        size="small"
-                                        color="error"
-                                        onClick={handleOpenDeleteConfirmation}
-                                        disabled={saving}
-                                      >
-                                        <DeleteIcon />
-                                      </IconButton>
-                                    </>
-                                  )}
-                                </Stack>
+                                    <Typography
+                                      variant="body1"
+                                      color="text.secondary"
+                                      sx={{}}
+                                    >
+                                      {list.likes}
+                                    </Typography>
+                                  </Stack>
+                                )}
+                                {list.isOwner && (
+                                  <Stack direction="row" spacing={0.5}>
+                                    <IconButton
+                                      size="small"
+                                      color="primary"
+                                      onClick={handleOpenEdit}
+                                    >
+                                      <EditIcon />
+                                    </IconButton>
+                                    <IconButton
+                                      size="small"
+                                      color="error"
+                                      onClick={handleOpenDeleteConfirmation}
+                                      disabled={saving}
+                                    >
+                                      <DeleteIcon />
+                                    </IconButton>
+                                  </Stack>
+                                )}
                               </Box>
                             </Stack>
                             {list.owner && (
@@ -1049,13 +1061,10 @@ export default function ListDetail() {
                                     : `${list.recordCount} records`
                                 }
                               />
-                              <Chip
+                              <ShareButton
                                 size="small"
-                                label={
-                                  list.likes === 1
-                                    ? `${list.likes} like`
-                                    : `${list.likes} likes`
-                                }
+                                title={list.name}
+                                text={`Check out this list: ${list.name}`}
                               />
                             </Stack>
                           </Box>
