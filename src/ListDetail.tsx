@@ -1061,6 +1061,16 @@ export default function ListDetail() {
                                     : `${list.recordCount} records`
                                 }
                               />
+                              {list.isOwner && (
+                                <Chip
+                                  size="small"
+                                  label={
+                                    list.likes === 1
+                                      ? `${list.likes} like`
+                                      : `${list.likes} likes`
+                                  }
+                                />
+                              )}
                               <ShareButton
                                 size="small"
                                 title={list.name}
