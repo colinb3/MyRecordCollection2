@@ -711,8 +711,11 @@ export default function Activity() {
                                   >
                                     {ownerDisplay}'s
                                   </Box>{" "}
-                                  review of {entry.record.name} -{" "}
-                                  {entry.record.artist || "Unknown Artist"}
+                                  review of{" "}
+                                  <b>
+                                    {entry.record.name} -{" "}
+                                    {entry.record.artist || "Unknown Artist"}
+                                  </b>
                                 </Typography>
                               </Box>
                               {likedDate && (
@@ -1460,8 +1463,11 @@ export default function Activity() {
                                       return (
                                         <Tooltip
                                           title={
-                                            `${preview.name} - ${preview.artist}` ||
-                                            "N/A"
+                                            preview.name && preview.artist
+                                              ? `${preview.name} - ${preview.artist}`
+                                              : preview.name ||
+                                                preview.artist ||
+                                                "N/A"
                                           }
                                           key={previewKey}
                                         >

@@ -1508,7 +1508,10 @@ export default function ListDetail() {
           </DialogContent>
           <DialogActions sx={{ bgcolor: "background.paper" }}>
             <Button onClick={handleCloseEditRecord}>Cancel</Button>
-            <Button variant="contained" onClick={() => void handleSaveEditRecord()}>
+            <Button
+              variant="contained"
+              onClick={() => void handleSaveEditRecord()}
+            >
               Save
             </Button>
           </DialogActions>

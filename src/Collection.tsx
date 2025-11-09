@@ -51,6 +51,16 @@ interface CollectionLocationState {
   message?: string;
 }
 
+interface CollectionPrivacy {
+  tableName: string;
+  isPrivate: boolean;
+}
+
+interface RecordsApiResponse {
+  records: Record[];
+  privacy: CollectionPrivacy | null;
+}
+
 const MIN_RELEASE_YEAR = 1901;
 const MAX_RELEASE_YEAR = 2100;
 
@@ -201,16 +211,20 @@ export default function Collection({ tableName, title }: CollectionProps) {
             if (!data) return null;
             // New server shape: { records: [...], privacy: { tableName, isPrivate } }
             if (Array.isArray(data)) {
-              return { records: data, privacy: null } as {
-                records: Record[];
-                privacy: any | null;
-              };
-            }
-            if (data && Array.isArray((data as any).records)) {
               return {
-                records: (data as any).records as Record[],
-                privacy: (data as any).privacy ?? null,
-              } as { records: Record[]; privacy: any | null };
+                records: data,
+                privacy: null,
+              } as RecordsApiResponse;
+            }
+            if (
+              data &&
+              typeof data === "object" &&
+              Array.isArray(data.records)
+            ) {
+              return {
+                records: data.records as Record[],
+                privacy: data.privacy ?? null,
+              } as RecordsApiResponse;
             }
             return null;
           })(),
@@ -220,14 +234,12 @@ export default function Collection({ tableName, title }: CollectionProps) {
 
         if (cancelled) return;
 
-        if (recordData && (recordData as any).records) {
-          const rd = (recordData as any).records as Record[];
+        if (recordData && recordData.records) {
+          const rd = recordData.records;
           setRecords(rd);
           setFilteredRecords(rd);
           setSelectedRecord(null);
-          setCurrentTableIsPrivate(
-            Boolean((recordData as any).privacy?.isPrivate)
-          );
+          setCurrentTableIsPrivate(Boolean(recordData.privacy?.isPrivate));
         }
 
         if (tagData) {
