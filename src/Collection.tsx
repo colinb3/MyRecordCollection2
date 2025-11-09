@@ -86,13 +86,17 @@ export default function Collection({ tableName, title }: CollectionProps) {
     cachedUserInfo?.profilePicUrl ?? null
   );
 
+  const [currentTableIsPrivate, setCurrentTableIsPrivate] = useState<
+    boolean | null
+  >(null);
+
   // Get the current collection URL in community format for sharing
   const getCollectionUrl = useCallback(() => {
     const baseUrl = window.location.origin;
     if (!username) {
       return baseUrl;
     }
-    return `${baseUrl}/community/${username}/collection?table=${encodeURIComponent(
+    return `${baseUrl}/#/community/${username}/collection?table=${encodeURIComponent(
       tableName
     )}`;
   }, [username, tableName]);
@@ -193,7 +197,22 @@ export default function Collection({ tableName, title }: CollectionProps) {
               console.error("Failed to fetch records", res.status);
               return null;
             }
-            return (await res.json()) as Record[];
+            const data = await res.json().catch(() => null);
+            if (!data) return null;
+            // New server shape: { records: [...], privacy: { tableName, isPrivate } }
+            if (Array.isArray(data)) {
+              return { records: data, privacy: null } as {
+                records: Record[];
+                privacy: any | null;
+              };
+            }
+            if (data && Array.isArray((data as any).records)) {
+              return {
+                records: (data as any).records as Record[],
+                privacy: (data as any).privacy ?? null,
+              } as { records: Record[]; privacy: any | null };
+            }
+            return null;
           })(),
           loadUserTags(),
           loadRecordTablePreferences(),
@@ -201,10 +220,14 @@ export default function Collection({ tableName, title }: CollectionProps) {
 
         if (cancelled) return;
 
-        if (recordData) {
-          setRecords(recordData);
-          setFilteredRecords(recordData);
+        if (recordData && (recordData as any).records) {
+          const rd = (recordData as any).records as Record[];
+          setRecords(rd);
+          setFilteredRecords(rd);
           setSelectedRecord(null);
+          setCurrentTableIsPrivate(
+            Boolean((recordData as any).privacy?.isPrivate)
+          );
         }
 
         if (tagData) {
@@ -399,11 +422,13 @@ export default function Collection({ tableName, title }: CollectionProps) {
           >
             Custom
           </Button>
-          <ShareButton
-            url={getCollectionUrl()}
-            title={title ?? tableName}
-            text={`Check out my ${title ?? tableName}`}
-          />
+          {!(currentTableIsPrivate === true) && (
+            <ShareButton
+              url={getCollectionUrl()}
+              title={title ?? tableName}
+              text={`Check out my ${title ?? tableName}`}
+            />
+          )}
         </Box>
         <Grid
           container

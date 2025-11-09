@@ -1099,17 +1099,18 @@ async function requireAdmin(req, res, next) {
 }
 
 app.get("/api/records", requireAuth, async (req, res) => {
-  console.log("Fetching records...");
   const tableName = typeof req.query.table === "string" ? req.query.table : null;
+  console.log("Fetching record table:", tableName);
   if (!tableName) {
     return res.status(400).json({ error: "table query parameter required" });
   }
   try {
     const pool = await getPool();
-    const tableId = await getUserTableId(pool, req.userUuid, tableName);
-    if (!tableId) {
-      return res.status(404).json({ error: "Collection not found" });
-    }
+      const tableRow = await getUserTableRow(pool, req.userUuid, tableName);
+      if (!tableRow) {
+        return res.status(404).json({ error: "Collection not found" });
+      }
+      const tableId = tableRow.id;
 
    const [rows] = await pool.query(
    `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId, r.isCustom as isCustom, r.masterId as masterId, r.review as review
@@ -1137,7 +1138,12 @@ app.get("/api/records", requireAuth, async (req, res) => {
       tableId: r.tableId,
       tags: tagsByRecord[r.id] || [],
     }));
-    res.json(out);
+    // Include privacy info for the requested collection so frontend doesn't need a separate call
+    const privacy = {
+      tableName: tableRow.name,
+      isPrivate: Number(tableRow.isPrivate) === 1,
+    };
+    res.json({ records: out, privacy });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "DB error" });
@@ -2822,7 +2828,7 @@ app.get('/api/records/:id', async (req, res) => {
       const [recordRows] = await pool.execute(
   `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release',
     r.added, r.tableId, r.isCustom, r.masterId, r.review, r.reviewLikes,
-                rt.name as tableName
+                rt.name as tableName, rt.isPrivate
          FROM Record r
          JOIN RecTable rt ON r.tableId = rt.id
          WHERE r.id = ? AND r.userUuid = ?
@@ -2850,8 +2856,11 @@ app.get('/api/records/:id', async (req, res) => {
       record.viewerHasLikedReview = false;
       
       // Format collection name
-      record.collectionName = record.tableName;
-      delete record.tableName;
+  record.collectionName = record.tableName;
+  // expose collection privacy for owner's view so UI can hide sharing when private
+  record.collectionPrivate = Number(record.isPrivate) === 1;
+  delete record.isPrivate;
+  delete record.tableName;
       
       res.json({ record, owner: null });
     }
@@ -4304,6 +4313,74 @@ app.delete('/api/lists/:listId/records/:recordId', requireAuth, async (req, res)
   } catch (err) {
     console.error('Failed to remove record from list', err);
     res.status(500).json({ error: 'Failed to remove record from list' });
+  }
+});
+
+app.put('/api/lists/:listId/records/:recordId', requireAuth, async (req, res) => {
+  console.log('Updating list record...');
+  const listId = Number(req.params.listId);
+  const recordId = Number(req.params.recordId);
+  if (!Number.isInteger(listId) || listId <= 0 || !Number.isInteger(recordId) || recordId <= 0) {
+    return res.status(400).json({ error: 'Invalid identifiers' });
+  }
+
+  try {
+    const pool = await getPool();
+    const listRow = await getOwnedListById(pool, listId, req.userUuid);
+    if (!listRow) {
+      return res.status(404).json({ error: 'List not found' });
+    }
+
+    // Extract and validate fields
+    let releaseYear = Number(req.body?.releaseYear);
+    if (!Number.isFinite(releaseYear)) {
+      releaseYear = null;
+    } else {
+      releaseYear = Math.trunc(releaseYear);
+      if (releaseYear < 1901 || releaseYear > 2100) {
+        releaseYear = null;
+      }
+    }
+
+    let rating = Number(req.body?.rating);
+    if (!Number.isFinite(rating)) {
+      rating = null;
+    } else {
+      rating = Math.trunc(rating);
+      if (rating < 0 || rating > 10) {
+        rating = null;
+      }
+    }
+
+    let cover = typeof req.body?.cover === 'string' && req.body.cover.trim() 
+      ? req.body.cover.trim() 
+      : null;
+
+    // Update the record
+    const [result] = await pool.execute(
+      `UPDATE ListRecord 
+       SET release_year = ?, rating = ?, cover = ?
+       WHERE id = ? AND listId = ? AND userUuid = ?`,
+      [releaseYear, rating, cover, recordId, listId, req.userUuid]
+    );
+
+    if (!result || result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Record not found in list' });
+    }
+
+    // Fetch and return the updated record
+    const [rows] = await pool.query(
+      `SELECT id, name, artist, cover, rating, release_year AS releaseYear, masterId, added, sortOrder
+       FROM ListRecord
+       WHERE id = ? AND listId = ? AND userUuid = ?
+       LIMIT 1`,
+      [recordId, listId, req.userUuid]
+    );
+    const updatedRecord = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+    res.json({ record: updatedRecord });
+  } catch (err) {
+    console.error('Failed to update list record', err);
+    res.status(500).json({ error: 'Failed to update list record' });
   }
 });
 

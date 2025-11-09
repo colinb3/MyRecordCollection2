@@ -1323,7 +1323,6 @@ export default function MasterRecord() {
                   <Box>
                     {masterInfo?.inDb ? (
                       <ShareButton
-                        url={`${window.location.origin}/master/${masterInfo.masterId}`}
                         title={`${album?.record || "Record"} by ${
                           album?.artist || "Unknown Artist"
                         }`}

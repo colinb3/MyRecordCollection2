@@ -15,6 +15,8 @@ export interface Record {
   review?: string | null;
   reviewLikes?: number;
   viewerHasLikedReview?: boolean;
+  // If present, indicates whether the collection this record belongs to is private
+  collectionPrivate?: boolean;
 }
 
 export interface RecordOwnerInfo {

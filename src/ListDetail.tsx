@@ -22,6 +22,7 @@ import {
   TextField,
   Switch,
   FormControlLabel,
+  Slider,
 } from "@mui/material";
 import FavoriteIcon from "@mui/icons-material/Favorite";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
@@ -107,6 +108,7 @@ interface SortableRecordItemProps {
   renderCover: (cover: string | null, name: string) => React.ReactElement;
   onRemove: (record: ListRecordEntry) => void;
   onViewMaster: (masterId: number) => void;
+  onEdit: (record: ListRecordEntry) => void;
 }
 
 function SortableRecordItem({
@@ -116,6 +118,7 @@ function SortableRecordItem({
   renderCover,
   onRemove,
   onViewMaster,
+  onEdit,
 }: SortableRecordItemProps) {
   const {
     attributes,
@@ -208,23 +211,38 @@ function SortableRecordItem({
             {/* list records no longer store freeform review text */}
           </Stack>
           {actionStackVisible && (
-            <Stack spacing={1} alignItems="center">
-              <Tooltip title="Remove from list">
-                <span style={{ pointerEvents: "auto", display: "inline-flex" }}>
-                  <IconButton
-                    color="error"
-                    onClick={(e) => {
-                      // prevent the ButtonBase parent from receiving this click
-                      e.stopPropagation();
-                      e.preventDefault();
-                      onRemove(record);
-                    }}
-                    disabled={removing}
-                  >
-                    <DeleteIcon />
-                  </IconButton>
-                </span>
-              </Tooltip>
+            <Stack
+              spacing={0.5}
+              alignItems="center"
+              direction={{ xs: "column", sm: "row" }}
+            >
+              <span style={{ pointerEvents: "auto", display: "inline-flex" }}>
+                <IconButton
+                  color="primary"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    onEdit(record);
+                  }}
+                  disabled={removing}
+                >
+                  <EditIcon />
+                </IconButton>
+              </span>
+              <span style={{ pointerEvents: "auto", display: "inline-flex" }}>
+                <IconButton
+                  color="error"
+                  onClick={(e) => {
+                    // prevent the ButtonBase parent from receiving this click
+                    e.stopPropagation();
+                    e.preventDefault();
+                    onRemove(record);
+                  }}
+                  disabled={removing}
+                >
+                  <DeleteIcon />
+                </IconButton>
+              </span>
             </Stack>
           )}
         </ButtonBase>
@@ -283,6 +301,13 @@ export default function ListDetail() {
   const [deleteConfirmation, setDeleteConfirmation] = useState<{
     open: boolean;
   }>({ open: false });
+  const [editRecordState, setEditRecordState] = useState<{
+    open: boolean;
+    record: ListRecordEntry | null;
+    rating: number;
+    releaseYear: number | null;
+    cover: string;
+  }>({ open: false, record: null, rating: 0, releaseYear: null, cover: "" });
 
   useEffect(() => {
     let cancelled = false;
@@ -526,6 +551,78 @@ export default function ListDetail() {
     },
     [list, showMessage]
   );
+
+  const handleEditRecord = useCallback((record: ListRecordEntry) => {
+    setEditRecordState({
+      open: true,
+      record,
+      rating: record.rating ?? 0,
+      releaseYear: record.releaseYear ?? null,
+      cover: record.cover ?? "",
+    });
+  }, []);
+
+  const handleCloseEditRecord = useCallback(() => {
+    setEditRecordState({
+      open: false,
+      record: null,
+      rating: 0,
+      releaseYear: null,
+      cover: "",
+    });
+  }, []);
+
+  const handleSaveEditRecord = useCallback(async () => {
+    if (!list || !editRecordState.record) return;
+
+    const rating = editRecordState.rating;
+    const releaseYear = editRecordState.releaseYear;
+    const cover = editRecordState.cover?.trim() || null;
+
+    try {
+      const response = await fetch(
+        apiUrl(`/api/lists/${list.id}/records/${editRecordState.record.id}`),
+        {
+          method: "PUT",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rating, releaseYear, cover }),
+        }
+      );
+
+      if (!response.ok) {
+        const problem = await response.json().catch(() => ({}));
+        throw new Error(problem.error || "Failed to update record");
+      }
+
+      const data = await response.json();
+      const updatedRecord = data?.record;
+
+      if (updatedRecord) {
+        setRecords((prev) =>
+          prev.map((r) =>
+            r.id === editRecordState.record!.id
+              ? {
+                  ...r,
+                  rating: updatedRecord.rating ?? null,
+                  releaseYear: updatedRecord.releaseYear ?? null,
+                  cover: updatedRecord.cover ?? null,
+                }
+              : r
+          )
+        );
+      }
+
+      showMessage("Record updated", "success");
+      handleCloseEditRecord();
+    } catch (error) {
+      console.error(error);
+      showMessage(
+        error instanceof Error ? error.message : "Failed to update record",
+        "error"
+      );
+    }
+  }, [list, editRecordState, showMessage, handleCloseEditRecord]);
 
   const handleDragEnd = useCallback(
     async (event: DragEndEvent) => {
@@ -1071,11 +1168,13 @@ export default function ListDetail() {
                                   }
                                 />
                               )}
-                              <ShareButton
-                                size="small"
-                                title={list.name}
-                                text={`Check out this list: ${list.name}`}
-                              />
+                              {!list.isPrivate && (
+                                <ShareButton
+                                  size="small"
+                                  title={list.name}
+                                  text={`Check out this list: ${list.name}`}
+                                />
+                              )}
                             </Stack>
                           </Box>
                         </Stack>
@@ -1119,6 +1218,7 @@ export default function ListDetail() {
                                     onViewMaster={(masterId) =>
                                       handleNavigateToMaster(masterId)
                                     }
+                                    onEdit={handleEditRecord}
                                   />
                                 ))}
                               </Stack>
@@ -1322,6 +1422,94 @@ export default function ListDetail() {
               onClick={() => void handleDeleteList()}
             >
               Delete
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Edit Record Dialog */}
+        <Dialog
+          open={editRecordState.open}
+          onClose={handleCloseEditRecord}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle sx={{ bgcolor: "background.paper" }}>
+            Edit Record
+          </DialogTitle>
+          <DialogContent dividers sx={{ bgcolor: "background.paper" }}>
+            <Stack spacing={1}>
+              <Typography variant="subtitle1" fontWeight={700} sx={{ pb: 0.5 }}>
+                {editRecordState.record?.name} -{" "}
+                {editRecordState.record?.artist}
+              </Typography>
+              <TextField
+                label="Cover URL"
+                size="small"
+                value={editRecordState.cover}
+                onChange={(e) =>
+                  setEditRecordState((prev) => ({
+                    ...prev,
+                    cover: e.target.value,
+                  }))
+                }
+                sx={{ pb: 1 }}
+              />
+              <TextField
+                label="Release Year"
+                type="number"
+                size="small"
+                value={editRecordState.releaseYear ?? ""}
+                onChange={(e) =>
+                  setEditRecordState((prev) => ({
+                    ...prev,
+                    releaseYear: e.target.value ? Number(e.target.value) : null,
+                  }))
+                }
+                slotProps={{
+                  input: {
+                    inputProps: { min: 1901, max: 2100 },
+                  },
+                }}
+              />
+              <Box>
+                <Typography gutterBottom>
+                  Rating: {editRecordState.rating}/10
+                </Typography>
+                <Box
+                  sx={{
+                    justifySelf: "center",
+                    width: "94%",
+                  }}
+                >
+                  <Slider
+                    value={editRecordState.rating}
+                    onChange={(_, newValue) =>
+                      setEditRecordState((prev) => ({
+                        ...prev,
+                        rating: newValue as number,
+                      }))
+                    }
+                    min={0}
+                    max={10}
+                    step={1}
+                    valueLabelDisplay="auto"
+                    sx={{
+                      "& .MuiSlider-rail, & .MuiSlider-track": { height: 6 },
+                      height: 0,
+                      "& .MuiSlider-thumb": {
+                        width: 18,
+                        height: 18,
+                      },
+                    }}
+                  />
+                </Box>
+              </Box>
+            </Stack>
+          </DialogContent>
+          <DialogActions sx={{ bgcolor: "background.paper" }}>
+            <Button onClick={handleCloseEditRecord}>Cancel</Button>
+            <Button variant="contained" onClick={() => void handleSaveEditRecord()}>
+              Save
             </Button>
           </DialogActions>
         </Dialog>

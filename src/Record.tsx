@@ -86,6 +86,14 @@ export default function RecordDetails() {
     useState<boolean>(false);
   const [likeLoading, setLikeLoading] = useState(false);
 
+  const getRecordUrl = useCallback(() => {
+    const baseUrl = window.location.origin;
+    if (!username) {
+      return baseUrl;
+    }
+    return `${baseUrl}/#/community/${username}/record/${recordIdNumber}`;
+  }, [username, recordIdNumber]);
+
   const recordCoverUrl =
     typeof record?.cover === "string" && record.cover.trim()
       ? record.cover.trim()
@@ -966,15 +974,18 @@ export default function RecordDetails() {
                                   </Button>
                                 </>
                               )}
-                              <ShareButton
-                                size="small"
-                                title={`${record?.record || "Record"} by ${
-                                  record?.artist || "Unknown Artist"
-                                }`}
-                                text={`Check out my record: ${
-                                  record?.record || "Record"
-                                } by ${record?.artist || "Unknown Artist"}`}
-                              />
+                              {record?.collectionPrivate ? null : (
+                                <ShareButton
+                                  url={getRecordUrl()}
+                                  size="small"
+                                  title={`${record?.record || "Record"} by ${
+                                    record?.artist || "Unknown Artist"
+                                  }`}
+                                  text={`Check out my record: ${
+                                    record?.record || "Record"
+                                  } by ${record?.artist || "Unknown Artist"}`}
+                                />
+                              )}
                             </Stack>
                           )}
                         </Stack>
