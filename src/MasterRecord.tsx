@@ -256,9 +256,14 @@ export default function MasterRecord() {
   });
   const isMountedRef = useRef(true);
   const releaseYearTouchedRef = useRef(false);
-  const skipNextMasterFetchRef = useRef<number | null>(null);
-  const masterFetchKeyRef = useRef<string | null>(null);
-  const masterFetchInFlightKeyRef = useRef<string | null>(null);
+  // Single ref to track the last successfully fetched master info
+  const lastFetchedMasterRef = useRef<{
+    masterId: number | null;
+    albumKey: string | null;
+  }>({
+    masterId: null,
+    albumKey: null,
+  });
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -388,20 +393,11 @@ export default function MasterRecord() {
 
     (async () => {
       try {
-        const genres = await wikiGenres(album.record, album.artist, true);
+        const genres = await wikiGenres(album.record, album.artist, false);
         if (cancelled) return;
         if (genres && genres.length > 0) {
-          const first = genres[0];
-          const yearNum = first && /^\d{4}$/.test(first) ? Number(first) : null;
-          const withinRange =
-            yearNum && yearNum >= 1901 && yearNum <= 2100 ? yearNum : null;
-          if (withinRange && !releaseYearTouchedRef.current) {
-            setReleaseYear(withinRange);
-          }
-          const tagsOnly = withinRange
-            ? genres.slice(1).filter((tag) => !!tag)
-            : genres.filter((tag) => !!tag);
-          setWikiTags(tagsOnly);
+          const filteredTags = genres.filter((tag) => !!tag);
+          setWikiTags(filteredTags);
         } else {
           setWikiTags([]);
         }
@@ -454,18 +450,25 @@ export default function MasterRecord() {
       const preserveReleaseYear =
         options?.preserveReleaseYear ?? releaseYearTouchedRef.current;
       const forceRefresh = options?.force ?? false;
-      const targetAlbumId =
-        album?.id ?? (masterIdToUse ? `master-${masterIdToUse}` : null);
 
       if (!album && !masterIdToUse) {
         return;
       }
 
-      const fetchKey = masterIdToUse
-        ? `master:${masterIdToUse}`
-        : album
-        ? `album:${album.id ?? ""}:${album.artist ?? ""}:${album.record ?? ""}`
-        : null;
+      // Create a unique key for deduplication
+      const albumKey = album ? `${album.artist}:${album.record}` : null;
+
+      // Check if we've already fetched this exact master info
+      if (!forceRefresh) {
+        const alreadyFetched =
+          (masterIdToUse &&
+            lastFetchedMasterRef.current.masterId === masterIdToUse) ||
+          (albumKey && lastFetchedMasterRef.current.albumKey === albumKey);
+
+        if (alreadyFetched) {
+          return;
+        }
+      }
 
       let endpoint: string | null = null;
       if (masterIdToUse) {
@@ -478,19 +481,9 @@ export default function MasterRecord() {
         endpoint = apiUrl(`/api/records/master-info?${params.toString()}`);
       }
 
-      if (!endpoint || !fetchKey) {
+      if (!endpoint) {
         return;
       }
-
-      if (
-        !forceRefresh &&
-        (fetchKey === masterFetchKeyRef.current ||
-          fetchKey === masterFetchInFlightKeyRef.current)
-      ) {
-        return;
-      }
-
-      masterFetchInFlightKeyRef.current = fetchKey;
 
       setMasterLoading(true);
       setMasterError(null);
@@ -649,6 +642,25 @@ export default function MasterRecord() {
           setCachedUserLists(listNames);
         }
 
+        // Update the lastFetchedMasterRef to prevent duplicate fetches
+        if (normalized.masterId) {
+          lastFetchedMasterRef.current = {
+            masterId: normalized.masterId,
+            albumKey: albumKey,
+          };
+
+          // Only set masterIdOverride if we don't already have it (prevents cascade)
+          if (normalized.masterId !== masterIdOverride) {
+            setMasterIdOverride(normalized.masterId);
+          }
+        } else if (albumKey) {
+          // Even without masterId, mark this album as fetched
+          lastFetchedMasterRef.current = {
+            masterId: null,
+            albumKey: albumKey,
+          };
+        }
+
         if (!album) {
           const nameFromResponse =
             typeof data?.record === "string" && data.record.trim()
@@ -661,18 +673,12 @@ export default function MasterRecord() {
 
           if (nameFromResponse || artistFromResponse) {
             setAlbum({
-              id:
-                targetAlbumId ?? `master-${normalized.masterId ?? Date.now()}`,
+              id: `master-${normalized.masterId ?? Date.now()}`,
               record: nameFromResponse ?? "Unknown Record",
               artist: artistFromResponse ?? "Unknown Artist",
               cover: coverValue ?? "",
             });
           }
-        }
-
-        if (normalized.masterId && normalized.masterId !== masterIdOverride) {
-          skipNextMasterFetchRef.current = normalized.masterId;
-          setMasterIdOverride(normalized.masterId);
         }
 
         if (album && coverValue && (!album.cover || album.cover.length === 0)) {
@@ -686,19 +692,8 @@ export default function MasterRecord() {
           );
         }
 
-        const currentAlbumId = album?.id ?? targetAlbumId;
-        if (
-          targetAlbumId &&
-          currentAlbumId &&
-          targetAlbumId !== currentAlbumId
-        ) {
-          setMasterLoading(false);
-          return;
-        }
-
         setMasterInfo(normalized);
         setMasterLoading(false);
-        masterFetchKeyRef.current = fetchKey;
 
         if (
           !preserveReleaseYear &&
@@ -722,10 +717,6 @@ export default function MasterRecord() {
             : "Failed to load community rating"
         );
         setMasterLoading(false);
-        masterFetchKeyRef.current = null;
-      }
-      if (masterFetchInFlightKeyRef.current === fetchKey) {
-        masterFetchInFlightKeyRef.current = null;
       }
     },
     [album, masterIdOverride]
@@ -735,17 +726,10 @@ export default function MasterRecord() {
     if (!album && !masterIdOverride) {
       setMasterInfo(null);
       setMasterError(null);
-      masterFetchKeyRef.current = null;
-      masterFetchInFlightKeyRef.current = null;
+      lastFetchedMasterRef.current = { masterId: null, albumKey: null };
       return;
     }
-    if (
-      skipNextMasterFetchRef.current !== null &&
-      masterIdOverride === skipNextMasterFetchRef.current
-    ) {
-      skipNextMasterFetchRef.current = null;
-      return;
-    }
+
     void loadMasterInfo({ preserveReleaseYear: false });
   }, [album, masterIdOverride, loadMasterInfo]);
 
@@ -1242,21 +1226,23 @@ export default function MasterRecord() {
             <Typography color="text.secondary">Ratings</Typography>
           </Box>
         ) : null}
-        <Box alignSelf={"center"}>
-          <Button
-            variant="outlined"
-            onClick={handleOpenMasterReviews}
-            sx={{ mt: 1.5, alignSelf: "flex-start", px: 3 }}
-          >
-            View community reviews
-          </Button>
-        </Box>
+        {masterInfo?.inDb && (
+          <Box alignSelf={"center"}>
+            <Button
+              variant="outlined"
+              onClick={handleOpenMasterReviews}
+              sx={{ mt: 1.5, alignSelf: "flex-start", px: 3 }}
+            >
+              View community reviews
+            </Button>
+          </Box>
+        )}
       </Box>
     );
   } else if (masterInfo) {
     masterRatingContent = (
       <Typography color="text.secondary">
-        No master for this release. Ratings unavailable.
+        Ratings unavailable. Make sure the record name and artist are correct.
       </Typography>
     );
   }

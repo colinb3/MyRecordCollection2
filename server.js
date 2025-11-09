@@ -568,6 +568,7 @@ function buildDiscogsSearchUrl(artist, record) {
   const url = new URL(DISCOGS_API_URL);
   url.searchParams.set("type", "master");
   url.searchParams.set("query", artist + " - " + record);
+  url.searchParams.set("per_page", "5");
   if (DISCOGS_API_KEY && DISCOGS_API_SECRET) {
     url.searchParams.set("key", DISCOGS_API_KEY);
     url.searchParams.set("secret", DISCOGS_API_SECRET);
@@ -618,6 +619,50 @@ function splitDiscogsTitle(title) {
     artist: null,
     record: value || null,
   };
+}
+
+/**
+ * Normalizes a string for comparison by removing punctuation, whitespace, and converting to lowercase.
+ * @param {string} str - The string to normalize
+ * @returns {string} The normalized string
+ */
+function normalizeForComparison(str) {
+  if (typeof str !== "string") {
+    return "";
+  }
+  // Remove all punctuation and whitespace, convert to lowercase
+  return str.toLowerCase().replace(/[\s\p{P}]/gu, "");
+}
+
+/**
+ * Checks if a Discogs result matches the expected artist and record name.
+ * @param {object} discogsResult - The result object from Discogs
+ * @param {string} expectedArtist - The artist we're searching for
+ * @param {string} expectedRecord - The record name we're searching for
+ * @returns {boolean} True if the result matches the expected artist and record
+ */
+function doesDiscogsResultMatch(discogsResult, expectedArtist, expectedRecord) {
+  if (!discogsResult?.title) {
+    return false;
+  }
+
+  const { artist, record } = splitDiscogsTitle(discogsResult.title);
+  if (!artist || !record) {
+    return false;
+  }
+
+  // Remove trailing (digit) from artist name, as seen in barcode lookup
+  const cleanedArtist = artist.replace(/\s*\(\d+\)\s*$/, "").trim();
+
+  const normalizedDiscogsArtist = normalizeForComparison(cleanedArtist);
+  const normalizedDiscogsRecord = normalizeForComparison(record);
+  const normalizedExpectedArtist = normalizeForComparison(expectedArtist);
+  const normalizedExpectedRecord = normalizeForComparison(expectedRecord);
+
+  return (
+    normalizedDiscogsArtist === normalizedExpectedArtist &&
+    normalizedDiscogsRecord === normalizedExpectedRecord
+  );
 }
 
 async function lookupDiscogsByBarcode(barcode) {
@@ -704,32 +749,47 @@ async function lookupDiscogsMaster(artist, record) {
     });
 
     if (!response.ok) {
+      if (response.status === 404) {
+        return null;
+      }
       const status = response.status;
       const text = await response.text().catch(() => "");
       throw new Error(`Discogs request failed (${status}): ${text}`);
     }
 
     const data = await response.json();
-    if (!data || !Array.isArray(data.results) || data.results.length === 0) {
+    const results = Array.isArray(data?.results) ? data.results : [];
+    if (results.length === 0) {
       return null;
     }
 
-    const result = data.results[0];
-    const masterIdRaw = result?.master_id ?? result?.id;
+    // Try to find a result that matches the artist and record name
+    let matchingResult = results.find((result) =>
+      doesDiscogsResultMatch(result, trimmedArtist, trimmedRecord)
+    );
+
+    // If no exact match found, use the first result as fallback
+    if (!matchingResult) {
+      console.log(
+        `No exact match found for "${trimmedArtist}" - "${trimmedRecord}", using first result`
+      );
+      matchingResult = results[0];
+    }
+
+    // Prioritize results with master_id, similar to barcode lookup
+    const masterIdRaw = matchingResult?.master_id ?? matchingResult?.id;
     const masterId = Number(masterIdRaw);
-    if (!Number.isInteger(masterId) || masterId <= 0) {
-      return null;
-    }
-
+    const releaseYear = normalizeDiscogsReleaseYear(matchingResult?.year);
     const cover =
-      typeof result?.cover_image === "string" && result.cover_image.trim()
-        ? result.cover_image.trim()
+      typeof matchingResult?.cover_image === "string" && matchingResult.cover_image.trim()
+        ? matchingResult.cover_image.trim()
+        : typeof matchingResult?.thumb === "string" && matchingResult.thumb.trim()
+        ? matchingResult.thumb.trim()
         : null;
-    const year = normalizeDiscogsReleaseYear(result?.year);
 
     return {
-      masterId,
-      releaseYear: year,
+      masterId: Number.isInteger(masterId) && masterId > 0 ? masterId : null,
+      releaseYear,
       cover,
     };
   } catch (error) {
@@ -1196,6 +1256,44 @@ app.get("/api/records/master-info", async (req, res) => {
       });
 
       if (!row) {
+        // Master ID exists but not in our database yet - fetch details from Discogs
+        console.log("*****Master ID not in DB, fetching from Discogs:", masterIdParam);
+        try {
+          const discogsUrl = `https://api.discogs.com/masters/${masterIdParam}`;
+          const discogsResponse = await fetch(discogsUrl, {
+            headers: {
+              "User-Agent": DISCOGS_USER_AGENT,
+              Accept: "application/json",
+            },
+          });
+          
+          if (discogsResponse.ok) {
+            const discogsData = await discogsResponse.json();
+            const releaseYear = normalizeDiscogsReleaseYear(discogsData?.year);
+            const cover = 
+              typeof discogsData?.images?.[0]?.uri === "string" && discogsData.images[0].uri.trim()
+                ? discogsData.images[0].uri.trim()
+                : null;
+            const artist = typeof discogsData?.artists?.[0]?.name === "string" ? discogsData.artists[0].name : null;
+            const name = typeof discogsData?.title === "string" ? discogsData.title : null;
+            
+            return res.json({
+              masterId: masterIdParam,
+              releaseYear,
+              ratingAverage: null,
+              cover,
+              ratingCounts: null,
+              record: name,
+              artist: artist,
+              userCollections,
+              userLists,
+              inDb: false,
+            });
+          }
+        } catch (discogsError) {
+          // Fallback if Discogs fetch fails
+        }
+        
         return res.json({
           masterId: masterIdParam,
           releaseYear: null,
@@ -1220,7 +1318,6 @@ app.get("/api/records/master-info", async (req, res) => {
         const num = Number(value);
         return Number.isFinite(num) && num >= 0 ? num : 0;
       });
-      console.log("Master found in DB");
 
       return res.json({
         masterId: row.id,
@@ -1279,7 +1376,7 @@ app.get("/api/records/master-info", async (req, res) => {
     }
 
     const [rows] = await pool.query(
-      `SELECT ratingAve, rating1, rating2, rating3, rating4, rating5, rating6, rating7, rating8, rating9, rating10
+      `SELECT ratingAve, rating1, rating2, rating3, rating4, rating5, rating6, rating7, rating8, rating9, rating10, release_year
          FROM Master
          WHERE id = ?
          LIMIT 1`,
@@ -1288,6 +1385,11 @@ app.get("/api/records/master-info", async (req, res) => {
     const ratingAveRow = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
     const ratingAverageRaw = ratingAveRow ? ratingAveRow.ratingAve : null;
     const ratingAverage = ratingAverageRaw != null ? Number(ratingAverageRaw) : null;
+    
+    // Prioritize database release year over Discogs release year
+    const dbReleaseYear = ratingAveRow?.release_year != null ? Number(ratingAveRow.release_year) : null;
+    const finalReleaseYear = Number.isInteger(dbReleaseYear) ? dbReleaseYear : result.releaseYear;
+    
     const ratingCounts = ratingAveRow
       ? Array.from({ length: 10 }, (_unused, index) => {
           const value = ratingAveRow[`rating${index + 1}`];
@@ -1309,7 +1411,7 @@ app.get("/api/records/master-info", async (req, res) => {
 
     res.json({
       masterId: result.masterId,
-      releaseYear: result.releaseYear,
+      releaseYear: finalReleaseYear,
       ratingAverage: Number.isFinite(ratingAverage) ? ratingAverage : null,
       cover: result.cover,
       ratingCounts,

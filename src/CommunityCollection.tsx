@@ -41,7 +41,9 @@ interface CommunityCollectionProps {
   tableName: string;
 }
 
-export default function CommunityCollection({ tableName }: CommunityCollectionProps) {
+export default function CommunityCollection({
+  tableName,
+}: CommunityCollectionProps) {
   const navigate = useNavigate();
   const params = useParams<{ username: string }>();
   const cachedUser = getCachedUserInfo();
@@ -58,7 +60,7 @@ export default function CommunityCollection({ tableName }: CommunityCollectionPr
   const normalizedTarget = targetUsername.trim().toLowerCase();
   const viewingOwnCollection =
     normalizedTarget.length > 0 && normalizedTarget === normalizedViewer;
-  
+
   const activeTableName = useMemo(() => {
     return tableName;
   }, [tableName]);
