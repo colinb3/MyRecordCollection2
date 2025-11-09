@@ -203,7 +203,23 @@ export default function AppRouter() {
           path="/community/:username/collection"
           element={
             <Suspense fallback={<div />}>
-              <CommunityCollection />
+              <CommunityCollection tableName="My Collection" />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/community/:username/wishlist"
+          element={
+            <Suspense fallback={<div />}>
+              <CommunityCollection tableName="Wishlist" />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/community/:username/listened"
+          element={
+            <Suspense fallback={<div />}>
+              <CommunityCollection tableName="Listened" />
             </Suspense>
           }
         />

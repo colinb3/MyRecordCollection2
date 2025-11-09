@@ -34,8 +34,6 @@ import ShareButton from "./components/ShareButton";
 import { performLogout } from "./logout";
 
 const OWN_PREVIEW_LIMIT = 3;
-const WISHLIST_COLLECTION_NAME = "Wishlist";
-const LISTENED_COLLECTION_NAME = "Listened";
 
 interface SectionCardProps {
   title: string;
@@ -257,9 +255,7 @@ export default function CommunityProfile() {
       return;
     }
     if (!profileUsername) return;
-    const base = `/community/${encodeURIComponent(profileUsername)}/collection`;
-    const params = new URLSearchParams({ table: WISHLIST_COLLECTION_NAME });
-    navigate(`${base}?${params.toString()}`);
+    navigate(`/community/${encodeURIComponent(profileUsername)}/wishlist`);
   }, [isViewingOwnProfile, navigate, profileUsername]);
 
   const handleSeeListened = useCallback(() => {
@@ -269,9 +265,7 @@ export default function CommunityProfile() {
     }
     const target = profileUsername || username;
     if (!target) return;
-    const base = `/community/${encodeURIComponent(target)}/collection`;
-    const params = new URLSearchParams({ table: LISTENED_COLLECTION_NAME });
-    navigate(`${base}?${params.toString()}`);
+    navigate(`/community/${encodeURIComponent(target)}/listened`);
   }, [isViewingOwnProfile, navigate, profileUsername, username]);
 
   const handleViewFollows = useCallback(

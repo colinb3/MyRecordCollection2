@@ -718,20 +718,19 @@ export async function loadPublicUserCollection(
     }
   }
 
-  const searchParams = new URLSearchParams();
-  if (tableKey) {
-    searchParams.set("table", tableKey);
+  // Determine endpoint based on table name
+  let endpoint = `/api/community/users/${username}/collection`;
+  const normalizedTable = tableKey.toLowerCase();
+  if (normalizedTable === "wishlist") {
+    endpoint = `/api/community/users/${username}/wishlist`;
+  } else if (normalizedTable === "listened") {
+    endpoint = `/api/community/users/${username}/listened`;
   }
-  const query = searchParams.toString();
 
   const fetchPromise = (async () => {
     try {
       const res = await fetch(
-        apiUrl(
-          `/api/community/users/${username}/collection${
-            query ? `?${query}` : ""
-          }`
-        ),
+        apiUrl(endpoint),
         { credentials: "include" }
       );
       if (!res.ok) {

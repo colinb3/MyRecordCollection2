@@ -572,17 +572,21 @@ export default function MasterReviews() {
                       {title}
                     </Typography>
                     {subtitle && (
-                      <Typography variant="subtitle1" color="text.secondary">
+                      <Typography
+                        variant="subtitle1"
+                        color="text.secondary"
+                        gutterBottom
+                      >
                         {subtitle}
                       </Typography>
                     )}
                     {masterRatingAverage !== null && (
                       <Typography
-                        variant="body2"
+                        variant="body1"
                         color="text.secondary"
                         sx={{ mt: 0.5 }}
                       >
-                        Rating: {masterRatingAverage.toFixed(1)}
+                        Rating: <b>{masterRatingAverage.toFixed(1)}</b>
                       </Typography>
                     )}
                   </Box>

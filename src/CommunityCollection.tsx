@@ -13,7 +13,7 @@ import {
 } from "@mui/material";
 import Grid from "@mui/material/Grid";
 import FilterListAltIcon from "@mui/icons-material/FilterListAlt";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import TopBar from "./components/TopBar";
 import { darkTheme } from "./theme";
 import { getCachedUserInfo, loadUserInfo } from "./userInfo";
@@ -37,14 +37,13 @@ const createInitialFilters = (): Filters => ({
   release: { min: MIN_RELEASE_YEAR, max: MAX_RELEASE_YEAR },
 });
 
-const DEFAULT_COLLECTION_NAME = "My Collection";
-const WISHLIST_COLLECTION_NAME = "Wishlist";
-const LISTENED_COLLECTION_NAME = "Listened";
+interface CommunityCollectionProps {
+  tableName: string;
+}
 
-export default function CommunityCollection() {
+export default function CommunityCollection({ tableName }: CommunityCollectionProps) {
   const navigate = useNavigate();
   const params = useParams<{ username: string }>();
-  const [searchParams] = useSearchParams();
   const cachedUser = getCachedUserInfo();
   const [username, setUsername] = useState<string>(cachedUser?.username ?? "");
   const [displayName, setDisplayName] = useState<string>(
@@ -59,23 +58,10 @@ export default function CommunityCollection() {
   const normalizedTarget = targetUsername.trim().toLowerCase();
   const viewingOwnCollection =
     normalizedTarget.length > 0 && normalizedTarget === normalizedViewer;
-  const rawTableParam = (searchParams.get("table") ?? "").trim();
+  
   const activeTableName = useMemo(() => {
-    if (!rawTableParam) {
-      return DEFAULT_COLLECTION_NAME;
-    }
-    const normalized = rawTableParam.toLowerCase();
-    if (normalized === DEFAULT_COLLECTION_NAME.toLowerCase()) {
-      return DEFAULT_COLLECTION_NAME;
-    }
-    if (normalized === WISHLIST_COLLECTION_NAME.toLowerCase()) {
-      return WISHLIST_COLLECTION_NAME;
-    }
-    if (normalized === LISTENED_COLLECTION_NAME.toLowerCase()) {
-      return LISTENED_COLLECTION_NAME;
-    }
-    return rawTableParam;
-  }, [rawTableParam]);
+    return tableName;
+  }, [tableName]);
 
   const [profile, setProfile] = useState<PublicUserProfile | null>(null);
   const [records, setRecords] = useState<MrcRecord[]>([]);
@@ -227,8 +213,8 @@ export default function CommunityCollection() {
   const targetAvatarInitial = (profile?.displayName || targetUsername)
     .charAt(0)
     .toUpperCase();
-  const isWishlistView = activeTableName === WISHLIST_COLLECTION_NAME;
-  const isListenedView = activeTableName === LISTENED_COLLECTION_NAME;
+  const isWishlistView = activeTableName === "Wishlist";
+  const isListenedView = activeTableName === "Listened";
   const searchPlaceholder = isWishlistView
     ? "Search Wishlist"
     : isListenedView

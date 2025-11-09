@@ -1761,6 +1761,8 @@ app.get(
   async (req, res) => {
     console.log("Fetching public collection...");
     const targetUsername = req.params.username;
+    const tableName = DEFAULT_COLLECTION_NAME;
+    
     if (!targetUsername) {
       return res.status(400).json({ error: "Username is required" });
     }
@@ -1777,10 +1779,6 @@ app.get(
       }
     }
     
-    const rawTable =
-      typeof req.query.table === "string" && req.query.table.trim()
-        ? req.query.table.trim()
-        : DEFAULT_COLLECTION_NAME;
     try {
       const pool = await getPool();
       const userRow = await getUserByUsername(pool, targetUsername);
@@ -1788,7 +1786,7 @@ app.get(
         return res.status(404).json({ error: "User not found" });
       }
 
-      const tableRow = await getUserTableRow(pool, userRow.uuid, rawTable);
+      const tableRow = await getUserTableRow(pool, userRow.uuid, tableName);
       if (!tableRow) {
         return res.status(404).json({ error: "Collection not found" });
       }
@@ -1814,6 +1812,126 @@ app.get(
     } catch (error) {
       console.error("Failed to load public collection", error);
       res.status(500).json({ error: "Failed to load collection" });
+    }
+  }
+);
+
+app.get(
+  "/api/community/users/:username/wishlist",
+  async (req, res) => {
+    console.log("Fetching public wishlist...");
+    const targetUsername = req.params.username;
+    const tableName = WISHLIST_COLLECTION_NAME;
+    
+    if (!targetUsername) {
+      return res.status(400).json({ error: "Username is required" });
+    }
+    
+    // Optional auth - extract userUuid from token if present
+    let authenticatedUserUuid = null;
+    const token = req.cookies.token;
+    if (token) {
+      try {
+        const payload = jwt.verify(token, JWT_SECRET);
+        authenticatedUserUuid = payload.userUuid;
+      } catch {
+        // Invalid token, continue as unauthenticated
+      }
+    }
+    
+    try {
+      const pool = await getPool();
+      const userRow = await getUserByUsername(pool, targetUsername);
+      if (!userRow) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const tableRow = await getUserTableRow(pool, userRow.uuid, tableName);
+      if (!tableRow) {
+        return res.status(404).json({ error: "Wishlist not found" });
+      }
+
+      const isOwner = authenticatedUserUuid && userRow.uuid === authenticatedUserUuid;
+      if (tableRow.isPrivate && !isOwner) {
+        return res.status(403).json({ error: "This wishlist is private" });
+      }
+
+      const [rows] = await pool.query(
+        `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId, r.isCustom as isCustom, r.masterId as masterId, r.review as review
+         FROM Record r WHERE r.userUuid = ? AND r.tableId = ?`,
+        [userRow.uuid, tableRow.id]
+      );
+
+      const recordIds = rows.map((row) => row.id);
+      const tagsByRecord = await fetchTagsByRecordIds(pool, recordIds);
+      const response = rows.map((row) => ({
+        ...row,
+        tags: tagsByRecord[row.id] || [],
+      }));
+      res.json(response);
+    } catch (error) {
+      console.error("Failed to load public wishlist", error);
+      res.status(500).json({ error: "Failed to load wishlist" });
+    }
+  }
+);
+
+app.get(
+  "/api/community/users/:username/listened",
+  async (req, res) => {
+    console.log("Fetching public listened...");
+    const targetUsername = req.params.username;
+    const tableName = LISTENED_COLLECTION_NAME;
+    
+    if (!targetUsername) {
+      return res.status(400).json({ error: "Username is required" });
+    }
+    
+    // Optional auth - extract userUuid from token if present
+    let authenticatedUserUuid = null;
+    const token = req.cookies.token;
+    if (token) {
+      try {
+        const payload = jwt.verify(token, JWT_SECRET);
+        authenticatedUserUuid = payload.userUuid;
+      } catch {
+        // Invalid token, continue as unauthenticated
+      }
+    }
+    
+    try {
+      const pool = await getPool();
+      const userRow = await getUserByUsername(pool, targetUsername);
+      if (!userRow) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const tableRow = await getUserTableRow(pool, userRow.uuid, tableName);
+      if (!tableRow) {
+        return res.status(404).json({ error: "Listened collection not found" });
+      }
+
+      const isOwner = authenticatedUserUuid && userRow.uuid === authenticatedUserUuid;
+      if (tableRow.isPrivate && !isOwner) {
+        return res.status(403).json({ error: "This listened collection is private" });
+      }
+
+      const [rows] = await pool.query(
+        `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId, r.isCustom as isCustom, r.masterId as masterId, r.review as review
+         FROM Record r WHERE r.userUuid = ? AND r.tableId = ?`,
+        [userRow.uuid, tableRow.id]
+      );
+
+      const recordIds = rows.map((row) => row.id);
+      const tagsByRecord = await fetchTagsByRecordIds(pool, recordIds);
+      const response = rows.map((row) => ({
+        ...row,
+        tags: tagsByRecord[row.id] || [],
+      }));
+      res.json(response);
+    } catch (error) {
+      console.error("Failed to load public listened collection", error);
+      res.status(500).json({ error: "Failed to load listened collection" });
     }
   }
 );
