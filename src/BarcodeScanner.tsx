@@ -671,7 +671,7 @@ export default function BarcodeScanner() {
                             .slice(0, 36);
                           setManualBarcode(filtered);
                         }}
-                        placeholder="e.g. 88985446751 or MS2038"
+                        placeholder="e.g. 88843032512 or MS2038"
                         fullWidth
                         inputProps={{ inputMode: "text", maxLength: 36 }}
                       />
