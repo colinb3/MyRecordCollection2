@@ -471,12 +471,20 @@ export default function MasterRecord() {
 
       console.log("[MasterRecord DEBUG] albumKey:", albumKey);
 
-      // Check if we've already fetched this exact master info
+      // Check if we've already fetched this exact master info with the same method
       if (!forceRefresh) {
-        const alreadyFetched =
-          (masterIdToUse &&
-            lastFetchedMasterRef.current.masterId === masterIdToUse) ||
-          (albumKey && lastFetchedMasterRef.current.albumKey === albumKey);
+        let alreadyFetched = false;
+        
+        if (masterIdToUse) {
+          // If we're fetching by masterId, only skip if we previously fetched by the same masterId
+          alreadyFetched = lastFetchedMasterRef.current.masterId === masterIdToUse;
+        } else if (albumKey) {
+          // If we're fetching by albumKey, only skip if we previously fetched by the same albumKey
+          // AND we didn't discover a new masterId (which would require a refetch by masterId)
+          alreadyFetched = 
+            lastFetchedMasterRef.current.albumKey === albumKey &&
+            lastFetchedMasterRef.current.masterId === null;
+        }
 
         if (alreadyFetched) {
           console.log("[MasterRecord DEBUG] Skipping - already fetched");
