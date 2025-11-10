@@ -4440,29 +4440,86 @@ app.post('/api/lists/:listId/records', requireAuth, async (req, res) => {
         `SELECT name, artist, cover, release_year FROM Master WHERE id = ? LIMIT 1`,
         [masterId]
       );
+      
       if (!Array.isArray(masterRows) || masterRows.length === 0) {
-        return res.status(404).json({ error: 'Master not found' });
-      }
-      const masterRow = masterRows[0];
-      if (!recordName) {
-        recordName = typeof masterRow.name === 'string' ? masterRow.name : '';
-      }
-      if (!artist) {
-        artist =
-          typeof masterRow.artist === 'string' && masterRow.artist.trim()
-            ? masterRow.artist.trim()
-            : null;
-      }
-      if (!cover) {
-        cover =
-          typeof masterRow.cover === 'string' && masterRow.cover.trim()
-            ? masterRow.cover.trim()
-            : null;
-      }
-      if (releaseYearValue === null && masterRow.release_year != null) {
-        const parsed = Number(masterRow.release_year);
-        if (Number.isInteger(parsed)) {
-          releaseYearValue = parsed;
+        // Master doesn't exist - fetch from Discogs and create it
+        console.log(`Master ${masterId} not found in database, fetching from Discogs...`);
+        try {
+          const discogsResponse = await fetch(
+            `https://api.discogs.com/masters/${masterId}`,
+            {
+              headers: {
+                'User-Agent': process.env.DISCOGS_USER_AGENT || 'MyRecordCollection/2.0',
+                'Authorization': `Discogs token=${process.env.DISCOGS_TOKEN}`,
+              },
+            }
+          );
+
+          if (discogsResponse.ok) {
+            const discogsData = await discogsResponse.json();
+            const discogsName = typeof discogsData.title === 'string' ? discogsData.title : '';
+            const discogsArtist = 
+              Array.isArray(discogsData.artists) && discogsData.artists.length > 0 
+                ? discogsData.artists[0].name 
+                : '';
+            const discogsCover = 
+              typeof discogsData.images?.[0]?.uri === 'string' 
+                ? discogsData.images[0].uri 
+                : null;
+            const discogsYear = Number(discogsData.year);
+            const discogsReleaseYear = Number.isInteger(discogsYear) ? discogsYear : null;
+
+            // Insert the master into the database
+            await pool.execute(
+              `INSERT INTO Master (id, name, artist, cover, release_year) VALUES (?, ?, ?, ?, ?)
+               ON DUPLICATE KEY UPDATE name = VALUES(name), artist = VALUES(artist), cover = VALUES(cover), release_year = VALUES(release_year)`,
+              [masterId, discogsName, discogsArtist, discogsCover, discogsReleaseYear]
+            );
+
+            // Use the Discogs data for this request
+            if (!recordName) {
+              recordName = discogsName;
+            }
+            if (!artist) {
+              artist = discogsArtist;
+            }
+            if (!cover) {
+              cover = discogsCover;
+            }
+            if (releaseYearValue === null && discogsReleaseYear !== null) {
+              releaseYearValue = discogsReleaseYear;
+            }
+          } else {
+            console.error(`Failed to fetch master ${masterId} from Discogs:`, discogsResponse.status);
+            return res.status(404).json({ error: 'Master not found in database or Discogs' });
+          }
+        } catch (error) {
+          console.error(`Error fetching master ${masterId} from Discogs:`, error);
+          return res.status(502).json({ error: 'Failed to fetch master information from Discogs' });
+        }
+      } else {
+        // Master exists in database - use its data
+        const masterRow = masterRows[0];
+        if (!recordName) {
+          recordName = typeof masterRow.name === 'string' ? masterRow.name : '';
+        }
+        if (!artist) {
+          artist =
+            typeof masterRow.artist === 'string' && masterRow.artist.trim()
+              ? masterRow.artist.trim()
+              : null;
+        }
+        if (!cover) {
+          cover =
+            typeof masterRow.cover === 'string' && masterRow.cover.trim()
+              ? masterRow.cover.trim()
+              : null;
+        }
+        if (releaseYearValue === null && masterRow.release_year != null) {
+          const parsed = Number(masterRow.release_year);
+          if (Number.isInteger(parsed)) {
+            releaseYearValue = parsed;
+          }
         }
       }
     }
