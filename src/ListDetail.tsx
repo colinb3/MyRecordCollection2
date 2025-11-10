@@ -28,11 +28,11 @@ import FavoriteIcon from "@mui/icons-material/Favorite";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
-import ImageNotSupportedIcon from "@mui/icons-material/ImageNotSupported";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
 import ShareButton from "./components/ShareButton";
+import CoverImage from "./components/CoverImage";
 import {
   DndContext,
   closestCenter,
@@ -408,6 +408,7 @@ export default function ListDetail() {
           const masterId = Number(row?.masterId);
           const rating = Number(row?.rating);
           const releaseYear = Number(row?.releaseYear);
+          const sortOrder = Number(row?.sortOrder);
           return {
             id,
             name: typeof row?.name === "string" ? row.name : "Unknown record",
@@ -433,6 +434,10 @@ export default function ListDetail() {
               typeof row?.added === "string" && row.added.trim()
                 ? row.added.trim()
                 : null,
+            sortOrder:
+              Number.isInteger(sortOrder) && sortOrder > 0
+                ? sortOrder
+                : undefined,
             // isCustom column was removed from ListRecord; determine custom status by absence of masterId when needed
           };
         })
@@ -518,37 +523,27 @@ export default function ListDetail() {
     async (removedRecord: ListRecordEntry) => {
       if (!list?.id) return;
       try {
-        const response = await fetch(
-          apiUrl(`/api/lists/${list.id}/records`),
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({
-              masterId: removedRecord.masterId,
-              recordName: removedRecord.name,
-              artist: removedRecord.artist,
-              cover: removedRecord.cover,
-              releaseYear: removedRecord.releaseYear,
-              rating: removedRecord.rating,
-            }),
-          }
-        );
+        const body = {
+          masterId: removedRecord.masterId,
+          recordName: removedRecord.name,
+          artist: removedRecord.artist,
+          cover: removedRecord.cover,
+          releaseYear: removedRecord.releaseYear,
+          rating: removedRecord.rating,
+          sortOrder: removedRecord.sortOrder, // Preserve original position
+        };
+        const response = await fetch(apiUrl(`/api/lists/${list.id}/records`), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(body),
+        });
         if (!response.ok) {
           const problem = await response.json().catch(() => ({}));
           throw new Error(problem.error || "Failed to restore record");
         }
-        const data = await response.json();
-        // Re-add the record to the list
-        setRecords((prev) => [...prev, { ...removedRecord, id: data.id }]);
-        setList((prev) =>
-          prev
-            ? {
-                ...prev,
-                recordCount: prev.recordCount + 1,
-              }
-            : prev
-        );
+        // Reload the entire list to get correct ordering from server
+        await loadList();
         showMessage("Record restored", "success");
       } catch (error) {
         console.error(error);
@@ -558,7 +553,7 @@ export default function ListDetail() {
         );
       }
     },
-    [list, showMessage]
+    [list, loadList, showMessage]
   );
 
   const handleRemoveRecord = useCallback(
@@ -586,7 +581,7 @@ export default function ListDetail() {
               }
             : prev
         );
-        
+
         // Show message with undo action
         showMessage(
           "Record removed",
@@ -933,23 +928,13 @@ export default function ListDetail() {
   );
 
   const renderCover = useCallback((cover: string | null, name: string) => {
-    if (cover) {
-      return (
-        <Avatar
-          src={cover}
-          alt={name}
-          variant="rounded"
-          sx={{ width: 72, height: 72, borderRadius: 2 }}
-        />
-      );
-    }
     return (
-      <Avatar
+      <CoverImage
+        src={cover}
+        alt={name}
         variant="rounded"
-        sx={{ width: 72, height: 72, borderRadius: 2, bgcolor: "grey.800" }}
-      >
-        <ImageNotSupportedIcon />
-      </Avatar>
+        sx={{ width: 72, height: 72, borderRadius: 2 }}
+      />
     );
   }, []);
 
@@ -1047,34 +1032,23 @@ export default function ListDetail() {
                       <Box>
                         <Stack direction={{ xs: "row", sm: "row" }} spacing={2}>
                           <Box>
-                            {list.pictureUrl ? (
-                              <Avatar
-                                src={
-                                  list.pictureUrl.startsWith("http")
+                            <CoverImage
+                              src={
+                                list.pictureUrl
+                                  ? list.pictureUrl.startsWith("http")
                                     ? list.pictureUrl
                                     : apiUrl(list.pictureUrl)
-                                }
-                                alt={list.name}
-                                variant="rounded"
-                                sx={{
-                                  width: 140,
-                                  height: 140,
-                                  borderRadius: 2,
-                                }}
-                              />
-                            ) : (
-                              <Avatar
-                                variant="rounded"
-                                sx={{
-                                  width: { xs: 120, sm: 140 },
-                                  height: { xs: 120, sm: 140 },
-                                  borderRadius: 2,
-                                  bgcolor: "grey.800",
-                                }}
-                              >
-                                <ImageNotSupportedIcon fontSize="large" />
-                              </Avatar>
-                            )}
+                                  : null
+                              }
+                              alt={list.name}
+                              variant="rounded"
+                              sx={{
+                                width: { xs: 120, sm: 140 },
+                                height: { xs: 120, sm: 140 },
+                                borderRadius: 2,
+                              }}
+                              iconSize="large"
+                            />
                           </Box>
                           <Box flex={1} minWidth={0}>
                             <Stack
@@ -1341,29 +1315,19 @@ export default function ListDetail() {
                   alt={editState.name}
                   sx={{ width: 96, height: 96, borderRadius: 2 }}
                 />
-              ) : editState.pictureUrl && !removePictureFlag ? (
-                <Avatar
+              ) : (
+                <CoverImage
                   src={
-                    editState.pictureUrl.startsWith("http")
-                      ? editState.pictureUrl
-                      : apiUrl(editState.pictureUrl)
+                    editState.pictureUrl && !removePictureFlag
+                      ? editState.pictureUrl.startsWith("http")
+                        ? editState.pictureUrl
+                        : apiUrl(editState.pictureUrl)
+                      : null
                   }
                   variant="rounded"
                   alt={editState.name}
                   sx={{ width: 96, height: 96, borderRadius: 2 }}
                 />
-              ) : (
-                <Avatar
-                  variant="rounded"
-                  sx={{
-                    width: 96,
-                    height: 96,
-                    borderRadius: 2,
-                    bgcolor: "grey.800",
-                  }}
-                >
-                  <ImageNotSupportedIcon />
-                </Avatar>
               )}
               <Stack spacing={1}>
                 <Button

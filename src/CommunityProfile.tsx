@@ -400,6 +400,17 @@ export default function CommunityProfile() {
                         gap: 2,
                       }}
                     >
+                      <Avatar
+                        variant="rounded"
+                        sx={{
+                          width: 120,
+                          height: 120,
+                          bgcolor: "grey.700",
+                        }}
+                        src={undefined}
+                      >
+                        {targetAvatarInitial}
+                      </Avatar>
                       <CircularProgress size={24} />
                       <Typography color="text.secondary">
                         Loading profile…
@@ -487,7 +498,7 @@ export default function CommunityProfile() {
                               size="small"
                               onClick={handleToggleFollow}
                               disabled={followPending}
-                              sx={{ textTransform: "none", minWidth: 0 }}
+                              sx={{ textTransform: "none", minWidth: 0, mr: 1 }}
                             >
                               {followPending
                                 ? "Updating…"
@@ -497,7 +508,7 @@ export default function CommunityProfile() {
                             </Button>
                           )}
                           <Button
-                            variant="text"
+                            variant="outlined"
                             size="small"
                             onClick={() => handleViewFollows("followers")}
                             sx={{ textTransform: "none", minWidth: 0 }}
@@ -505,7 +516,7 @@ export default function CommunityProfile() {
                             {profile?.followersCount.toLocaleString()} Followers
                           </Button>
                           <Button
-                            variant="text"
+                            variant="outlined"
                             size="small"
                             onClick={() => handleViewFollows("following")}
                             sx={{ textTransform: "none", minWidth: 0 }}

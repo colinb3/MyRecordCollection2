@@ -1263,10 +1263,16 @@ function RecordsTab() {
           <TextField
             label="Review"
             multiline
-            minRows={3}
+            minRows={2}
+            maxRows={4}
             value={reviewInput}
             onChange={(event) => setReviewInput(event.target.value)}
             size="small"
+            sx={{
+              "& .MuiInputBase-root": {
+                height: "auto",
+              },
+            }}
           />
           <TextField
             label="Master ID"

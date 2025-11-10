@@ -30,8 +30,8 @@ import apiUrl from "./api";
 import TopBar from "./components/TopBar";
 import { darkTheme } from "./theme";
 import { setUserId } from "./analytics";
-import ImageNotSupportedIcon from "@mui/icons-material/ImageNotSupported";
 import FindRecordSidebar from "./components/FindRecordSidebar";
+import CoverImage from "./components/CoverImage";
 import { getCachedUserInfo, loadUserInfo } from "./userInfo";
 import { loadUserTags } from "./userTags";
 import { wikiGenres } from "./wiki";
@@ -467,10 +467,7 @@ export default function MasterRecord() {
             lastFetchedMasterRef.current.masterId === masterIdToUse;
         } else if (albumKey) {
           // If we're fetching by albumKey, only skip if we previously fetched by the same albumKey
-          // AND we didn't discover a new masterId (which would require a refetch by masterId)
-          alreadyFetched =
-            lastFetchedMasterRef.current.albumKey === albumKey &&
-            lastFetchedMasterRef.current.masterId === null;
+          alreadyFetched = lastFetchedMasterRef.current.albumKey === albumKey;
         }
 
         if (alreadyFetched) {
@@ -651,7 +648,6 @@ export default function MasterRecord() {
         }
 
         // Update the lastFetchedMasterRef to prevent duplicate fetches
-        // IMPORTANT: Only store masterId if we fetched BY masterId, not if we just discovered it
         if (masterIdToUse) {
           // We fetched by masterId
           lastFetchedMasterRef.current = {
@@ -659,21 +655,21 @@ export default function MasterRecord() {
             albumKey: null,
           };
         } else if (albumKey) {
-          // We fetched by albumKey (may have discovered a masterId in response)
+          // We fetched by albumKey
           lastFetchedMasterRef.current = {
-            masterId: null, // Don't store discovered masterId - we haven't fetched BY it yet
+            masterId: null,
             albumKey: albumKey,
           };
         }
 
-        // If we discovered a masterId from an albumKey search, update masterIdOverride for URL sync
-        // But DON'T trigger a refetch since we already have all the data
+        // If we discovered a masterId, update masterIdOverride for URL sync
+        // This won't trigger a refetch since we'll mark it as fetched
         if (
           normalized.masterId &&
           !masterIdToUse &&
           normalized.masterId !== masterIdOverride
         ) {
-          // Update lastFetchedMasterRef with the discovered masterId to prevent refetch
+          // Update the ref to include the discovered masterId so we don't refetch when URL changes
           lastFetchedMasterRef.current = {
             masterId: normalized.masterId,
             albumKey: null,
@@ -1363,36 +1359,24 @@ export default function MasterRecord() {
                         width: { xs: 150, sm: 175, md: 200 },
                         height: { xs: 150, sm: 175, md: 200 },
                         borderRadius: 2,
-                        bgcolor: "grey.900",
                         mb: { xs: 0, md: 1.5 },
                         overflow: "hidden",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        position: "relative",
                       }}
                     >
-                      {displayedCoverUrl ? (
-                        <Box
-                          component="img"
-                          src={displayedCoverUrl}
-                          alt={album?.record ?? "Album cover"}
-                          sx={{
-                            position: "absolute",
-                            inset: 0,
-                            width: "100%",
-                            height: "100%",
-                            objectFit: "cover",
-                          }}
-                        />
-                      ) : (
-                        <ImageNotSupportedIcon
-                          sx={{
-                            fontSize: { xs: 54, md: 72 },
-                            color: "text.secondary",
-                          }}
-                        />
-                      )}
+                      <CoverImage
+                        src={displayedCoverUrl}
+                        alt={album?.record ?? "Album cover"}
+                        variant="rounded"
+                        iconSize="large"
+                        sx={{
+                          width: { xs: 150, sm: 175, md: 200 },
+                          height: { xs: 150, sm: 175, md: 200 },
+                          borderRadius: 2,
+                        }}
+                      />
                     </Box>
                   )}
                   <Box sx={{ ml: { xs: 2, md: 0 } }}>
@@ -1415,6 +1399,7 @@ export default function MasterRecord() {
                   mt: { xs: -1, md: 0 },
                   mb: { xs: 2, md: 0 },
                   maxHeight: { xs: 720, md: "none" },
+                  minWidth: 0,
                   display: "flex",
                   flexDirection: "column",
                 }}

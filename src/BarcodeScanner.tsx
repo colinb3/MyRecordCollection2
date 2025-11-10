@@ -556,7 +556,7 @@ export default function BarcodeScanner() {
                       sx={{ color: "text.secondary", mt: 0.5 }}
                     >
                       Align the barcode within the frame to find it's master
-                      record.
+                      entry.
                     </Typography>
                   </Box>
 
@@ -653,9 +653,9 @@ export default function BarcodeScanner() {
                         onChange={(event) =>
                           setManualBarcode(event.target.value)
                         }
-                        placeholder="e.g. 602455750181"
+                        placeholder="e.g. 88985446751 or MS2038"
                         fullWidth
-                        inputProps={{ inputMode: "numeric" }}
+                        inputProps={{ inputMode: "text" }}
                       />
                       <Button
                         type="submit"

@@ -3,11 +3,11 @@ import Box from "@mui/material/Box";
 import Grid from "@mui/material/Grid";
 import Paper from "@mui/material/Paper";
 import Typography from "@mui/material/Typography";
-import ImageNotSupportedIcon from "@mui/icons-material/ImageNotSupported";
 import type { Record } from "../types";
 import { useNavigate } from "react-router-dom";
 import { Divider } from "@mui/material";
 import { formatLocalDate } from "../dateUtils";
+import CoverImage from "./CoverImage";
 
 interface RecordPreviewGridProps {
   records: Record[];
@@ -86,30 +86,18 @@ export default function RecordPreviewGrid({
                   position: "relative",
                   width: "100%",
                   aspectRatio: "1 / 1",
-                  backgroundColor: "grey.800",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
                 }}
               >
-                {record.cover ? (
-                  <Box
-                    component="img"
-                    src={record.cover}
-                    alt={record.record}
-                    sx={{
-                      position: "absolute",
-                      inset: 0,
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                    }}
-                  />
-                ) : (
-                  <ImageNotSupportedIcon
-                    sx={{ fontSize: 48, color: "text.secondary" }}
-                  />
-                )}
+                <CoverImage
+                  src={record.cover ?? null}
+                  alt={record.record}
+                  variant="square"
+                  sx={{
+                    width: "100%",
+                    height: "100%",
+                    borderRadius: 0,
+                  }}
+                />
               </Box>
               <Box sx={{ p: { xs: 1, sm: 1.25, md: 1.5 } }}>
                 <Typography variant="subtitle1" noWrap>

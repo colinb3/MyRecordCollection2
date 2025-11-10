@@ -27,9 +27,9 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import FavoriteIcon from "@mui/icons-material/Favorite";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
-import ImageNotSupportedIcon from "@mui/icons-material/ImageNotSupported";
 import LockIcon from "@mui/icons-material/Lock";
 import PublicIcon from "@mui/icons-material/Public";
+import CoverImage from "./components/CoverImage";
 import { useNavigate } from "react-router-dom";
 import TopBar from "./components/TopBar";
 import apiUrl from "./api";
@@ -796,32 +796,18 @@ export default function Lists() {
 
   const renderListPicture = useCallback(
     (pictureUrl: string | null, name: string) => {
-      if (pictureUrl) {
-        // Use apiUrl to ensure proper domain when deployed
-        const imageUrl = pictureUrl.startsWith("http")
+      const imageUrl = pictureUrl
+        ? pictureUrl.startsWith("http")
           ? pictureUrl
-          : apiUrl(pictureUrl);
-        return (
-          <Avatar
-            src={imageUrl}
-            variant="rounded"
-            alt={name}
-            sx={{ width: 80, height: 80, borderRadius: 2 }}
-          />
-        );
-      }
+          : apiUrl(pictureUrl)
+        : null;
       return (
-        <Avatar
+        <CoverImage
+          src={imageUrl}
+          alt={name}
           variant="rounded"
-          sx={{
-            width: 80,
-            height: 80,
-            borderRadius: 2,
-            bgcolor: "grey.800",
-          }}
-        >
-          <ImageNotSupportedIcon />
-        </Avatar>
+          sx={{ width: 80, height: 80, borderRadius: 2 }}
+        />
       );
     },
     []
@@ -1077,17 +1063,12 @@ export default function Lists() {
                             sx={{ width: 80, height: 80, borderRadius: 2 }}
                           />
                         ) : (
-                          <Avatar
+                          <CoverImage
+                            src={null}
+                            alt="List picture"
                             variant="rounded"
-                            sx={{
-                              width: 80,
-                              height: 80,
-                              borderRadius: 2,
-                              bgcolor: "grey.800",
-                            }}
-                          >
-                            <ImageNotSupportedIcon />
-                          </Avatar>
+                            sx={{ width: 80, height: 80, borderRadius: 2 }}
+                          />
                         )}
                         <Stack direction={"column"} spacing={1.5}>
                           <Button
@@ -1240,6 +1221,8 @@ export default function Lists() {
                                             <Typography
                                               variant="h6"
                                               fontWeight={700}
+                                              textOverflow={"ellipsis"}
+                                              overflow={"hidden"}
                                             >
                                               {list.name}
                                             </Typography>
@@ -1383,29 +1366,19 @@ export default function Lists() {
                   alt={editState.name}
                   sx={{ width: 96, height: 96, borderRadius: 2 }}
                 />
-              ) : editState.pictureUrl && !removePictureFlag ? (
-                <Avatar
+              ) : (
+                <CoverImage
                   src={
-                    editState.pictureUrl.startsWith("http")
-                      ? editState.pictureUrl
-                      : apiUrl(editState.pictureUrl)
+                    editState.pictureUrl && !removePictureFlag
+                      ? editState.pictureUrl.startsWith("http")
+                        ? editState.pictureUrl
+                        : apiUrl(editState.pictureUrl)
+                      : null
                   }
                   variant="rounded"
                   alt={editState.name}
                   sx={{ width: 96, height: 96, borderRadius: 2 }}
                 />
-              ) : (
-                <Avatar
-                  variant="rounded"
-                  sx={{
-                    width: 96,
-                    height: 96,
-                    borderRadius: 2,
-                    bgcolor: "grey.800",
-                  }}
-                >
-                  <ImageNotSupportedIcon />
-                </Avatar>
               )}
               <Stack spacing={1}>
                 <Button

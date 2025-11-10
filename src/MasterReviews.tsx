@@ -30,7 +30,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import TopBar from "./components/TopBar";
 import { darkTheme } from "./theme";
 import apiUrl from "./api";
-import ImageNotSupportedIcon from "@mui/icons-material/ImageNotSupported";
+import CoverImage from "./components/CoverImage";
 import { getCachedUserInfo, loadUserInfo } from "./userInfo";
 import { setUserId } from "./analytics";
 import { performLogout } from "./logout";
@@ -536,36 +536,20 @@ export default function MasterReviews() {
                       width: { xs: 125, sm: 150, md: 175 },
                       height: { xs: 125, sm: 150, md: 175 },
                       borderRadius: 2,
-                      bgcolor: "grey.900",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      overflow: "hidden",
-                      position: "relative",
                       boxShadow: 2,
                     }}
                   >
-                    {coverUrl ? (
-                      <Box
-                        component="img"
-                        src={coverUrl}
-                        alt={album?.record || "Album cover"}
-                        sx={{
-                          position: "absolute",
-                          inset: 0,
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "cover",
-                        }}
-                      />
-                    ) : (
-                      <ImageNotSupportedIcon
-                        sx={{
-                          fontSize: { xs: 48, md: 64 },
-                          color: "text.secondary",
-                        }}
-                      />
-                    )}
+                    <CoverImage
+                      src={coverUrl}
+                      alt={album?.record || "Album cover"}
+                      variant="rounded"
+                      iconSize="large"
+                      sx={{
+                        width: { xs: 125, sm: 150, md: 175 },
+                        height: { xs: 125, sm: 150, md: 175 },
+                        borderRadius: 2,
+                      }}
+                    />
                   </Box>
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Typography variant="h5" fontWeight={600} gutterBottom>

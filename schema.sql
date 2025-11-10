@@ -111,7 +111,6 @@ CREATE TABLE ListRecord (
     userUuid CHAR(36),
     listId INT,
     masterId INT,
-    reviewLikes INT DEFAULT 0,
     FOREIGN KEY (masterId) REFERENCES Master(id) ON DELETE SET NULL,
     FOREIGN KEY (userUuid) REFERENCES User(uuid) ON DELETE CASCADE,
     FOREIGN KEY (listId) REFERENCES List(id) ON DELETE CASCADE

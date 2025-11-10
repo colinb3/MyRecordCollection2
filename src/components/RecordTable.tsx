@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 import Box from "@mui/material/Box";
-import ImageNotSupportedIcon from "@mui/icons-material/ImageNotSupported";
+import CoverImage from "./CoverImage";
 import {
   type Record,
   type ColumnVisibilityMap,
@@ -21,38 +21,26 @@ const columns: GridColDef[] = [
       const coverUrl =
         typeof params.row.cover === "string" && params.row.cover.trim()
           ? params.row.cover.trim()
-          : "";
+          : null;
       return (
         <Box
           sx={{
             ml: -0.5,
             width: 100,
             height: 100,
-            borderRadius: 1,
-            overflow: "hidden",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            bgcolor: coverUrl ? undefined : "grey.900",
           }}
         >
-          {coverUrl ? (
-            <Box
-              component="img"
-              src={coverUrl}
-              alt={title}
-              sx={{
-                width: "100%",
-                height: "100%",
-                objectFit: "cover",
-              }}
-            />
-          ) : (
-            <ImageNotSupportedIcon
-              sx={{ fontSize: 32, color: "text.secondary" }}
-              aria-label={`${title} cover unavailable`}
-            />
-          )}
+          <CoverImage
+            src={coverUrl}
+            alt={title}
+            variant="rounded"
+            iconSize="small"
+            sx={{
+              width: 100,
+              height: 100,
+              borderRadius: 1,
+            }}
+          />
         </Box>
       );
     },

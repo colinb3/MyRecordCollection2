@@ -475,6 +475,7 @@ function mapListRecordRow(row) {
   const ratingValue = Number(row?.rating);
   const releaseYearValue = Number(row?.releaseYear);
   const masterIdValue = Number(row?.masterId);
+  const sortOrderValue = Number(row?.sortOrder);
   return {
     id: Number.isInteger(id) && id > 0 ? id : 0,
     name: typeof row?.name === "string" ? row.name : "",
@@ -493,6 +494,7 @@ function mapListRecordRow(row) {
     releaseYear: Number.isInteger(releaseYearValue) ? releaseYearValue : null,
     masterId: Number.isInteger(masterIdValue) && masterIdValue > 0 ? masterIdValue : null,
     added: row?.added ? formatUtcDateTime(row.added) : null,
+    sortOrder: Number.isInteger(sortOrderValue) && sortOrderValue > 0 ? sortOrderValue : undefined,
   };
 }
 
@@ -665,6 +667,41 @@ function doesDiscogsResultMatch(discogsResult, expectedArtist, expectedRecord) {
   );
 }
 
+/**
+ * Normalizes a barcode to alphanumeric characters only for comparison.
+ * @param {string} barcode - The barcode to normalize
+ * @returns {string} The normalized barcode with only alphanumeric characters
+ */
+function normalizeBarcode(barcode) {
+  if (typeof barcode !== "string") {
+    return "";
+  }
+  return barcode.replace(/[^0-9A-Za-z]/g, "").toLowerCase();
+}
+
+/**
+ * Checks if a Discogs result contains the searched barcode.
+ * @param {object} discogsResult - The result object from Discogs
+ * @param {string} searchedBarcode - The barcode that was searched for
+ * @returns {boolean} True if the result contains a matching barcode
+ */
+function doesDiscogsResultContainBarcode(discogsResult, searchedBarcode) {
+  const normalizedSearch = normalizeBarcode(searchedBarcode);
+  if (!normalizedSearch) {
+    return false;
+  }
+
+  const barcodes = discogsResult?.barcode;
+  if (!Array.isArray(barcodes) || barcodes.length === 0) {
+    return false;
+  }
+
+  return barcodes.some((barcode) => {
+    const normalizedBarcode = normalizeBarcode(barcode);
+    return normalizedBarcode === normalizedSearch;
+  });
+}
+
 async function lookupDiscogsByBarcode(barcode) {
   const trimmed = typeof barcode === "string" ? barcode.trim() : "";
   if (!trimmed) {
@@ -699,6 +736,14 @@ async function lookupDiscogsByBarcode(barcode) {
     const prioritized =
       results.find((item) => Number(item?.master_id) > 0) ?? results[0];
     if (!prioritized) {
+      return null;
+    }
+
+    // Verify that the result actually contains the searched barcode
+    if (!doesDiscogsResultContainBarcode(prioritized, trimmed)) {
+      console.log(
+        `Discogs result does not contain searched barcode: ${trimmed}`
+      );
       return null;
     }
 
@@ -1256,8 +1301,7 @@ app.get("/api/records/master-info", async (req, res) => {
       });
 
       if (!row) {
-        // Master ID exists but not in our database yet - fetch details from Discogs
-        console.log("*****Master ID not in DB, fetching from Discogs:", masterIdParam);
+        // Master ID exists but not in our database yet - fetch details from Discogs (barcode search)
         try {
           const discogsUrl = `https://api.discogs.com/masters/${masterIdParam}`;
           const discogsResponse = await fetch(discogsUrl, {
@@ -2639,7 +2683,7 @@ app.post('/api/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials.' });
     }
     const token = issueToken(user.uuid);
-  res.cookie('token', token, { httpOnly: true, sameSite: process.env.CROSS_SITE_COOKIES === 'true' ? 'none' : 'lax', secure: process.env.NODE_ENV === 'production', maxAge: 7*24*60*60*1000 });
+  res.cookie('token', token, { httpOnly: true, sameSite: process.env.CROSS_SITE_COOKIES === 'true' ? 'none' : 'lax', secure: process.env.NODE_ENV === 'production', maxAge: 365*24*60*60*1000 });
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Login failed.' });
@@ -4330,8 +4374,8 @@ app.get('/api/lists/popular', async (req, res) => {
 });
 
 app.get('/api/lists/:listId', async (req, res) => {
-  console.log('Fetching list detail...');
   const listId = Number(req.params.listId);
+  console.log('Fetching list detail...', listId);
   if (!Number.isInteger(listId) || listId <= 0) {
     return res.status(400).json({ error: 'Invalid list id' });
   }
@@ -4385,8 +4429,8 @@ app.get('/api/lists/:listId', async (req, res) => {
 });
 
 app.post('/api/lists/:listId/records', requireAuth, async (req, res) => {
-  console.log('Adding record to list...');
   const listId = Number(req.params.listId);
+  console.log('Adding record to list...', listId);
   if (!Number.isInteger(listId) || listId <= 0) {
     return res.status(400).json({ error: 'Invalid list id' });
   }
@@ -4400,11 +4444,14 @@ app.post('/api/lists/:listId/records', requireAuth, async (req, res) => {
     typeof req.body?.cover === 'string' && req.body.cover.trim() ? req.body.cover.trim() : null;
   let releaseYearValue = Number(req.body?.releaseYear);
   let ratingValue = Number(req.body?.rating);
-  console.log('Received rating val:', ratingValue);
   const review =
     typeof req.body?.review === 'string' && req.body.review.trim()
       ? req.body.review.trim()
       : null;
+  
+  // Allow optional sortOrder for undo operations
+  const requestedSortOrder = Number(req.body?.sortOrder);
+  const hasSortOrder = Number.isInteger(requestedSortOrder) && requestedSortOrder > 0;
 
   if (!recordName && masterId === null) {
     return res.status(400).json({ error: 'recordName is required when masterId is not provided' });
@@ -4526,17 +4573,22 @@ app.post('/api/lists/:listId/records', requireAuth, async (req, res) => {
 
     recordName = recordName || 'Untitled';
 
-    // Get the next sortOrder value (max + 1, or 1 if list is empty)
-    const [sortOrderRows] = await pool.query(
-      'SELECT COALESCE(MAX(sortOrder), 0) + 1 AS nextOrder FROM ListRecord WHERE listId = ?',
-      [listId]
-    );
-    const nextSortOrder = sortOrderRows?.[0]?.nextOrder || 1;
-
+    // Use provided sortOrder if available (for undo operations), otherwise get the next available
+    let sortOrderToUse;
+    if (hasSortOrder) {
+      sortOrderToUse = requestedSortOrder;
+    } else {
+      // Get the next sortOrder value (max + 1, or 1 if list is empty)
+      const [sortOrderRows] = await pool.query(
+        'SELECT COALESCE(MAX(sortOrder), 0) + 1 AS nextOrder FROM ListRecord WHERE listId = ?',
+        [listId]
+      );
+      sortOrderToUse = sortOrderRows?.[0]?.nextOrder || 1;
+    }
 
     const [result] = await pool.execute(
-      `INSERT INTO ListRecord (added, artist, cover, name, rating, release_year, userUuid, listId, masterId, reviewLikes, sortOrder)
-       VALUES (UTC_TIMESTAMP(), ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
+      `INSERT INTO ListRecord (added, artist, cover, name, rating, release_year, userUuid, listId, masterId, sortOrder)
+       VALUES (UTC_TIMESTAMP(), ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         artist,
         cover,
@@ -4546,13 +4598,13 @@ app.post('/api/lists/:listId/records', requireAuth, async (req, res) => {
         req.userUuid,
         listId,
         masterId,
-        nextSortOrder,
+        sortOrderToUse,
       ]
     );
 
     const newId = Number(result?.insertId);
     const [rows] = await pool.query(
-      `SELECT id, added, artist, cover, name, rating, release_year AS releaseYear, masterId
+      `SELECT id, added, artist, cover, name, rating, release_year AS releaseYear, masterId, sortOrder
          FROM ListRecord
         WHERE id = ? AND listId = ? AND userUuid = ?
         LIMIT 1`,
@@ -4567,9 +4619,9 @@ app.post('/api/lists/:listId/records', requireAuth, async (req, res) => {
 });
 
 app.delete('/api/lists/:listId/records/:recordId', requireAuth, async (req, res) => {
-  console.log('Removing record from list...');
   const listId = Number(req.params.listId);
   const recordId = Number(req.params.recordId);
+  console.log('Removing record', recordId, 'from list', listId);
   if (!Number.isInteger(listId) || listId <= 0 || !Number.isInteger(recordId) || recordId <= 0) {
     return res.status(400).json({ error: 'Invalid identifiers' });
   }
@@ -4590,6 +4642,69 @@ app.delete('/api/lists/:listId/records/:recordId', requireAuth, async (req, res)
   } catch (err) {
     console.error('Failed to remove record from list', err);
     res.status(500).json({ error: 'Failed to remove record from list' });
+  }
+});
+
+// IMPORTANT: This route must come BEFORE app.put('/api/lists/:listId/records/:recordId')
+// so that 'reorder' doesn't get matched as :recordId
+app.put('/api/lists/:listId/records/reorder', requireAuth, async (req, res) => {
+  console.log('Reordering list records...');
+  const listId = Number(req.params.listId);
+  
+  if (!Number.isInteger(listId) || listId <= 0) {
+    return res.status(400).json({ error: 'Invalid list id' });
+  }
+  
+  // Expect an array of { id, sortOrder } objects
+  const updates = req.body?.updates;
+  if (!Array.isArray(updates) || updates.length === 0) {
+    return res.status(400).json({ error: 'Invalid updates array' });
+  }
+
+  let connection;
+  try {
+    const pool = await getPool();
+    connection = await pool.getConnection();
+    
+    // Verify the user owns this list
+    const [listRows] = await connection.query(
+      'SELECT userUuid FROM List WHERE id = ?',
+      [listId]
+    );
+    
+    if (!Array.isArray(listRows) || listRows.length === 0 || listRows[0].userUuid !== req.userUuid) {
+      return res.status(404).json({ error: 'List not found or access denied' });
+    }
+
+    await connection.beginTransaction();
+
+    // Update sortOrder for each record
+    for (const update of updates) {
+      const recordId = Number(update.id);
+      const sortOrder = Number(update.sortOrder);
+      
+      if (!Number.isInteger(recordId) || !Number.isInteger(sortOrder)) {
+        await connection.rollback();
+        return res.status(400).json({ error: 'Invalid record id or sortOrder' });
+      }
+
+      const [result] = await connection.execute(
+        'UPDATE ListRecord SET sortOrder = ? WHERE id = ? AND listId = ?',
+        [sortOrder, recordId, listId]
+      );
+    }
+
+    await connection.commit();
+    res.json({ success: true });
+  } catch (err) {
+    if (connection) {
+      await connection.rollback();
+    }
+    res.status(500).json({ error: 'Failed to reorder list records' });
+  } finally {
+    if (connection) {
+      connection.release();
+    }
   }
 });
 
@@ -4658,66 +4773,6 @@ app.put('/api/lists/:listId/records/:recordId', requireAuth, async (req, res) =>
   } catch (err) {
     console.error('Failed to update list record', err);
     res.status(500).json({ error: 'Failed to update list record' });
-  }
-});
-
-app.put('/api/lists/:listId/records/reorder', requireAuth, async (req, res) => {
-  console.log('Reordering list records...');
-  const listId = Number(req.params.listId);
-  if (!Number.isInteger(listId) || listId <= 0) {
-    return res.status(400).json({ error: 'Invalid list id' });
-  }
-  
-  // Expect an array of { id, sortOrder } objects
-  const updates = req.body?.updates;
-  if (!Array.isArray(updates) || updates.length === 0) {
-    return res.status(400).json({ error: 'Invalid updates array' });
-  }
-
-  let connection;
-  try {
-    const pool = await getPool();
-    connection = await pool.getConnection();
-    
-    // Verify the user owns this list
-    const [listRows] = await connection.query(
-      'SELECT userUuid FROM List WHERE id = ?',
-      [listId]
-    );
-    if (!Array.isArray(listRows) || listRows.length === 0 || listRows[0].userUuid !== req.userUuid) {
-      return res.status(404).json({ error: 'List not found or access denied' });
-    }
-
-    await connection.beginTransaction();
-
-    // Update sortOrder for each record
-    for (const update of updates) {
-      const recordId = Number(update.id);
-      const sortOrder = Number(update.sortOrder);
-      
-      if (!Number.isInteger(recordId) || !Number.isInteger(sortOrder)) {
-        await connection.rollback();
-        return res.status(400).json({ error: 'Invalid record id or sortOrder' });
-      }
-
-      await connection.execute(
-        'UPDATE ListRecord SET sortOrder = ? WHERE id = ? AND listId = ? AND userUuid = ?',
-        [sortOrder, recordId, listId, req.userUuid]
-      );
-    }
-
-    await connection.commit();
-    res.json({ success: true });
-  } catch (err) {
-    if (connection) {
-      await connection.rollback();
-    }
-    console.error('Failed to reorder list records', err);
-    res.status(500).json({ error: 'Failed to reorder list records' });
-  } finally {
-    if (connection) {
-      connection.release();
-    }
   }
 });
 

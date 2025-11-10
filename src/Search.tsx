@@ -24,7 +24,7 @@ import {
   ListItemText,
   Button,
 } from "@mui/material";
-import ImageNotSupportedIcon from "@mui/icons-material/ImageNotSupported";
+import CoverImage from "./components/CoverImage";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import TopBar from "./components/TopBar";
 import { darkTheme } from "./theme";
@@ -674,7 +674,7 @@ export default function Search() {
                           const coverUrl =
                             typeof item.cover === "string" && item.cover.trim()
                               ? item.cover.trim()
-                              : "";
+                              : null;
                           return (
                             <ListItemButton
                               key={item.id}
@@ -683,26 +683,16 @@ export default function Search() {
                               sx={{ alignItems: "flex-start", gap: 2 }}
                             >
                               <ListItemAvatar>
-                                <Avatar
-                                  variant="square"
-                                  src={coverUrl || undefined}
+                                <CoverImage
+                                  src={coverUrl}
                                   alt={item.record}
+                                  variant="square"
                                   sx={{
                                     width: { xs: 90, md: 120 },
                                     height: { xs: 90, md: 120 },
                                     borderRadius: 1,
-                                    bgcolor: "grey.900",
                                   }}
-                                >
-                                  {!coverUrl && (
-                                    <ImageNotSupportedIcon
-                                      sx={{
-                                        fontSize: { xs: 36, md: 48 },
-                                        color: "text.secondary",
-                                      }}
-                                    />
-                                  )}
-                                </Avatar>
+                                />
                               </ListItemAvatar>
                               <ListItemText
                                 sx={{ alignSelf: "center" }}
@@ -875,25 +865,15 @@ export default function Search() {
                               sx={{ borderRadius: 1, alignItems: "flex-start" }}
                             >
                               <ListItemAvatar>
-                                <Avatar
-                                  variant="rounded"
-                                  src={apiUrl(coverUrl) || undefined}
+                                <CoverImage
+                                  src={coverUrl ? apiUrl(coverUrl) : null}
                                   alt={list.name}
+                                  variant="rounded"
                                   sx={{
                                     width: 90,
                                     height: 90,
-                                    bgcolor: "grey.800",
                                   }}
-                                >
-                                  {!coverUrl && (
-                                    <ImageNotSupportedIcon
-                                      sx={{
-                                        fontSize: 32,
-                                        color: "text.secondary",
-                                      }}
-                                    />
-                                  )}
-                                </Avatar>
+                                />
                               </ListItemAvatar>
                               <ListItemText
                                 sx={{ ml: 2 }}

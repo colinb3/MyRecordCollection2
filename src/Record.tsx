@@ -31,7 +31,7 @@ import FavoriteIcon from "@mui/icons-material/Favorite";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import TopBar from "./components/TopBar";
 import { darkTheme } from "./theme";
-import ImageNotSupportedIcon from "@mui/icons-material/ImageNotSupported";
+import CoverImage from "./components/CoverImage";
 import apiUrl from "./api";
 import { getCachedUserInfo, loadUserInfo } from "./userInfo";
 import { loadUserTags, updateTagsCache } from "./userTags";
@@ -711,42 +711,17 @@ export default function RecordDetails() {
                             alignSelf: "flex-start",
                           }}
                         >
-                          <Box
+                          <CoverImage
+                            src={recordCoverUrl}
+                            alt={record.record}
+                            variant="rounded"
+                            iconSize="large"
                             sx={{
                               width: { xs: 150, sm: 175, md: 200 },
                               height: { xs: 150, sm: 175, md: 200 },
                               borderRadius: 2,
-                              aspectRatio: "1 / 1",
-                              bgcolor: "grey.900",
-                              overflow: "hidden",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              position: "relative",
                             }}
-                          >
-                            {recordCoverUrl ? (
-                              <Box
-                                component="img"
-                                src={recordCoverUrl}
-                                alt={record.record}
-                                sx={{
-                                  position: "absolute",
-                                  inset: 0,
-                                  width: "100%",
-                                  height: "100%",
-                                  objectFit: "cover",
-                                }}
-                              />
-                            ) : (
-                              <ImageNotSupportedIcon
-                                sx={{
-                                  fontSize: { xs: 48, md: 64 },
-                                  color: "text.secondary",
-                                }}
-                              />
-                            )}
-                          </Box>
+                          />
                         </Box>
                         <Stack spacing={2} sx={{ flex: 1 }}>
                           <Stack spacing={0.5}>
