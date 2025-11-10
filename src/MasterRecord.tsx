@@ -676,28 +676,33 @@ export default function MasterRecord() {
         }
 
         // Update the lastFetchedMasterRef to prevent duplicate fetches
-        if (normalized.masterId) {
+        // IMPORTANT: Only store masterId if we fetched BY masterId, not if we just discovered it
+        if (masterIdToUse) {
+          // We fetched by masterId
+          lastFetchedMasterRef.current = {
+            masterId: masterIdToUse,
+            albumKey: null,
+          };
+          console.log("[MasterRecord DEBUG] Updated lastFetchedMasterRef (fetched by masterId):", lastFetchedMasterRef.current);
+        } else if (albumKey) {
+          // We fetched by albumKey (may have discovered a masterId in response)
+          lastFetchedMasterRef.current = {
+            masterId: null,  // Don't store discovered masterId - we haven't fetched BY it yet
+            albumKey: albumKey,
+          };
+          console.log("[MasterRecord DEBUG] Updated lastFetchedMasterRef (fetched by albumKey):", lastFetchedMasterRef.current);
+        }
+
+        // If we discovered a masterId from an albumKey search, update masterIdOverride for URL sync
+        // But DON'T trigger a refetch since we already have all the data
+        if (normalized.masterId && !masterIdToUse && normalized.masterId !== masterIdOverride) {
+          console.log("[MasterRecord DEBUG] Discovered masterId, setting masterIdOverride to:", normalized.masterId);
+          // Update lastFetchedMasterRef with the discovered masterId to prevent refetch
           lastFetchedMasterRef.current = {
             masterId: normalized.masterId,
-            albumKey: albumKey,
+            albumKey: null,
           };
-
-          console.log("[MasterRecord DEBUG] Updated lastFetchedMasterRef:", lastFetchedMasterRef.current);
-
-          // Only set masterIdOverride if we don't already have it (prevents cascade)
-          if (normalized.masterId !== masterIdOverride) {
-            console.log("[MasterRecord DEBUG] Setting masterIdOverride to:", normalized.masterId);
-            setMasterIdOverride(normalized.masterId);
-          } else {
-            console.log("[MasterRecord DEBUG] masterIdOverride already set to:", masterIdOverride);
-          }
-        } else if (albumKey) {
-          // Even without masterId, mark this album as fetched
-          lastFetchedMasterRef.current = {
-            masterId: null,
-            albumKey: albumKey,
-          };
-          console.log("[MasterRecord DEBUG] Updated lastFetchedMasterRef (no masterId):", lastFetchedMasterRef.current);
+          setMasterIdOverride(normalized.masterId);
         }
 
         if (!album) {
