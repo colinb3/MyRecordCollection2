@@ -97,6 +97,7 @@ interface SnackbarState {
   open: boolean;
   message: string;
   severity: "success" | "error" | "info";
+  action?: React.ReactNode;
 }
 
 const ACCEPTED_IMAGE_TYPES = "image/jpeg,image/png,image/webp,image/avif";
@@ -326,8 +327,12 @@ export default function ListDetail() {
   }, []);
 
   const showMessage = useCallback(
-    (message: string, severity: SnackbarState["severity"] = "success") => {
-      setSnackbar({ open: true, message, severity });
+    (
+      message: string,
+      severity: SnackbarState["severity"] = "success",
+      action?: React.ReactNode
+    ) => {
+      setSnackbar({ open: true, message, severity, action });
     },
     []
   );
@@ -509,6 +514,53 @@ export default function ListDetail() {
     }
   }, [list, showMessage]);
 
+  const handleUndoRemove = useCallback(
+    async (removedRecord: ListRecordEntry) => {
+      if (!list?.id) return;
+      try {
+        const response = await fetch(
+          apiUrl(`/api/lists/${list.id}/records`),
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              masterId: removedRecord.masterId,
+              recordName: removedRecord.name,
+              artist: removedRecord.artist,
+              cover: removedRecord.cover,
+              releaseYear: removedRecord.releaseYear,
+              rating: removedRecord.rating,
+            }),
+          }
+        );
+        if (!response.ok) {
+          const problem = await response.json().catch(() => ({}));
+          throw new Error(problem.error || "Failed to restore record");
+        }
+        const data = await response.json();
+        // Re-add the record to the list
+        setRecords((prev) => [...prev, { ...removedRecord, id: data.id }]);
+        setList((prev) =>
+          prev
+            ? {
+                ...prev,
+                recordCount: prev.recordCount + 1,
+              }
+            : prev
+        );
+        showMessage("Record restored", "success");
+      } catch (error) {
+        console.error(error);
+        showMessage(
+          error instanceof Error ? error.message : "Failed to restore record",
+          "error"
+        );
+      }
+    },
+    [list, showMessage]
+  );
+
   const handleRemoveRecord = useCallback(
     async (record: ListRecordEntry) => {
       if (!list?.isOwner) return;
@@ -534,7 +586,22 @@ export default function ListDetail() {
               }
             : prev
         );
-        showMessage("Record removed", "success");
+        
+        // Show message with undo action
+        showMessage(
+          "Record removed",
+          "success",
+          <Button
+            color="inherit"
+            size="small"
+            onClick={() => {
+              closeSnackbar();
+              handleUndoRemove(record);
+            }}
+          >
+            UNDO
+          </Button>
+        );
       } catch (error) {
         console.error(error);
         showMessage(
@@ -549,7 +616,7 @@ export default function ListDetail() {
         });
       }
     },
-    [list, showMessage]
+    [list, showMessage, handleUndoRemove, closeSnackbar]
   );
 
   const handleEditRecord = useCallback((record: ListRecordEntry) => {
@@ -999,8 +1066,8 @@ export default function ListDetail() {
                               <Avatar
                                 variant="rounded"
                                 sx={{
-                                  width: 140,
-                                  height: 140,
+                                  width: { xs: 120, sm: 140 },
+                                  height: { xs: 120, sm: 140 },
                                   borderRadius: 2,
                                   bgcolor: "grey.800",
                                 }}
@@ -1014,7 +1081,13 @@ export default function ListDetail() {
                               direction={"row"}
                               justifyContent={"space-between"}
                             >
-                              <Typography variant="h5" fontWeight={700} mr={1}>
+                              <Typography
+                                variant="h5"
+                                fontWeight={700}
+                                mr={1}
+                                textOverflow={"ellipsis"}
+                                overflow={"hidden"}
+                              >
                                 {list.name}{" "}
                                 {list.isOwner ? (
                                   list.isPrivate ? (
@@ -1243,6 +1316,7 @@ export default function ListDetail() {
             onClose={closeSnackbar}
             severity={snackbar.severity}
             variant="filled"
+            action={snackbar.action}
           >
             {snackbar.message}
           </Alert>
