@@ -383,8 +383,6 @@ export default function MasterRecord() {
 
     setSelectedTags([]);
     setRating(0);
-    // Don't reset releaseYear here - it should come from the API response
-    // setReleaseYear(new Date().getFullYear());
     setWikiTags([]);
     setWikiLoading(true);
     setMasterError(null);
@@ -452,43 +450,30 @@ export default function MasterRecord() {
         options?.preserveReleaseYear ?? releaseYearTouchedRef.current;
       const forceRefresh = options?.force ?? false;
 
-      console.log("[MasterRecord DEBUG] loadMasterInfo called:", {
-        masterIdToUse,
-        albumId: album?.id,
-        albumArtist: album?.artist,
-        albumRecord: album?.record,
-        preserveReleaseYear,
-        forceRefresh,
-        lastFetchedMaster: lastFetchedMasterRef.current,
-      });
-
       if (!album && !masterIdToUse) {
-        console.log("[MasterRecord DEBUG] Skipping - no album and no masterIdToUse");
         return;
       }
 
       // Create a unique key for deduplication
       const albumKey = album ? `${album.artist}:${album.record}` : null;
 
-      console.log("[MasterRecord DEBUG] albumKey:", albumKey);
-
-      // Check if we've already fetched this exact master info with the same method
+      // Check if we've already fetched this exact master info
       if (!forceRefresh) {
         let alreadyFetched = false;
-        
+
         if (masterIdToUse) {
           // If we're fetching by masterId, only skip if we previously fetched by the same masterId
-          alreadyFetched = lastFetchedMasterRef.current.masterId === masterIdToUse;
+          alreadyFetched =
+            lastFetchedMasterRef.current.masterId === masterIdToUse;
         } else if (albumKey) {
           // If we're fetching by albumKey, only skip if we previously fetched by the same albumKey
           // AND we didn't discover a new masterId (which would require a refetch by masterId)
-          alreadyFetched = 
+          alreadyFetched =
             lastFetchedMasterRef.current.albumKey === albumKey &&
             lastFetchedMasterRef.current.masterId === null;
         }
 
         if (alreadyFetched) {
-          console.log("[MasterRecord DEBUG] Skipping - already fetched");
           return;
         }
       }
@@ -505,11 +490,8 @@ export default function MasterRecord() {
       }
 
       if (!endpoint) {
-        console.log("[MasterRecord DEBUG] Skipping - no endpoint");
         return;
       }
-
-      console.log("[MasterRecord DEBUG] Fetching from:", endpoint);
 
       setMasterLoading(true);
       setMasterError(null);
@@ -533,15 +515,7 @@ export default function MasterRecord() {
 
         const data = await response.json();
 
-        console.log("[MasterRecord DEBUG] Received response data:", {
-          masterId: data?.masterId,
-          releaseYear: data?.releaseYear,
-          cover: data?.cover ? "present" : "null",
-          inDb: data?.inDb,
-        });
-
         if (!isMountedRef.current) {
-          console.log("[MasterRecord DEBUG] Component unmounted, bailing");
           return;
         }
 
@@ -684,20 +658,29 @@ export default function MasterRecord() {
             masterId: masterIdToUse,
             albumKey: null,
           };
-          console.log("[MasterRecord DEBUG] Updated lastFetchedMasterRef (fetched by masterId):", lastFetchedMasterRef.current);
         } else if (albumKey) {
           // We fetched by albumKey (may have discovered a masterId in response)
           lastFetchedMasterRef.current = {
-            masterId: null,  // Don't store discovered masterId - we haven't fetched BY it yet
+            masterId: null, // Don't store discovered masterId - we haven't fetched BY it yet
             albumKey: albumKey,
           };
-          console.log("[MasterRecord DEBUG] Updated lastFetchedMasterRef (fetched by albumKey):", lastFetchedMasterRef.current);
+          console.log(
+            "[MasterRecord DEBUG] Updated lastFetchedMasterRef (fetched by albumKey):",
+            lastFetchedMasterRef.current
+          );
         }
 
         // If we discovered a masterId from an albumKey search, update masterIdOverride for URL sync
         // But DON'T trigger a refetch since we already have all the data
-        if (normalized.masterId && !masterIdToUse && normalized.masterId !== masterIdOverride) {
-          console.log("[MasterRecord DEBUG] Discovered masterId, setting masterIdOverride to:", normalized.masterId);
+        if (
+          normalized.masterId &&
+          !masterIdToUse &&
+          normalized.masterId !== masterIdOverride
+        ) {
+          console.log(
+            "[MasterRecord DEBUG] Discovered masterId, setting masterIdOverride to:",
+            normalized.masterId
+          );
           // Update lastFetchedMasterRef with the discovered masterId to prevent refetch
           lastFetchedMasterRef.current = {
             masterId: normalized.masterId,
@@ -743,7 +726,8 @@ export default function MasterRecord() {
         console.log("[MasterRecord DEBUG] About to set release year:", {
           preserveReleaseYear,
           normalizedReleaseYear: normalized.releaseYear,
-          willSet: !preserveReleaseYear &&
+          willSet:
+            !preserveReleaseYear &&
             normalized.releaseYear &&
             normalized.releaseYear >= 1901 &&
             normalized.releaseYear <= 2100,
@@ -755,7 +739,10 @@ export default function MasterRecord() {
           normalized.releaseYear >= 1901 &&
           normalized.releaseYear <= 2100
         ) {
-          console.log("[MasterRecord DEBUG] Setting release year to:", normalized.releaseYear);
+          console.log(
+            "[MasterRecord DEBUG] Setting release year to:",
+            normalized.releaseYear
+          );
           setReleaseYear(normalized.releaseYear);
           setReleaseYearTouched(true);
           releaseYearTouchedRef.current = true;
@@ -780,21 +767,13 @@ export default function MasterRecord() {
   );
 
   useEffect(() => {
-    console.log("[MasterRecord DEBUG] useEffect triggered:", {
-      albumId: album?.id,
-      masterIdOverride,
-      lastFetchedMaster: lastFetchedMasterRef.current,
-    });
-
     if (!album && !masterIdOverride) {
-      console.log("[MasterRecord DEBUG] Clearing state");
       setMasterInfo(null);
       setMasterError(null);
       lastFetchedMasterRef.current = { masterId: null, albumKey: null };
       return;
     }
 
-    console.log("[MasterRecord DEBUG] Calling loadMasterInfo from useEffect");
     void loadMasterInfo({ preserveReleaseYear: false });
   }, [album, masterIdOverride, loadMasterInfo]);
 
