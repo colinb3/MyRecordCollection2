@@ -1211,11 +1211,7 @@ app.get("/api/records", requireAuth, async (req, res) => {
 });
 
 app.get("/api/records/master-info", async (req, res) => {
-  console.log("[MasterInfo API DEBUG] Request received:", {
-    masterId: req.query.masterId,
-    artist: req.query.artist,
-    record: req.query.record,
-  });
+  console.log("Fetching master info...");
 
   let authenticatedUserUuid = null;
   const token = req.cookies?.token;
@@ -1261,7 +1257,7 @@ app.get("/api/records/master-info", async (req, res) => {
 
       if (!row) {
         // Master ID exists but not in our database yet - fetch details from Discogs
-        console.log("[MasterInfo API DEBUG] Master not in DB, fetching from Discogs:", masterIdParam);
+        console.log("*****Master ID not in DB, fetching from Discogs:", masterIdParam);
         try {
           const discogsUrl = `https://api.discogs.com/masters/${masterIdParam}`;
           const discogsResponse = await fetch(discogsUrl, {
@@ -1281,13 +1277,6 @@ app.get("/api/records/master-info", async (req, res) => {
             const artist = typeof discogsData?.artists?.[0]?.name === "string" ? discogsData.artists[0].name : null;
             const name = typeof discogsData?.title === "string" ? discogsData.title : null;
             
-            console.log("[MasterInfo API DEBUG] Discogs fetch success:", {
-              releaseYear,
-              artist,
-              name,
-              hasCover: !!cover,
-            });
-
             return res.json({
               masterId: masterIdParam,
               releaseYear,
@@ -1330,12 +1319,6 @@ app.get("/api/records/master-info", async (req, res) => {
         return Number.isFinite(num) && num >= 0 ? num : 0;
       });
 
-      console.log("[MasterInfo API DEBUG] Found in DB:", {
-        masterId: row.id,
-        releaseYear: releaseYearValue,
-        ratingAverage,
-      });
-
       return res.json({
         masterId: row.id,
         releaseYear: Number.isInteger(releaseYearValue) ? releaseYearValue : null,
@@ -1361,18 +1344,9 @@ app.get("/api/records/master-info", async (req, res) => {
     return res.status(400).json({ error: "artist and record are required" });
   }
 
-  console.log("[MasterInfo API DEBUG] Searching Discogs by artist/record:", {
-    artist,
-    record: recordName,
-  });
-
   try {
     const result = await lookupDiscogsMaster(artist, recordName);
-    console.log("[MasterInfo API DEBUG] Discogs lookup result:", {
-      found: !!result,
-      masterId: result?.masterId,
-      releaseYear: result?.releaseYear,
-    });
+    console.log("Fetching discogs result");
 
     const pool = await getPool();
 

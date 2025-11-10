@@ -664,10 +664,6 @@ export default function MasterRecord() {
             masterId: null, // Don't store discovered masterId - we haven't fetched BY it yet
             albumKey: albumKey,
           };
-          console.log(
-            "[MasterRecord DEBUG] Updated lastFetchedMasterRef (fetched by albumKey):",
-            lastFetchedMasterRef.current
-          );
         }
 
         // If we discovered a masterId from an albumKey search, update masterIdOverride for URL sync
@@ -677,10 +673,6 @@ export default function MasterRecord() {
           !masterIdToUse &&
           normalized.masterId !== masterIdOverride
         ) {
-          console.log(
-            "[MasterRecord DEBUG] Discovered masterId, setting masterIdOverride to:",
-            normalized.masterId
-          );
           // Update lastFetchedMasterRef with the discovered masterId to prevent refetch
           lastFetchedMasterRef.current = {
             masterId: normalized.masterId,
@@ -723,31 +715,15 @@ export default function MasterRecord() {
         setMasterInfo(normalized);
         setMasterLoading(false);
 
-        console.log("[MasterRecord DEBUG] About to set release year:", {
-          preserveReleaseYear,
-          normalizedReleaseYear: normalized.releaseYear,
-          willSet:
-            !preserveReleaseYear &&
-            normalized.releaseYear &&
-            normalized.releaseYear >= 1901 &&
-            normalized.releaseYear <= 2100,
-        });
-
         if (
           !preserveReleaseYear &&
           normalized.releaseYear &&
           normalized.releaseYear >= 1901 &&
           normalized.releaseYear <= 2100
         ) {
-          console.log(
-            "[MasterRecord DEBUG] Setting release year to:",
-            normalized.releaseYear
-          );
           setReleaseYear(normalized.releaseYear);
           setReleaseYearTouched(true);
           releaseYearTouchedRef.current = true;
-        } else {
-          console.log("[MasterRecord DEBUG] NOT setting release year");
         }
       } catch (error) {
         if (!isMountedRef.current) {
@@ -1450,6 +1426,7 @@ export default function MasterRecord() {
                   onAddNewTag={handleAddNewTag}
                   wikiTags={wikiTags}
                   wikiLoading={wikiLoading}
+                  masterLoading={masterLoading}
                   rating={rating}
                   onRatingChange={setRating}
                   releaseYear={releaseYear}

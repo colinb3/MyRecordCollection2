@@ -48,6 +48,7 @@ interface FindRecordSidebarProps {
   wikiTags?: string[];
   // Whether wiki suggestions are currently loading
   wikiLoading?: boolean;
+  masterLoading?: boolean;
   rating: number;
   onRatingChange: (value: number) => void;
   releaseYear: number;
@@ -78,6 +79,7 @@ export default function FindRecordSidebar({
   onAddNewTag,
   wikiTags,
   wikiLoading,
+  masterLoading,
   rating,
   onRatingChange,
   releaseYear,
@@ -264,7 +266,7 @@ export default function FindRecordSidebar({
           sx={{ display: "flex", alignItems: "center", mt: 1 }}
         >
           Release
-          {wikiLoading && <CircularProgress size={16} sx={{ ml: 1 }} />}
+          {masterLoading && <CircularProgress size={16} sx={{ ml: 1 }} />}
         </Typography>
         <TextField
           value={releaseYear}
