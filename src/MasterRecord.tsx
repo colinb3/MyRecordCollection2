@@ -451,12 +451,25 @@ export default function MasterRecord() {
         options?.preserveReleaseYear ?? releaseYearTouchedRef.current;
       const forceRefresh = options?.force ?? false;
 
+      console.log("[MasterRecord DEBUG] loadMasterInfo called:", {
+        masterIdToUse,
+        albumId: album?.id,
+        albumArtist: album?.artist,
+        albumRecord: album?.record,
+        preserveReleaseYear,
+        forceRefresh,
+        lastFetchedMaster: lastFetchedMasterRef.current,
+      });
+
       if (!album && !masterIdToUse) {
+        console.log("[MasterRecord DEBUG] Skipping - no album and no masterIdToUse");
         return;
       }
 
       // Create a unique key for deduplication
       const albumKey = album ? `${album.artist}:${album.record}` : null;
+
+      console.log("[MasterRecord DEBUG] albumKey:", albumKey);
 
       // Check if we've already fetched this exact master info
       if (!forceRefresh) {
@@ -466,6 +479,7 @@ export default function MasterRecord() {
           (albumKey && lastFetchedMasterRef.current.albumKey === albumKey);
 
         if (alreadyFetched) {
+          console.log("[MasterRecord DEBUG] Skipping - already fetched");
           return;
         }
       }
@@ -482,8 +496,11 @@ export default function MasterRecord() {
       }
 
       if (!endpoint) {
+        console.log("[MasterRecord DEBUG] Skipping - no endpoint");
         return;
       }
+
+      console.log("[MasterRecord DEBUG] Fetching from:", endpoint);
 
       setMasterLoading(true);
       setMasterError(null);
@@ -507,7 +524,15 @@ export default function MasterRecord() {
 
         const data = await response.json();
 
+        console.log("[MasterRecord DEBUG] Received response data:", {
+          masterId: data?.masterId,
+          releaseYear: data?.releaseYear,
+          cover: data?.cover ? "present" : "null",
+          inDb: data?.inDb,
+        });
+
         if (!isMountedRef.current) {
+          console.log("[MasterRecord DEBUG] Component unmounted, bailing");
           return;
         }
 
@@ -649,9 +674,14 @@ export default function MasterRecord() {
             albumKey: albumKey,
           };
 
+          console.log("[MasterRecord DEBUG] Updated lastFetchedMasterRef:", lastFetchedMasterRef.current);
+
           // Only set masterIdOverride if we don't already have it (prevents cascade)
           if (normalized.masterId !== masterIdOverride) {
+            console.log("[MasterRecord DEBUG] Setting masterIdOverride to:", normalized.masterId);
             setMasterIdOverride(normalized.masterId);
+          } else {
+            console.log("[MasterRecord DEBUG] masterIdOverride already set to:", masterIdOverride);
           }
         } else if (albumKey) {
           // Even without masterId, mark this album as fetched
@@ -659,6 +689,7 @@ export default function MasterRecord() {
             masterId: null,
             albumKey: albumKey,
           };
+          console.log("[MasterRecord DEBUG] Updated lastFetchedMasterRef (no masterId):", lastFetchedMasterRef.current);
         }
 
         if (!album) {
@@ -695,15 +726,27 @@ export default function MasterRecord() {
         setMasterInfo(normalized);
         setMasterLoading(false);
 
+        console.log("[MasterRecord DEBUG] About to set release year:", {
+          preserveReleaseYear,
+          normalizedReleaseYear: normalized.releaseYear,
+          willSet: !preserveReleaseYear &&
+            normalized.releaseYear &&
+            normalized.releaseYear >= 1901 &&
+            normalized.releaseYear <= 2100,
+        });
+
         if (
           !preserveReleaseYear &&
           normalized.releaseYear &&
           normalized.releaseYear >= 1901 &&
           normalized.releaseYear <= 2100
         ) {
+          console.log("[MasterRecord DEBUG] Setting release year to:", normalized.releaseYear);
           setReleaseYear(normalized.releaseYear);
           setReleaseYearTouched(true);
           releaseYearTouchedRef.current = true;
+        } else {
+          console.log("[MasterRecord DEBUG] NOT setting release year");
         }
       } catch (error) {
         if (!isMountedRef.current) {
@@ -723,13 +766,21 @@ export default function MasterRecord() {
   );
 
   useEffect(() => {
+    console.log("[MasterRecord DEBUG] useEffect triggered:", {
+      albumId: album?.id,
+      masterIdOverride,
+      lastFetchedMaster: lastFetchedMasterRef.current,
+    });
+
     if (!album && !masterIdOverride) {
+      console.log("[MasterRecord DEBUG] Clearing state");
       setMasterInfo(null);
       setMasterError(null);
       lastFetchedMasterRef.current = { masterId: null, albumKey: null };
       return;
     }
 
+    console.log("[MasterRecord DEBUG] Calling loadMasterInfo from useEffect");
     void loadMasterInfo({ preserveReleaseYear: false });
   }, [album, masterIdOverride, loadMasterInfo]);
 
