@@ -667,41 +667,6 @@ function doesDiscogsResultMatch(discogsResult, expectedArtist, expectedRecord) {
   );
 }
 
-/**
- * Normalizes a barcode to alphanumeric characters only for comparison.
- * @param {string} barcode - The barcode to normalize
- * @returns {string} The normalized barcode with only alphanumeric characters
- */
-function normalizeBarcode(barcode) {
-  if (typeof barcode !== "string") {
-    return "";
-  }
-  return barcode.replace(/[^0-9A-Za-z]/g, "").toLowerCase();
-}
-
-/**
- * Checks if a Discogs result contains the searched barcode.
- * @param {object} discogsResult - The result object from Discogs
- * @param {string} searchedBarcode - The barcode that was searched for
- * @returns {boolean} True if the result contains a matching barcode
- */
-function doesDiscogsResultContainBarcode(discogsResult, searchedBarcode) {
-  const normalizedSearch = normalizeBarcode(searchedBarcode);
-  if (!normalizedSearch) {
-    return false;
-  }
-
-  const barcodes = discogsResult?.barcode;
-  if (!Array.isArray(barcodes) || barcodes.length === 0) {
-    return false;
-  }
-
-  return barcodes.some((barcode) => {
-    const normalizedBarcode = normalizeBarcode(barcode);
-    return normalizedBarcode === normalizedSearch;
-  });
-}
-
 async function lookupDiscogsByBarcode(barcode) {
   const trimmed = typeof barcode === "string" ? barcode.trim() : "";
   if (!trimmed) {
@@ -736,14 +701,6 @@ async function lookupDiscogsByBarcode(barcode) {
     const prioritized =
       results.find((item) => Number(item?.master_id) > 0) ?? results[0];
     if (!prioritized) {
-      return null;
-    }
-
-    // Verify that the result actually contains the searched barcode
-    if (!doesDiscogsResultContainBarcode(prioritized, trimmed)) {
-      console.log(
-        `Discogs result does not contain searched barcode: ${trimmed}`
-      );
       return null;
     }
 

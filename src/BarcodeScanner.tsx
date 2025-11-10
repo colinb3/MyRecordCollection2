@@ -116,7 +116,7 @@ export default function BarcodeScanner() {
   }, []);
 
   const processBarcode = useCallback(
-    async (rawCode: string) => {
+    async (rawCode: string, isManual = false) => {
       const code = rawCode.trim();
       if (!code) {
         setStatus("error");
@@ -124,7 +124,11 @@ export default function BarcodeScanner() {
         return;
       }
 
-      setDetectedBarcode(code);
+      if (isManual) {
+        setDetectedBarcode(null);
+      } else {
+        setDetectedBarcode(code);
+      }
       setStatus("processing");
       setMessage(null);
 
@@ -154,6 +158,15 @@ export default function BarcodeScanner() {
           const payload = (await response.json().catch(() => ({}))) as {
             error?: string;
           };
+
+          // Handle 404 - no results found
+          if (response.status === 404) {
+            setStatus("error");
+            setMessage(`No results found for barcode: ${code}`);
+            setDetectedBarcode(null);
+            return;
+          }
+
           const errorMessage = payload?.error
             ? String(payload.error)
             : `Failed to search barcode (${response.status})`;
@@ -488,7 +501,7 @@ export default function BarcodeScanner() {
       }
       stopScanner();
       scanningActiveRef.current = false;
-      await processBarcode(trimmed);
+      await processBarcode(trimmed, true);
     },
     [manualBarcode, processBarcode, stopScanner]
   );
@@ -650,12 +663,17 @@ export default function BarcodeScanner() {
                     >
                       <TextField
                         value={manualBarcode}
-                        onChange={(event) =>
-                          setManualBarcode(event.target.value)
-                        }
+                        onChange={(event) => {
+                          const value = event.target.value;
+                          // Only allow alphanumeric characters and limit to 36 characters
+                          const filtered = value
+                            .replace(/[^a-zA-Z0-9]/g, "")
+                            .slice(0, 36);
+                          setManualBarcode(filtered);
+                        }}
                         placeholder="e.g. 88985446751 or MS2038"
                         fullWidth
-                        inputProps={{ inputMode: "text" }}
+                        inputProps={{ inputMode: "text", maxLength: 36 }}
                       />
                       <Button
                         type="submit"
