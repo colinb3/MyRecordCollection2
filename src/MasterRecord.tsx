@@ -383,7 +383,8 @@ export default function MasterRecord() {
 
     setSelectedTags([]);
     setRating(0);
-    setReleaseYear(new Date().getFullYear());
+    // Don't reset releaseYear here - it should come from the API response
+    // setReleaseYear(new Date().getFullYear());
     setWikiTags([]);
     setWikiLoading(true);
     setMasterError(null);
