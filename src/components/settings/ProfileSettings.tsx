@@ -882,11 +882,7 @@ export default function ProfileSettings({
           accept={ALLOWED_PROFILE_MIME_TYPES.join(",")}
           onChange={handleProfilePicInputChange}
         />
-        <Stack
-          spacing={2}
-          pb={2}
-          width={{ xs: "100%", sm: "50%", lg: "40%", xl: "30%" }}
-        >
+        <Stack spacing={2} pb={2} width={{ xs: "100%", sm: "50%" }}>
           <TextField
             label="Display name"
             value={displayNameValue}

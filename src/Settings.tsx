@@ -174,66 +174,67 @@ export default function Settings() {
           profilePicUrl={profilePicUrl ?? undefined}
         />
 
-        {!isLargeScreen && (
-          <Box sx={{ mb: 1, display: "flex", alignItems: "center", gap: 1 }}>
-            <IconButton
-              color="inherit"
-              onClick={() => setDrawerOpen(true)}
-              aria-label="Open settings menu"
-            >
-              <MenuIcon />
-            </IconButton>
-            <Typography variant="body1">Menu</Typography>
-          </Box>
-        )}
-
-        <Grid
-          container
-          spacing={2}
-          sx={{ flex: 1, minHeight: 0, overflow: "hidden" }}
-          columns={{ xs: 12, md: 12, lg: 12 }}
-        >
-          {isLargeScreen && (
-            <Grid
-              size={{ lg: 2, md: 3 }}
-              sx={{ display: "flex", minHeight: 0, height: "100%", pb: 2 }}
-            >
-              <Paper
+        <Box sx={{ flex: 1, overflowY: "auto", pb: 3, px: 1 }}>
+          <Box maxWidth={850} mx="auto" sx={{ mt: 1 }}>
+            {!isLargeScreen && (
+              <Box
                 sx={{
-                  p: 1,
-                  width: "100%",
-                  borderRadius: 2,
+                  mb: 2,
                   display: "flex",
-                  flexDirection: "column",
+                  alignItems: "center",
                   gap: 1,
-                  flex: 1,
+                  position: "sticky",
+                  top: 0,
+                  bgcolor: "background.default",
+                  zIndex: 10,
+                  py: 1,
+                  mx: -1,
+                  px: 1,
                 }}
               >
-                <Box sx={{ flex: 1, overflowY: "auto", p: 1 }}>{menu}</Box>
-              </Paper>
-            </Grid>
-          )}
-          <Grid
-            size={{ lg: 10, md: 9, xs: 12 }}
-            sx={{ display: "flex", minHeight: 0, height: "100%", pb: 2 }}
-          >
-            <Paper
-              sx={{
-                p: 1,
-                width: "100%",
-                borderRadius: 2,
-                display: "flex",
-                flexDirection: "column",
-                minHeight: 0,
-                flex: 1,
-              }}
-            >
-              <Box sx={{ flex: 1, overflowY: "auto", p: 2, pb: 3 }}>
-                {currentContent}
+                <IconButton
+                  color="inherit"
+                  onClick={() => setDrawerOpen(true)}
+                  aria-label="Open settings menu"
+                >
+                  <MenuIcon />
+                </IconButton>
+                <Typography variant="body1">Menu</Typography>
               </Box>
-            </Paper>
-          </Grid>
-        </Grid>
+            )}
+
+            <Grid container spacing={2} columns={{ xs: 12, md: 12, lg: 12 }}>
+              {isLargeScreen && (
+                <Grid size={{ md: 3 }}>
+                  <Paper
+                    sx={{
+                      p: 1,
+                      borderRadius: 2,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 1,
+                      position: "sticky",
+                      top: 8,
+                      alignSelf: "flex-start",
+                    }}
+                  >
+                    <Box sx={{ p: 1 }}>{menu}</Box>
+                  </Paper>
+                </Grid>
+              )}
+              <Grid size={{ md: 9, xs: 12 }}>
+                <Paper
+                  sx={{
+                    p: 3,
+                    borderRadius: 2,
+                  }}
+                >
+                  {currentContent}
+                </Paper>
+              </Grid>
+            </Grid>
+          </Box>
+        </Box>
 
         {!isLargeScreen && (
           <Drawer
