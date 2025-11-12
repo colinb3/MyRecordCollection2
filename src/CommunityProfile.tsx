@@ -13,6 +13,7 @@ import {
   Typography,
   Avatar,
   Button,
+  ButtonBase,
   CircularProgress,
   IconButton,
 } from "@mui/material";
@@ -554,7 +555,7 @@ export default function CommunityProfile() {
               </Grid>
               {profile ? (
                 <>
-                  {profile.listeningTo && (
+                  {profile.listeningTo && profile.listeningTo.masterId && (
                     <Grid size={{ xs: 12 }}>
                       <Paper
                         sx={{
@@ -567,18 +568,28 @@ export default function CommunityProfile() {
                           position: "relative",
                         }}
                       >
-                        <Box
+                        <ButtonBase
+                          onClick={() =>
+                            navigate(`/master/${profile.listeningTo!.masterId}`)
+                          }
                           sx={{
                             display: "flex",
                             alignItems: "center",
                             gap: 2.5,
+                            borderRadius: 1,
+                            p: 1,
+                            mx: -1,
+                            "&:hover": {
+                              bgcolor: "action.hover",
+                            },
+                            transition: "background-color 0.2s",
                           }}
                         >
                           <SpinningRecord
                             coverUrl={profile.listeningTo.cover}
                             size={80}
                           />
-                          <Box>
+                          <Box sx={{ textAlign: "left" }}>
                             <Typography
                               variant="body2"
                               color="text.secondary"
@@ -601,7 +612,7 @@ export default function CommunityProfile() {
                               </Typography>
                             )}
                           </Box>
-                        </Box>
+                        </ButtonBase>
                       </Paper>
                     </Grid>
                   )}

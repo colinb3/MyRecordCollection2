@@ -1231,12 +1231,20 @@ export default function ProfileSettings({
 
         <TextField
           label="Search for a record"
+          type="search"
           value={listeningToSearch}
           onChange={(e) => setListeningToSearch(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
+              e.stopPropagation();
               void handleSearchListeningTo();
+            }
+          }}
+          onKeyPress={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              e.stopPropagation();
             }
           }}
           placeholder="Press Enter to search..."
