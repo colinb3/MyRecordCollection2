@@ -559,7 +559,7 @@ export default function CommunityProfile() {
                     <Grid size={{ xs: 12 }}>
                       <Paper
                         sx={{
-                          p: { xs: 2, md: 3 },
+                          p: { xs: 1, md: 2 },
                           borderRadius: 2,
                           display: "flex",
                           flexDirection: { xs: "column", sm: "row" },
@@ -578,7 +578,6 @@ export default function CommunityProfile() {
                             gap: 2.5,
                             borderRadius: 1,
                             p: 1,
-                            mx: -1,
                             "&:hover": {
                               bgcolor: "action.hover",
                             },
