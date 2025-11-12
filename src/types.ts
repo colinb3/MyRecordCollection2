@@ -198,11 +198,24 @@ export interface CommunityFeedLikedListEntry {
   likedAt: string;
 }
 
+export interface CommunityFeedListeningToEntry {
+  type: 'listening-to';
+  listener: CommunityFeedOwner;
+  record: {
+    masterId: number;
+    name: string;
+    artist: string;
+    cover: string | null;
+  };
+  listeningAt: string;
+}
+
 export type CommunityFeedEntry =
   | CommunityFeedRecordEntry
   | CommunityFeedListEntry
   | CommunityFeedLikedReviewEntry
-  | CommunityFeedLikedListEntry;
+  | CommunityFeedLikedListEntry
+  | CommunityFeedListeningToEntry;
 
 export interface MasterReviewEntry {
   recordId: number;
@@ -234,6 +247,12 @@ export interface PublicUserProfile {
   collectionPrivate: boolean;
   wishlistPrivate: boolean;
   listenedPrivate: boolean;
+  listeningTo: {
+    artist: string | null;
+    cover: string | null;
+    name: string;
+    masterId: number | null;
+  } | null;
 }
 
 export interface UserFollowLists {

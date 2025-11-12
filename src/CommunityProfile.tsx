@@ -23,6 +23,7 @@ import { darkTheme } from "./theme";
 import { getCachedUserInfo, loadUserInfo } from "./userInfo";
 import { setUserId } from "./analytics";
 import RecordPreviewGrid from "./components/RecordPreviewGrid";
+import SpinningRecord from "./components/SpinningRecord";
 import type { PublicUserProfile } from "./types";
 import {
   loadPublicUserProfile,
@@ -551,6 +552,61 @@ export default function CommunityProfile() {
                   )}
                 </Paper>
               </Grid>
+              {profile ? (
+                <>
+                  {profile.listeningTo && (
+                    <Grid size={{ xs: 12 }}>
+                      <Paper
+                        sx={{
+                          p: { xs: 2, md: 3 },
+                          borderRadius: 2,
+                          display: "flex",
+                          flexDirection: { xs: "column", sm: "row" },
+                          alignItems: "flex-start",
+                          gap: 3,
+                          position: "relative",
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 2.5,
+                          }}
+                        >
+                          <SpinningRecord
+                            coverUrl={profile.listeningTo.cover}
+                            size={80}
+                          />
+                          <Box>
+                            <Typography
+                              variant="body2"
+                              color="text.secondary"
+                              sx={{ mb: 0.5 }}
+                            >
+                              Listening to:
+                            </Typography>
+                            <Typography
+                              variant="body1"
+                              sx={{ fontWeight: 600 }}
+                            >
+                              {profile.listeningTo.name}
+                            </Typography>
+                            {profile.listeningTo.artist && (
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                              >
+                                {profile.listeningTo.artist}
+                              </Typography>
+                            )}
+                          </Box>
+                        </Box>
+                      </Paper>
+                    </Grid>
+                  )}
+                </>
+              ) : null}
 
               <Grid size={{ xs: 12 }}>
                 <SectionCard title="Collection Highlights">

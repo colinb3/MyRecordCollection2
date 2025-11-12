@@ -188,12 +188,11 @@ export async function loadCollectionRecords(
         throw new Error(`Failed to load records for ${key} (${res.status})`);
       }
 
-      const data = await res.json().catch(() => []);
-      const normalized = Array.isArray(data)
-    ? data
-      .map((item) => normalizeApiRecord(item))
-      .filter((item): item is MrcRecord => item !== null)
-        : [];
+      const data = await res.json().catch(() => ({ records: [] }));
+      const recordsArray = Array.isArray(data?.records) ? data.records : Array.isArray(data) ? data : [];
+      const normalized = recordsArray
+        .map((item: unknown) => normalizeApiRecord(item))
+        .filter((item: unknown): item is MrcRecord => item !== null);
       collectionCache.set(key, normalized);
       cachedAllRecords = null; // Invalidate aggregated cache
       return cloneRecords(normalized);

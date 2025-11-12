@@ -1842,6 +1842,23 @@ app.get("/api/community/users/:username", async (req, res) => {
       }));
     }
 
+    // Fetch listening to record
+    let listeningTo = null;
+    const [listeningToRows] = await pool.query(
+      `SELECT artist, cover, name, masterId FROM ListeningTo WHERE userUuid = ? LIMIT 1`,
+      [userRow.uuid]
+    );
+    if (listeningToRows && listeningToRows.length > 0) {
+      const row = listeningToRows[0];
+      const masterIdValue = Number(row.masterId);
+      listeningTo = {
+        artist: typeof row.artist === 'string' && row.artist.trim() ? row.artist.trim() : null,
+        cover: typeof row.cover === 'string' && row.cover.trim() ? row.cover.trim() : null,
+        name: typeof row.name === 'string' ? row.name : '',
+        masterId: Number.isInteger(masterIdValue) && masterIdValue > 0 ? masterIdValue : null,
+      };
+    }
+
     res.json({
       ...publicUser,
       highlights,
@@ -1852,6 +1869,7 @@ app.get("/api/community/users/:username", async (req, res) => {
       wishlistPrivate,
       listenedRecords,
       listenedPrivate,
+      listeningTo,
     });
   } catch (error) {
     console.error("Failed to load public profile", error);
@@ -2080,7 +2098,7 @@ app.get("/api/activity", requireAuth, async (req, res) => {
 
   try {
     const pool = await getPool();
-    let recordRows, listRows, likedReviewRows, likedListRows;
+    let recordRows, listRows, likedReviewRows, likedListRows, listeningToRows;
 
     if (scope === "friends") {
       // Get records from followed users
@@ -2128,10 +2146,6 @@ app.get("/api/activity", requireAuth, async (req, res) => {
           WHERE f.userUuid = ? AND r.review IS NOT NULL AND r.review != '' AND t.isPrivate = 0`,
         [req.userUuid]
       );
-      console.log(`Liked reviews fetched: ${likedReviewRows.length}`);
-      if (likedReviewRows.length > 0) {
-        console.log('Sample liked review:', likedReviewRows[0]);
-      }
       // Get liked lists from followed users
       [likedListRows] = await pool.query(
         `SELECT 'liked-list' as activityType, ll.created as timestamp, ll.listId,
@@ -2146,10 +2160,17 @@ app.get("/api/activity", requireAuth, async (req, res) => {
           WHERE f.userUuid = ? AND l.isPrivate = 0`,
         [req.userUuid]
       );
-      console.log(`Liked lists fetched: ${likedListRows.length}`);
-      if (likedListRows.length > 0) {
-        console.log('Sample liked list:', likedListRows[0]);
-      }
+      // Get listening to from followed users
+      [listeningToRows] = await pool.query(
+        `SELECT 'listening-to' as activityType, lt.created as timestamp, lt.masterId,
+                lt.name as recordName, lt.artist, lt.cover,
+                u.username as listenerUsername, u.displayName as listenerDisplayName, u.profilePic as listenerProfilePic
+           FROM ListeningTo lt
+           JOIN Follows f ON f.followsUuid = lt.userUuid
+           JOIN User u ON u.uuid = lt.userUuid
+          WHERE f.userUuid = ?`,
+        [req.userUuid]
+      );
     } else {
       // Get user's own records
       [recordRows] = await pool.query(
@@ -2206,6 +2227,16 @@ app.get("/api/activity", requireAuth, async (req, res) => {
           WHERE ll.userUuid = ? AND l.isPrivate = 0`,
         [req.userUuid]
       );
+      // Get user's own listening to
+      [listeningToRows] = await pool.query(
+        `SELECT 'listening-to' as activityType, lt.created as timestamp, lt.masterId,
+                lt.name as recordName, lt.artist, lt.cover,
+                u.username as listenerUsername, u.displayName as listenerDisplayName, u.profilePic as listenerProfilePic
+           FROM ListeningTo lt
+           JOIN User u ON u.uuid = lt.userUuid
+          WHERE lt.userUuid = ?`,
+        [req.userUuid]
+      );
     }
 
     // Combine and sort all activity
@@ -2213,7 +2244,8 @@ app.get("/api/activity", requireAuth, async (req, res) => {
       ...(Array.isArray(recordRows) ? recordRows : []),
       ...(Array.isArray(listRows) ? listRows : []),
       ...(Array.isArray(likedReviewRows) ? likedReviewRows : []),
-      ...(Array.isArray(likedListRows) ? likedListRows : [])
+      ...(Array.isArray(likedListRows) ? likedListRows : []),
+      ...(Array.isArray(listeningToRows) ? listeningToRows : [])
     ];
     
     allActivity.sort((a, b) => {
@@ -2281,6 +2313,33 @@ app.get("/api/activity", requireAuth, async (req, res) => {
     const tagsByRecord = recordIds.length > 0 ? await fetchTagsByRecordIds(pool, recordIds) : {};
 
     const feed = paginatedActivity.map((row) => {
+      // Handle listening-to activity
+      if (row.activityType === 'listening-to') {
+        const listenerDisplayName =
+          typeof row.listenerDisplayName === "string" && row.listenerDisplayName.trim()
+            ? row.listenerDisplayName.trim()
+            : null;
+        
+        return {
+          type: 'listening-to',
+          listener: {
+            username: row.listenerUsername,
+            displayName: listenerDisplayName,
+            profilePicUrl: buildProfilePicPublicPath(row.listenerProfilePic),
+          },
+          record: {
+            masterId: row.masterId,
+            name: row.recordName,
+            artist: row.artist,
+            cover:
+              typeof row.cover === 'string' && row.cover.trim()
+                ? row.cover.trim()
+                : null,
+          },
+          listeningAt: row.timestamp,
+        };
+      }
+
       // Handle liked-review activity
       if (row.activityType === 'liked-review') {
         const likerDisplayName =
@@ -2436,7 +2495,6 @@ app.get("/api/activity", requireAuth, async (req, res) => {
       };
     });
 
-    console.log(`Returning ${feed.length} feed items. Activity types: ${feed.map(f => f.type).join(', ')}`);
     res.json(feed);
   } catch (error) {
     console.error("Failed to load activity feed", error);
@@ -6065,6 +6123,142 @@ app.delete('/api/admin/lists/:listId/records/:recordId', requireAuth, requireAdm
   } catch (error) {
     console.error('Failed to delete record from list as admin', error);
     res.status(500).json({ error: 'Failed to delete record from list' });
+  }
+});
+
+// Search for master records (for listening to feature)
+app.get("/api/masters/search", requireAuth, async (req, res) => {
+  console.log("Searching for master records...");
+  const query = typeof req.query.q === "string" ? req.query.q.trim() : "";
+  
+  if (query.length < 2) {
+    return res.json([]);
+  }
+
+  try {
+    const pool = await getPool();
+    const likeTerm = `%${escapeForLike(query)}%`;
+    
+    const [rows] = await pool.query(
+      `SELECT id, name, artist, cover
+       FROM Master
+       WHERE name LIKE ? OR artist LIKE ?
+       ORDER BY name
+       LIMIT 5`,
+      [likeTerm, likeTerm]
+    );
+
+    const results = rows.map((row) => ({
+      masterId: Number(row.id),
+      name: typeof row.name === 'string' ? row.name : '',
+      artist: typeof row.artist === 'string' && row.artist.trim() ? row.artist.trim() : null,
+      cover: typeof row.cover === 'string' && row.cover.trim() ? row.cover.trim() : null,
+    }));
+
+    res.json(results);
+  } catch (error) {
+    console.error("Master search failed", error);
+    res.status(500).json({ error: "Failed to search masters" });
+  }
+});
+
+// Get current listening to
+app.get("/api/user/listening-to", requireAuth, async (req, res) => {
+  console.log("Fetching listening to...");
+  
+  try {
+    const pool = await getPool();
+    const [rows] = await pool.query(
+      `SELECT artist, cover, name, masterId FROM ListeningTo WHERE userUuid = ? LIMIT 1`,
+      [req.userUuid]
+    );
+
+    if (!rows || rows.length === 0) {
+      return res.json({ listeningTo: null });
+    }
+
+    const row = rows[0];
+    const listeningTo = {
+      artist: typeof row.artist === 'string' && row.artist.trim() ? row.artist.trim() : null,
+      cover: typeof row.cover === 'string' && row.cover.trim() ? row.cover.trim() : null,
+      name: typeof row.name === 'string' ? row.name : '',
+      masterId: Number.isInteger(row.masterId) && row.masterId > 0 ? row.masterId : null,
+    };
+
+    res.json({ listeningTo });
+  } catch (error) {
+    console.error("Failed to fetch listening to", error);
+    res.status(500).json({ error: "Failed to fetch listening to" });
+  }
+});
+
+// Update listening to
+app.put("/api/user/listening-to", requireAuth, async (req, res) => {
+  console.log("Updating listening to...");
+  
+  const masterId = req.body?.masterId;
+  const masterIdNum = Number(masterId);
+  
+  if (!Number.isInteger(masterIdNum) || masterIdNum <= 0) {
+    return res.status(400).json({ error: "Valid masterId is required" });
+  }
+
+  try {
+    const pool = await getPool();
+    
+    // Fetch master details
+    const [masterRows] = await pool.query(
+      `SELECT id, name, artist, cover FROM Master WHERE id = ? LIMIT 1`,
+      [masterIdNum]
+    );
+
+    if (!masterRows || masterRows.length === 0) {
+      return res.status(404).json({ error: "Master record not found" });
+    }
+
+    const master = masterRows[0];
+    const artist = typeof master.artist === 'string' && master.artist.trim() ? master.artist.trim() : null;
+    const cover = typeof master.cover === 'string' && master.cover.trim() ? master.cover.trim() : null;
+    const name = typeof master.name === 'string' ? master.name : '';
+
+    // Insert or update listening to
+    await pool.execute(
+      `INSERT INTO ListeningTo (userUuid, artist, cover, name, masterId, created)
+       VALUES (?, ?, ?, ?, ?, UTC_TIMESTAMP())
+       ON DUPLICATE KEY UPDATE
+         artist = VALUES(artist),
+         cover = VALUES(cover),
+         name = VALUES(name),
+         masterId = VALUES(masterId),
+         created = UTC_TIMESTAMP()`,
+      [req.userUuid, artist, cover, name, masterIdNum]
+    );
+
+    res.json({
+      success: true,
+      listeningTo: { artist, cover, name, masterId: masterIdNum },
+    });
+  } catch (error) {
+    console.error("Failed to update listening to", error);
+    res.status(500).json({ error: "Failed to update listening to" });
+  }
+});
+
+// Clear listening to
+app.delete("/api/user/listening-to", requireAuth, async (req, res) => {
+  console.log("Clearing listening to...");
+  
+  try {
+    const pool = await getPool();
+    await pool.execute(
+      `DELETE FROM ListeningTo WHERE userUuid = ?`,
+      [req.userUuid]
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Failed to clear listening to", error);
+    res.status(500).json({ error: "Failed to clear listening to" });
   }
 });
 

@@ -127,6 +127,20 @@ function cloneFeedEntry(entry: CommunityFeedEntry): CommunityFeedEntry {
     };
   }
 
+  if (entry.type === 'listening-to') {
+    return {
+      type: 'listening-to',
+      listener: { ...entry.listener },
+      record: {
+        masterId: entry.record.masterId,
+        name: entry.record.name,
+        artist: entry.record.artist,
+        cover: entry.record.cover,
+      },
+      listeningAt: entry.listeningAt,
+    };
+  }
+
   // entry.type === 'list'
   const previews = Array.isArray(entry.previewRecords)
     ? entry.previewRecords.map((preview) => ({ ...preview }))
@@ -279,6 +293,61 @@ function normalizeFeedEntry(raw: AnyObject): CommunityFeedEntry | null {
         name: listName,
       },
       likedAt: typeof raw.likedAt === 'string' ? raw.likedAt : '',
+    };
+  }
+
+  // Handle listening-to entry
+  if (type === 'listening-to') {
+    const listenerRaw = raw.listener;
+    
+    if (!isObject(listenerRaw)) {
+      return null;
+    }
+
+    const listenerObject = listenerRaw as AnyObject;
+    const listenerUsername =
+      typeof listenerObject.username === "string" && listenerObject.username.trim()
+        ? listenerObject.username.trim()
+        : "";
+    if (!listenerUsername) {
+      return null;
+    }
+
+    const recordRaw = raw.record;
+    if (!isObject(recordRaw)) {
+      return null;
+    }
+
+    const recordObject = recordRaw as AnyObject;
+    const masterId = Number(recordObject.masterId);
+    const recordName = typeof recordObject.name === 'string' ? recordObject.name : '';
+    const artist = typeof recordObject.artist === 'string' ? recordObject.artist : '';
+    const cover = typeof recordObject.cover === 'string' && recordObject.cover.trim()
+      ? recordObject.cover.trim()
+      : null;
+
+    if (!Number.isInteger(masterId) || masterId <= 0 || !recordName) {
+      return null;
+    }
+
+    return {
+      type: 'listening-to',
+      listener: {
+        username: listenerUsername,
+        displayName:
+          typeof listenerObject.displayName === "string" &&
+          listenerObject.displayName.trim()
+            ? listenerObject.displayName
+            : null,
+        profilePicUrl: normalizeProfilePicUrl(listenerObject.profilePicUrl),
+      },
+      record: {
+        masterId: masterId,
+        name: recordName,
+        artist: artist,
+        cover: cover,
+      },
+      listeningAt: typeof raw.listeningAt === 'string' ? raw.listeningAt : '',
     };
   }
 
@@ -590,6 +659,30 @@ export async function loadPublicUserProfile(
         collectionPrivate: Boolean(data.collectionPrivate),
         wishlistPrivate: Boolean(data.wishlistPrivate ?? true),
         listenedPrivate: Boolean(data.listenedPrivate ?? false),
+        listeningTo:
+          data.listeningTo && typeof data.listeningTo === "object"
+            ? (() => {
+                const lt = data.listeningTo as AnyObject;
+                return {
+                  artist:
+                    typeof lt.artist === "string" && lt.artist.trim()
+                      ? lt.artist.trim()
+                      : null,
+                  cover:
+                    typeof lt.cover === "string" && lt.cover.trim()
+                      ? lt.cover.trim()
+                      : null,
+                  name:
+                    typeof lt.name === "string" && lt.name.trim()
+                      ? lt.name.trim()
+                      : "",
+                  masterId:
+                    typeof lt.masterId === "number" && Number.isInteger(lt.masterId)
+                      ? lt.masterId
+                      : null,
+                };
+              })()
+            : null,
       };
       profileCache.set(key, {
         ...normalizedProfile,

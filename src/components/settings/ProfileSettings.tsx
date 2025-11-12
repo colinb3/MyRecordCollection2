@@ -126,6 +126,29 @@ export default function ProfileSettings({
   const [hasLoadedCandidates, setHasLoadedCandidates] = useState(false);
   const [searchInput, setSearchInput] = useState("");
 
+  // Listening To state
+  const [listeningTo, setListeningTo] = useState<{
+    artist: string | null;
+    cover: string | null;
+    name: string;
+    masterId: number;
+  } | null>(null);
+  const [listeningToSearch, setListeningToSearch] = useState("");
+  const [listeningToResults, setListeningToResults] = useState<
+    Array<{
+      masterId: number;
+      name: string;
+      artist: string | null;
+      cover: string | null;
+    }>
+  >([]);
+  const [listeningToSearching, setListeningToSearching] = useState(false);
+  const [listeningToError, setListeningToError] = useState<string | null>(null);
+  const [listeningToSuccess, setListeningToSuccess] = useState<string | null>(
+    null
+  );
+  const [savingListeningTo, setSavingListeningTo] = useState(false);
+
   useEffect(() => {
     setUsernameValue(username);
   }, [username]);
@@ -351,6 +374,141 @@ export default function ProfileSettings({
       setSavingHighlights(false);
     }
   }, [highlightRecords]);
+
+  // Listening To handlers
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadListeningTo = async () => {
+      try {
+        const res = await fetch(apiUrl("/api/user/listening-to"), {
+          credentials: "include",
+        });
+        if (!res.ok) return;
+        const data = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (data?.listeningTo) {
+          setListeningTo(data.listeningTo);
+        }
+      } catch (error) {
+        console.warn("Failed to load listening to", error);
+      }
+    };
+
+    loadListeningTo();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleSearchListeningTo = useCallback(async () => {
+    const query = listeningToSearch.trim();
+    if (query.length < 2) {
+      setListeningToResults([]);
+      return;
+    }
+
+    setListeningToSearching(true);
+    setListeningToError(null);
+
+    try {
+      const res = await fetch(
+        apiUrl(`/api/masters/search?q=${encodeURIComponent(query)}`),
+        {
+          credentials: "include",
+        }
+      );
+
+      if (!res.ok) {
+        setListeningToError("Failed to search masters");
+        setListeningToResults([]);
+        return;
+      }
+
+      const data = await res.json().catch(() => []);
+      setListeningToResults(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Failed to search masters", error);
+      setListeningToError("Failed to search masters");
+      setListeningToResults([]);
+    } finally {
+      setListeningToSearching(false);
+    }
+  }, [listeningToSearch]);
+
+  const handleSelectListeningTo = useCallback(
+    async (
+      master: {
+        masterId: number;
+        name: string;
+        artist: string | null;
+        cover: string | null;
+      } | null
+    ) => {
+      if (!master) return;
+
+      setListeningToError(null);
+      setListeningToSuccess(null);
+      setSavingListeningTo(true);
+
+      try {
+        const res = await fetch(apiUrl("/api/user/listening-to"), {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ masterId: master.masterId }),
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          setListeningToError(data?.error || "Failed to update listening to");
+          return;
+        }
+
+        if (data?.listeningTo) {
+          setListeningTo(data.listeningTo);
+          setListeningToSuccess("Listening to updated");
+          setListeningToSearch("");
+          setListeningToResults([]);
+        }
+      } catch (error) {
+        console.error("Failed to update listening to", error);
+        setListeningToError("Network error");
+      } finally {
+        setSavingListeningTo(false);
+      }
+    },
+    []
+  );
+
+  const handleClearListeningTo = useCallback(async () => {
+    setListeningToError(null);
+    setListeningToSuccess(null);
+    setSavingListeningTo(true);
+
+    try {
+      const res = await fetch(apiUrl("/api/user/listening-to"), {
+        method: "DELETE",
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setListeningToError(data?.error || "Failed to clear listening to");
+        return;
+      }
+
+      setListeningTo(null);
+      setListeningToSuccess("Listening to cleared");
+    } catch (error) {
+      console.error("Failed to clear listening to", error);
+      setListeningToError("Network error");
+    } finally {
+      setSavingListeningTo(false);
+    }
+  }, []);
 
   const profileDirty = useMemo(() => {
     const normalizedUsername = usernameValue.trim();
@@ -724,7 +882,11 @@ export default function ProfileSettings({
           accept={ALLOWED_PROFILE_MIME_TYPES.join(",")}
           onChange={handleProfilePicInputChange}
         />
-        <Stack spacing={2} pb={2} width={{ xs: "100%", sm: "50%" }}>
+        <Stack
+          spacing={2}
+          pb={2}
+          width={{ xs: "100%", sm: "50%", lg: "40%", xl: "30%" }}
+        >
           <TextField
             label="Display name"
             value={displayNameValue}
@@ -792,11 +954,11 @@ export default function ProfileSettings({
 
       <Box>
         <Typography variant="h6" gutterBottom>
-          Collection Highlights
+          Highlights
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Choose up to {MAX_PROFILE_HIGHLIGHTS} records to feature on your
-          profile page.
+          Choose up to {MAX_PROFILE_HIGHLIGHTS} of your records to feature on
+          your profile page.
         </Typography>
 
         <Box sx={{ mt: 2 }}>
@@ -830,6 +992,11 @@ export default function ProfileSettings({
                     : "Type to search for a record"
                 }
                 size="small"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                  }
+                }}
                 InputProps={{
                   ...params.InputProps,
                   endAdornment: (
@@ -899,7 +1066,7 @@ export default function ProfileSettings({
               You haven&apos;t selected any highlights yet.
             </Typography>
           ) : (
-            <Stack spacing={2}>
+            <Stack spacing={1}>
               {highlightRecords.map((record, index) => {
                 const coverUrl =
                   typeof record.cover === "string" && record.cover.trim()
@@ -1007,6 +1174,127 @@ export default function ProfileSettings({
             Clear highlights
           </Button>
         </Stack>
+      </Box>
+
+      <Divider />
+
+      <Box>
+        <Typography variant="h6" sx={{ mb: 1 }}>
+          Listening To
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Set what record you're currently listening to. This will be displayed
+          on your profile.
+        </Typography>
+
+        {listeningTo && (
+          <Paper
+            sx={{
+              p: 2,
+              mb: 2,
+              display: "flex",
+              alignItems: "center",
+              gap: 2,
+              borderRadius: 2,
+            }}
+            variant="outlined"
+          >
+            {listeningTo.cover && (
+              <Avatar
+                variant="rounded"
+                src={listeningTo.cover}
+                alt={listeningTo.name}
+                sx={{ width: 64, height: 64 }}
+              />
+            )}
+            <Box flex={1}>
+              <Typography variant="body1" fontWeight={600}>
+                {listeningTo.name}
+              </Typography>
+              {listeningTo.artist && (
+                <Typography variant="body2" color="text.secondary">
+                  {listeningTo.artist}
+                </Typography>
+              )}
+            </Box>
+            <Button
+              variant="text"
+              color="error"
+              onClick={handleClearListeningTo}
+              disabled={savingListeningTo}
+              size="small"
+            >
+              Clear
+            </Button>
+          </Paper>
+        )}
+
+        <TextField
+          label="Search for a record"
+          value={listeningToSearch}
+          onChange={(e) => setListeningToSearch(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              void handleSearchListeningTo();
+            }
+          }}
+          placeholder="Press Enter to search..."
+          size="small"
+          fullWidth
+          sx={{ mb: 2 }}
+        />
+
+        {listeningToSearching && (
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+            <CircularProgress size={16} />
+            <Typography variant="body2" color="text.secondary">
+              Searching...
+            </Typography>
+          </Box>
+        )}
+
+        {!listeningToSearching && listeningToResults.length > 0 && (
+          <Stack spacing={0.5} sx={{ mb: 2 }}>
+            {listeningToResults.map((master) => (
+              <Paper
+                key={master.masterId}
+                variant="outlined"
+                sx={{
+                  p: 1.5,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 2,
+                  cursor: "pointer",
+                  borderRadius: 1,
+                  "&:hover": {
+                    bgcolor: "action.hover",
+                  },
+                }}
+                onClick={() => void handleSelectListeningTo(master)}
+              >
+                {master.cover && (
+                  <Avatar
+                    variant="rounded"
+                    src={master.cover}
+                    alt={master.name}
+                    sx={{ width: 48, height: 48 }}
+                  />
+                )}
+                <Box flex={1}>
+                  <Typography variant="body2" fontWeight={600}>
+                    {master.name}
+                  </Typography>
+                  {master.artist && (
+                    <Typography variant="caption" color="text.secondary">
+                      {master.artist}
+                    </Typography>
+                  )}
+                </Box>
+              </Paper>
+            ))}
+          </Stack>
+        )}
       </Box>
 
       <Divider />
@@ -1204,6 +1492,34 @@ export default function ProfileSettings({
           variant="filled"
         >
           {highlightSuccess}
+        </Alert>
+      </Snackbar>
+      <Snackbar
+        open={!!listeningToSuccess}
+        autoHideDuration={4000}
+        onClose={() => setListeningToSuccess(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          severity="success"
+          onClose={() => setListeningToSuccess(null)}
+          variant="filled"
+        >
+          {listeningToSuccess}
+        </Alert>
+      </Snackbar>
+      <Snackbar
+        open={!!listeningToError}
+        autoHideDuration={4000}
+        onClose={() => setListeningToError(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          severity="error"
+          onClose={() => setListeningToError(null)}
+          variant="filled"
+        >
+          {listeningToError}
         </Alert>
       </Snackbar>
     </Box>

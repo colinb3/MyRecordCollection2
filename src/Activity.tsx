@@ -677,9 +677,11 @@ export default function Activity() {
                                       fontWeight: 700,
                                       cursor: "pointer",
                                       borderRadius: 1,
-                                      px: 0.5,
-                                      py: 0.25,
-                                      mx: -0.5,
+                                      pl: 4,
+                                      pr: 0.5,
+                                      py: 1.25,
+                                      ml: -4,
+                                      mr: -0.5,
                                       "&:hover": {
                                         bgcolor: "action.hover",
                                       },
@@ -702,7 +704,7 @@ export default function Activity() {
                                       cursor: "pointer",
                                       borderRadius: 1,
                                       px: 0.5,
-                                      py: 0.25,
+                                      py: 1.25,
                                       mx: -0.5,
                                       "&:hover": {
                                         bgcolor: "action.hover",
@@ -826,9 +828,11 @@ export default function Activity() {
                                       fontWeight: 700,
                                       cursor: "pointer",
                                       borderRadius: 1,
-                                      px: 0.5,
-                                      py: 0.25,
-                                      mx: -0.5,
+                                      pl: 4,
+                                      pr: 0.5,
+                                      py: 1.25,
+                                      ml: -4,
+                                      mr: -0.5,
                                       "&:hover": {
                                         bgcolor: "action.hover",
                                       },
@@ -851,7 +855,7 @@ export default function Activity() {
                                       cursor: "pointer",
                                       borderRadius: 1,
                                       px: 0.5,
-                                      py: 0.25,
+                                      py: 1.25,
                                       mx: -0.5,
                                       "&:hover": {
                                         bgcolor: "action.hover",
@@ -880,6 +884,133 @@ export default function Activity() {
                                   }}
                                 >
                                   {likedDate}
+                                </Typography>
+                              )}
+                            </Box>
+                          </ListItemButton>
+                        );
+                      }
+
+                      // Handle listening-to activity
+                      if (entry.type === "listening-to") {
+                        const listenerDisplayName =
+                          typeof entry.listener.displayName === "string"
+                            ? entry.listener.displayName.trim()
+                            : "";
+                        const listenerDisplay =
+                          listenerDisplayName || entry.listener.username;
+                        const listenerInitial = listenerDisplay
+                          .charAt(0)
+                          .toUpperCase();
+
+                        const listeningDate = entry.listeningAt
+                          ? formatRelativeTime(entry.listeningAt) ??
+                            entry.listeningAt
+                          : null;
+
+                        return (
+                          <ListItemButton
+                            key={`${entry.listener.username}-listening-to-${entry.record.masterId}`}
+                            onClick={() =>
+                              navigate(`/master/${entry.record.masterId}`)
+                            }
+                            sx={{
+                              borderRadius: 1,
+                              mb: 1,
+                              px: { xs: 1, sm: 2 },
+                              py: 1.5,
+                              alignItems: "flex-start",
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                display: "flex",
+                                width: "100%",
+                                gap: 1,
+                              }}
+                            >
+                              <Avatar
+                                src={entry.listener.profilePicUrl ?? undefined}
+                                alt={listenerDisplay}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handleOwnerClick(
+                                    event,
+                                    entry.listener.username
+                                  );
+                                }}
+                                sx={{
+                                  width: 40,
+                                  height: 40,
+                                  bgcolor: "grey.700",
+                                  cursor: "pointer",
+                                  flexShrink: 0,
+                                  mx: 0.5,
+                                  "&:hover": {
+                                    opacity: 0.8,
+                                  },
+                                }}
+                              >
+                                {!entry.listener.profilePicUrl &&
+                                  listenerInitial}
+                              </Avatar>
+                              <Box
+                                sx={{
+                                  flex: 1,
+                                  minWidth: 0,
+                                }}
+                              >
+                                <Typography
+                                  component="div"
+                                  sx={{
+                                    wordBreak: "break-word",
+                                    overflowWrap: "break-word",
+                                    pt: 1,
+                                  }}
+                                >
+                                  <Box
+                                    component="span"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      handleOwnerClick(
+                                        event,
+                                        entry.listener.username
+                                      );
+                                    }}
+                                    sx={{
+                                      fontWeight: 700,
+                                      cursor: "pointer",
+                                      borderRadius: 1,
+                                      pl: 4,
+                                      pr: 0.5,
+                                      py: 1.25,
+                                      ml: -4,
+                                      mr: -0.5,
+                                      "&:hover": {
+                                        bgcolor: "action.hover",
+                                      },
+                                    }}
+                                  >
+                                    {listenerDisplay}
+                                  </Box>{" "}
+                                  is currently listening to:{" "}
+                                  <b>
+                                    {entry.record.name} -{" "}
+                                    {entry.record.artist || "Unknown Artist"}
+                                  </b>
+                                </Typography>
+                              </Box>
+                              {listeningDate && (
+                                <Typography
+                                  variant="body2"
+                                  color="text.secondary"
+                                  sx={{
+                                    flexShrink: 0,
+                                    whiteSpace: "nowrap",
+                                    pt: 1.25,
+                                  }}
+                                >
+                                  {listeningDate}
                                 </Typography>
                               )}
                             </Box>
