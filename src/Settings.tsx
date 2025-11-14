@@ -175,7 +175,7 @@ export default function Settings() {
         />
 
         <Box sx={{ flex: 1, overflowY: "auto", pb: 3, px: 1 }}>
-          <Box maxWidth={850} mx="auto" sx={{ mt: 1 }}>
+          <Box maxWidth={860} mx="auto" sx={{ mt: 1 }}>
             {!isLargeScreen && (
               <Box
                 sx={{
