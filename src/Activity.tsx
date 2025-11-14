@@ -1608,9 +1608,9 @@ export default function Activity() {
                                             src={previewSrc}
                                             alt={preview.name || "List record"}
                                             sx={{
-                                              width: { xs: 40, sm: 55, md: 70 },
+                                              width: { xs: 45, sm: 55, md: 70 },
                                               height: {
-                                                xs: 40,
+                                                xs: 45,
                                                 sm: 55,
                                                 md: 70,
                                               },
@@ -1630,6 +1630,35 @@ export default function Activity() {
                                         </Tooltip>
                                       );
                                     })}
+                                    {entry.list.recordCount > 3 && (
+                                      <Tooltip
+                                        title={
+                                          entry.list.recordCount === 4
+                                            ? `${
+                                                entry.list.recordCount - 3
+                                              } more record`
+                                            : `${
+                                                entry.list.recordCount - 3
+                                              } more records`
+                                        }
+                                      >
+                                        <Avatar
+                                          variant="rounded"
+                                          sx={{
+                                            width: { xs: 45, sm: 55, md: 70 },
+                                            height: {
+                                              xs: 45,
+                                              sm: 55,
+                                              md: 70,
+                                            },
+                                            bgcolor: "grey.800",
+                                          }}
+                                          src={undefined}
+                                        >
+                                          <b>+{entry.list.recordCount - 3}</b>
+                                        </Avatar>
+                                      </Tooltip>
+                                    )}
                                   </Stack>
                                 )}
                               </Box>
