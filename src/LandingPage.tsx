@@ -26,7 +26,7 @@ import LibraryMusicIcon from "@mui/icons-material/LibraryMusic";
 import FilterAltIcon from "@mui/icons-material/FilterAlt";
 import PeopleAltIcon from "@mui/icons-material/PeopleAlt";
 import FavoriteIcon from "@mui/icons-material/Favorite";
-import LocalOfferIcon from "@mui/icons-material/LocalOffer";
+import FeedIcon from "@mui/icons-material/Feed";
 import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
 import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
 import { performLogout } from "./logout";
@@ -198,14 +198,14 @@ export default function LandingPage() {
     {
       title: "Powerful filters & search",
       description:
-        "Slice your collection by custom tags, rating, decade, or date added to help you find the perfect spin instantly.",
+        "Slice your collection by custom suggested tags, rating, decade, or date added to help you find the perfect spin instantly.",
       Icon: FilterAltIcon,
     },
     {
-      title: "Smart tagging tools",
+      title: "Keep up with your friends",
       description:
-        "Automatic tag suggestions from the record's genres let you easily import and organize your collection.",
-      Icon: LocalOfferIcon,
+        "Follow other collectors to keep up with their latest activity — including their latest collection additions, reviews, lists, and likes.",
+      Icon: FeedIcon,
     },
     {
       title: "Discogs import in seconds",
@@ -267,11 +267,6 @@ export default function LandingPage() {
             >
               <Box>
                 <Stack spacing={3}>
-                  <Chip
-                    label="Version 2.0 Beta"
-                    color="primary"
-                    sx={{ alignSelf: { xs: "center", md: "flex-start" } }}
-                  />
                   <Typography
                     variant="h2"
                     fontWeight={700}
