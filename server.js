@@ -6126,6 +6126,66 @@ app.delete('/api/admin/lists/:listId/records/:recordId', requireAuth, requireAdm
   }
 });
 
+// Admin endpoint to bulk replace cover URLs
+app.post('/api/admin/covers/replace', requireAuth, requireAdmin, async (req, res) => {
+  console.log('Admin replacing cover URLs...');
+  const { oldCoverUrl, newCoverUrl } = req.body;
+
+  if (typeof oldCoverUrl !== 'string' || !oldCoverUrl.trim()) {
+    return res.status(400).json({ error: 'oldCoverUrl is required' });
+  }
+  if (typeof newCoverUrl !== 'string' || !newCoverUrl.trim()) {
+    return res.status(400).json({ error: 'newCoverUrl is required' });
+  }
+
+  const trimmedOld = oldCoverUrl.trim();
+  const trimmedNew = newCoverUrl.trim();
+
+  if (trimmedOld === trimmedNew) {
+    return res.status(400).json({ error: 'Old and new cover URLs cannot be the same' });
+  }
+
+  try {
+    const pool = await getPool();
+    
+    // Update Master table
+    const [masterResult] = await pool.execute(
+      'UPDATE Master SET cover = ? WHERE cover = ?',
+      [trimmedNew, trimmedOld]
+    );
+
+    // Update Record table
+    const [recordResult] = await pool.execute(
+      'UPDATE Record SET cover = ? WHERE cover = ?',
+      [trimmedNew, trimmedOld]
+    );
+
+    // Update ListRecord table
+    const [listRecordResult] = await pool.execute(
+      'UPDATE ListRecord SET cover = ? WHERE cover = ?',
+      [trimmedNew, trimmedOld]
+    );
+
+    const masterCount = masterResult.affectedRows || 0;
+    const recordCount = recordResult.affectedRows || 0;
+    const listRecordCount = listRecordResult.affectedRows || 0;
+    const totalCount = masterCount + recordCount + listRecordCount;
+
+    console.log(`Cover URLs replaced: ${masterCount} masters, ${recordCount} records, ${listRecordCount} list records (total: ${totalCount})`);
+
+    res.json({
+      success: true,
+      masterCount,
+      recordCount,
+      listRecordCount,
+      totalCount
+    });
+  } catch (error) {
+    console.error('Failed to replace cover URLs as admin', error);
+    res.status(500).json({ error: 'Failed to replace cover URLs' });
+  }
+});
+
 // Search for master records (for listening to feature)
 app.get("/api/masters/search", requireAuth, async (req, res) => {
   console.log("Searching for master records...");

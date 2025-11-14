@@ -48,7 +48,13 @@ const MASTERS_PAGE_SIZE = 25;
 const TAGS_PAGE_SIZE = 25;
 const LISTS_PAGE_SIZE = 25;
 
-type AdminTabKey = "users" | "records" | "masters" | "tags" | "lists";
+type AdminTabKey =
+  | "users"
+  | "records"
+  | "masters"
+  | "tags"
+  | "lists"
+  | "fixcovers";
 
 const TAB_OPTIONS: { label: string; value: AdminTabKey }[] = [
   { label: "Users", value: "users" },
@@ -56,6 +62,7 @@ const TAB_OPTIONS: { label: string; value: AdminTabKey }[] = [
   { label: "Masters", value: "masters" },
   { label: "Tags", value: "tags" },
   { label: "Lists", value: "lists" },
+  { label: "Fix Covers", value: "fixcovers" },
 ];
 
 type AdminUser = {
@@ -175,6 +182,160 @@ function getErrorMessage(payload: unknown, fallback: string): string {
     }
   }
   return fallback;
+}
+
+function FixCoversTab() {
+  const [oldCoverUrl, setOldCoverUrl] = useState("");
+  const [newCoverUrl, setNewCoverUrl] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<{
+    success: boolean;
+    message: string;
+    masterCount?: number;
+    recordCount?: number;
+    listRecordCount?: number;
+  } | null>(null);
+
+  const handleReplaceCover = async () => {
+    const trimmedOld = oldCoverUrl.trim();
+    const trimmedNew = newCoverUrl.trim();
+
+    if (!trimmedOld || !trimmedNew) {
+      setResult({
+        success: false,
+        message: "Both old and new cover URLs are required",
+      });
+      return;
+    }
+
+    if (trimmedOld === trimmedNew) {
+      setResult({
+        success: false,
+        message: "Old and new cover URLs cannot be the same",
+      });
+      return;
+    }
+
+    setLoading(true);
+    setResult(null);
+
+    try {
+      const response = await fetch(apiUrl("/api/admin/covers/replace"), {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          oldCoverUrl: trimmedOld,
+          newCoverUrl: trimmedNew,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setResult({
+          success: false,
+          message: data.error || "Failed to replace cover URLs",
+        });
+        return;
+      }
+
+      setResult({
+        success: true,
+        message: "Cover URLs replaced successfully",
+        masterCount: data.masterCount || 0,
+        recordCount: data.recordCount || 0,
+        listRecordCount: data.listRecordCount || 0,
+      });
+
+      // Clear inputs on success
+      setOldCoverUrl("");
+      setNewCoverUrl("");
+    } catch (error) {
+      console.error("Failed to replace cover URLs:", error);
+      setResult({
+        success: false,
+        message: "Network error: Failed to replace cover URLs",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Box>
+      <Typography variant="h5" sx={{ mb: 3, fontWeight: 600 }}>
+        Fix Cover URLs
+      </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+        Replace cover URLs across all Master, Record, and ListRecord tables.
+        This will update all instances of the old cover URL with the new one.
+      </Typography>
+
+      <Stack spacing={3} sx={{ maxWidth: 800 }}>
+        <TextField
+          label="Old Cover URL"
+          fullWidth
+          value={oldCoverUrl}
+          onChange={(e) => setOldCoverUrl(e.target.value)}
+          placeholder="Enter the cover URL to replace"
+          disabled={loading}
+          helperText="The exact cover URL currently in the database"
+          size="small"
+        />
+
+        <TextField
+          label="New Cover URL"
+          fullWidth
+          value={newCoverUrl}
+          onChange={(e) => setNewCoverUrl(e.target.value)}
+          placeholder="Enter the new cover URL"
+          disabled={loading}
+          helperText="The new cover URL to use as replacement"
+          size="small"
+        />
+
+        <Box>
+          <Button
+            variant="contained"
+            onClick={handleReplaceCover}
+            disabled={loading || !oldCoverUrl.trim() || !newCoverUrl.trim()}
+            sx={{ fontWeight: 600 }}
+          >
+            {loading ? (
+              <>
+                <CircularProgress size={20} sx={{ mr: 1 }} />
+                Replacing...
+              </>
+            ) : (
+              "Replace Cover URLs"
+            )}
+          </Button>
+        </Box>
+
+        {result && (
+          <Alert severity={result.success ? "success" : "error"}>
+            <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
+              {result.message}
+            </Typography>
+            {result.success && (
+              <Box component="ul" sx={{ mt: 1, mb: 0, pl: 2 }}>
+                <li>Masters updated: {result.masterCount}</li>
+                <li>Records updated: {result.recordCount}</li>
+                <li>List records updated: {result.listRecordCount}</li>
+                <li>
+                  Total:{" "}
+                  {(result.masterCount || 0) +
+                    (result.recordCount || 0) +
+                    (result.listRecordCount || 0)}
+                </li>
+              </Box>
+            )}
+          </Alert>
+        )}
+      </Stack>
+    </Box>
+  );
 }
 
 interface UsersTabProps {
@@ -2615,6 +2776,8 @@ export default function Admin() {
         return <MastersTab />;
       case "lists":
         return <ListsTab />;
+      case "fixcovers":
+        return <FixCoversTab />;
       case "tags":
       default:
         return <TagsTab />;

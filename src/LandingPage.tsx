@@ -18,8 +18,9 @@ import { loadUserInfo, getCachedUserInfo } from "./userInfo";
 import icon from "./assets/icon.png";
 import collectionViewImg from "./assets/collectionview.png";
 import editViewImg from "./assets/editview.png";
+import activityViewImg from "./assets/activityview.png";
 import profileViewImg from "./assets/profileview.png";
-import discogsViewImg from "./assets/discogsview.png";
+import listViewImg from "./assets/listview.png";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import LibraryMusicIcon from "@mui/icons-material/LibraryMusic";
 import FilterAltIcon from "@mui/icons-material/FilterAlt";
@@ -46,7 +47,7 @@ export default function LandingPage() {
   const carouselSlides = useMemo(
     () => [
       {
-        title: "A collection view designed for crate diggers",
+        title: "Collection view designed for crate diggers",
         caption:
           "Sort, filter, and edit records without leaving the table. Hide columns to see just the information you want.",
         bullets: [
@@ -72,30 +73,41 @@ export default function LandingPage() {
           "Preview of the edit dialog showcasing quick tagging workflows",
       },
       {
+        title: "Create lists to share your favourites",
+        caption:
+          "Curate custom lists of records for any occasion—whether it's your top 10 jazz albums or the ultimate road trip vibes.",
+        bullets: [
+          "Shareable public lists or keep them private for your own enjoyment",
+          "Reorder records in a list with drag-and-drop ease",
+          "Easily find popular lists made by others",
+        ],
+        image: listViewImg,
+        imageAlt:
+          "Preview of the Discogs import dialog with progress and summaries",
+      },
+      {
         title: "Create your profile and connect with friends",
         caption:
           "Show off your music taste and see what your friends are listening to.",
         bullets: [
           "Display your favourite records in your collection on your profile",
-          "Follow other collectors and see their collections",
-          "Easily see what records your friends have recently picked up",
+          "Follow other collectors and see they're listening to",
+          "Easily share your profile with friends",
         ],
         image: profileViewImg,
         imageAlt:
-          "Preview of the Discogs import dialog with progress and summaries",
+          "Preview of the profile page showing user info and featured records",
       },
       {
-        title: "Discogs import that feels like magic",
-        caption:
-          "Upload your CSV once—duplicates are skipped, tags can be suggested from album genres, and cover art streams in from Last.fm.",
+        title: "Keep up with your friends' activity",
+        caption: "See what your friends are adding, reviewing, and liking.",
         bullets: [
-          "Batch processing with friendly summaries of what changed",
-          "Optional tag enrichment allows you to filter your collection instantly",
-          "Covers fetched automatically from Last.fm",
+          "See recently added records, lists, and likes from friends you follow",
+          "Like reviews and lists from other users to show your appreciation",
+          "See your own recent activity in one place",
         ],
-        image: discogsViewImg,
-        imageAlt:
-          "Preview of the Discogs import dialog with progress and summaries",
+        image: activityViewImg,
+        imageAlt: "Preview of the activity feed showing recent user actions",
       },
     ],
     []
@@ -408,9 +420,16 @@ export default function LandingPage() {
                   gap: { xs: 4, md: 6 },
                   gridTemplateColumns: { xs: "1fr", md: "1.2fr 0.8fr" },
                   alignItems: "center",
+                  minHeight: { xs: 670, md: 300 },
                 }}
               >
-                <Box>
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    minHeight: { xs: "auto", md: 320 },
+                  }}
+                >
                   <Stack spacing={2}>
                     <Typography variant="h4" fontWeight={700}>
                       {currentSlide.title}
@@ -449,7 +468,13 @@ export default function LandingPage() {
                     </Stack>
                   </Stack>
                 </Box>
-                <Box>
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
                   <Box
                     sx={{
                       position: "relative",
@@ -535,9 +560,8 @@ export default function LandingPage() {
                 Everything you need to stay on top of your collection
               </Typography>
               <Typography variant="body1" color="text.secondary">
-                From showing off to your friends to tag management and
-                intelligent filters, every feature is built with collectors in
-                mind.
+                From showing off to your friends to checking the reviews of an
+                new record, every feature is built with collectors in mind.
               </Typography>
             </Box>
 
@@ -658,8 +682,7 @@ export default function LandingPage() {
                 mx="auto"
                 paragraph
               >
-                Join a growing community of collectors keeping track of every
-                spin, trade, and wishlist grail.
+                Join a growing community of collectors and never miss a beat.
               </Typography>
               <Stack
                 direction={{ xs: "column", sm: "row" }}

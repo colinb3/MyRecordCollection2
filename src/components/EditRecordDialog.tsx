@@ -16,6 +16,7 @@ import {
 } from "@mui/material";
 import { type Record } from "../types"; // Assuming types.ts is in the parent directory
 import { wikiGenres } from "../wiki";
+import apiUrl from "../api";
 
 // --- COMPONENT PROPS ---
 interface EditRecordDialogProps {
@@ -37,6 +38,7 @@ export default function EditRecordDialog({
   const [editedRecord, setEditedRecord] = useState<Record | null>(null);
   const [tagInputValue, setTagInputValue] = useState<string>("");
   const [imageUrl, setImageUrl] = useState("");
+  const [masterCover, setMasterCover] = useState<string | null>(null);
   const [recommendedTags, setRecommendedTags] = useState<string[]>([]);
   const [fetchingRecommendedTags, setFetchingRecommendedTags] =
     useState<boolean>(false);
@@ -48,9 +50,33 @@ export default function EditRecordDialog({
     if (record) {
       setEditedRecord({ ...record, isCustom: record.isCustom ?? false });
       setImageUrl(record.cover || "");
+      setMasterCover(null);
+
+      // Fetch master cover if record has a masterId
+      if (record.masterId) {
+        const fetchMasterCover = async () => {
+          try {
+            const response = await fetch(
+              apiUrl(`/api/records/master-info?masterId=${record.masterId}`),
+              { credentials: "include" }
+            );
+            if (response.ok) {
+              const data = await response.json();
+              if (data?.cover && typeof data.cover === "string") {
+                setMasterCover(data.cover.trim());
+              }
+            }
+          } catch (error) {
+            // Silently fail - reset button just won't show
+            console.error("Failed to fetch master cover:", error);
+          }
+        };
+        fetchMasterCover();
+      }
     } else {
       setEditedRecord(null);
       setImageUrl("");
+      setMasterCover(null);
     }
 
     setRecommendedTags([]);
@@ -85,6 +111,19 @@ export default function EditRecordDialog({
         ...editedRecord,
         cover: event.target.value,
       });
+    }
+  };
+
+  // Handler to reset image URL to master cover
+  const handleResetCover = () => {
+    if (masterCover) {
+      setImageUrl(masterCover);
+      if (editedRecord) {
+        setEditedRecord({
+          ...editedRecord,
+          cover: masterCover,
+        });
+      }
     }
   };
 
@@ -244,11 +283,24 @@ export default function EditRecordDialog({
               onChange={handleImageUrlChange}
               size="small"
               sx={{
+                mb: 1,
                 "& .MuiOutlinedInput-root": {
                   backgroundColor: "background.paper",
                 },
               }}
             />
+            {masterCover && (
+              <Button
+                variant="outlined"
+                size="small"
+                fullWidth
+                onClick={handleResetCover}
+                disabled={imageUrl === masterCover}
+                sx={{ fontWeight: 600 }}
+              >
+                Reset to Master Cover
+              </Button>
+            )}
           </Grid>
 
           {/* Right Column: Record Details */}
@@ -444,7 +496,7 @@ export default function EditRecordDialog({
                 <Typography
                   variant="caption"
                   color="text.secondary"
-                  sx={{ display: "block", mt: 0.5 }}
+                  sx={{ display: "block", my: 0.5 }}
                 >
                   Fetching suggestions...
                 </Typography>
@@ -453,7 +505,7 @@ export default function EditRecordDialog({
                 <Typography
                   variant="caption"
                   color="text.secondary"
-                  sx={{ display: "block", mt: 0.5 }}
+                  sx={{ display: "block", my: 0.5 }}
                 >
                   We’ll suggest tags automatically once both title and artist
                   are filled.

@@ -1195,16 +1195,6 @@ export default function ListDetail() {
                                   }
                                 />
                               )}
-                              <Chip
-                                size="small"
-                                label={
-                                  list.recordCount === 0
-                                    ? "No records"
-                                    : list.recordCount === 1
-                                    ? `${list.recordCount} record`
-                                    : `${list.recordCount} records`
-                                }
-                              />
                               {list.isOwner && (
                                 <Chip
                                   size="small"
