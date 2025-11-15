@@ -82,6 +82,7 @@ interface ParsedDiscogsRecord {
   rating: number;
   release: number;
   rawDateAdded: string | null;
+  releaseId: string | null;
 }
 
 interface ImportResult {
@@ -121,6 +122,11 @@ function parseDiscogsRows(rows: DiscogsCsvRow[]): ParsedDiscogsRecord[] {
 
     const ratingRaw = pickField(row, ["Rating", "rating"]);
     const releaseRaw = pickField(row, ["Released", "released", "Year", "year"]);
+    const releaseIdRaw = pickField(row, [
+      "release_id",
+      "Release Id",
+      "ReleaseId",
+    ]);
     const rawDate = pickField(row, [
       "Date Added",
       "Added",
@@ -166,6 +172,7 @@ function parseDiscogsRows(rows: DiscogsCsvRow[]): ParsedDiscogsRecord[] {
       rating,
       release,
       rawDateAdded: normalizedDate,
+      releaseId: releaseIdRaw || null,
     });
   }
   return parsed;
@@ -638,6 +645,7 @@ export default function CollectionSettings() {
         release: record.release,
         tags,
         added: useDateAdded ? record.rawDateAdded : null,
+        releaseId: record.releaseId,
       });
     }
 
@@ -668,10 +676,10 @@ export default function CollectionSettings() {
       };
       setImportSummary(summary);
       const parts = [
-        `${summary.created} added`,
-        summary.skipped ? `${summary.skipped} skipped` : null,
+        `${summary.created} records added`,
+        summary.skipped ? `${summary.skipped} records skipped` : null,
         summary.withoutCover
-          ? `${summary.withoutCover} without cover art`
+          ? `${summary.withoutCover} records without cover art`
           : null,
       ].filter(Boolean);
       setSnackbar({
@@ -902,6 +910,13 @@ export default function CollectionSettings() {
           , choose your exported Discogs CSV file below, optionally enrich
           records with genre tags and date added values, and click import.
         </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+          Note: Large collections may take some time to import. After your
+          (optional) suggested tags have been added, you may leave the page
+          while the server continues processing. Please remain on the page if
+          you would like to see import results. Import can take 2 seconds per
+          record if record is not already in our database.
+        </Typography>
       </Box>
       <Paper
         variant="outlined"
@@ -1000,7 +1015,7 @@ export default function CollectionSettings() {
             <Typography variant="caption" display="block" sx={{ mt: 1 }}>
               {includeWikiTags && !submittingRecords
                 ? `Fetching wiki tags... ${tagProgress}% | Do not leave this page`
-                : "Submitting records to the server..."}
+                : "Submitted records to the server. Your import will continue in the background. You can leave this page."}
             </Typography>
           </Box>
         )}

@@ -1053,6 +1053,37 @@ async function getOwnedListById(pool, listId, userUuid) {
   return rows[0];
 }
 
+async function fetchDiscogsRelease(releaseId) {
+  if (!releaseId) return null;
+  const userAgent = process.env.DISCOGS_USER_AGENT || 'MyRecordCollection/1.0';
+  const url = new URL(`https://api.discogs.com/releases/${releaseId}`);
+  if (DISCOGS_API_KEY && DISCOGS_API_SECRET) {
+    url.searchParams.set("key", DISCOGS_API_KEY);
+    url.searchParams.set("secret", DISCOGS_API_SECRET);
+  }
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': userAgent,
+      },
+    });
+    if (!response.ok) {
+      console.warn(`Discogs API returned ${response.status} for release ${releaseId}`);
+      return null;
+    }
+    const data = await response.json();
+    return {
+      masterId: data.master_id || null,
+      title: data.title || null,
+      artists: data.artists || [],
+      year: data.year || null,
+    };
+  } catch (err) {
+    console.warn('Discogs release lookup failed', err);
+    return null;
+  }
+}
+
 async function fetchLastFmCover(artist, record) {
   const apiKey = process.env.LASTFM_API_KEY;
   if (!apiKey) return null;
@@ -3580,8 +3611,8 @@ app.post('/api/records/delete', requireAuth, async (req, res) => {
 });
 
 app.post('/api/import/discogs', requireAuth, async (req, res) => {
-  console.log('Importing Discogs collection...');
   const { records, tableName } = req.body || {};
+  console.log('Importing Discogs collection of', Array.isArray(records) ? records.length : 0, 'records...');
   if (!Array.isArray(records) || records.length === 0) {
     return res.status(400).json({ error: 'records array is required' });
   }
@@ -3601,6 +3632,9 @@ app.post('/api/import/discogs', requireAuth, async (req, res) => {
     let skipped = 0;
     let withoutCover = 0;
     const tagCache = new Map();
+    const masterCache = new Map();
+    const usedMasterIds = new Set();
+    let lastDiscogsCall = 0;
 
     for (const raw of records) {
       if (!raw || typeof raw !== 'object') {
@@ -3628,6 +3662,8 @@ app.post('/api/import/discogs', requireAuth, async (req, res) => {
   const dateVal = typeof raw.added === 'string' ? raw.added.trim() : '';
   const dateAdded = /^\d{4}-\d{2}-\d{2}$/.test(dateVal) ? dateVal : null;
 
+      const releaseId = typeof raw.releaseId === 'string' ? raw.releaseId.trim() : null;
+
       const tagsArray = Array.isArray(raw.tags) ? raw.tags : [];
       const cleanTags = Array.from(
         new Set(
@@ -3647,6 +3683,76 @@ app.post('/api/import/discogs', requireAuth, async (req, res) => {
         continue;
       }
 
+      // Try to find or create master ID
+      let masterId = null;
+      let isCustom = true;
+      
+      // First, check if a master already exists in the database with matching name and artist
+      const [existingMasterRows] = await pool.execute(
+        `SELECT id FROM Master WHERE LOWER(name) = ? AND LOWER(artist) = ? LIMIT 1`,
+        [recordName.toLowerCase(), artist.toLowerCase()]
+      );
+      
+      if (existingMasterRows.length > 0) {
+        // Found existing master - check if already used in this import
+        const existingMasterId = existingMasterRows[0].id;
+        if (usedMasterIds.has(existingMasterId)) {
+          masterId = null;
+          isCustom = true;
+        } else {
+          masterId = existingMasterId;
+          isCustom = false;
+          usedMasterIds.add(existingMasterId);
+        }
+      } else if (releaseId) {
+        // No existing master found, try to fetch from Discogs if releaseId is provided
+        // Rate limit: wait at least 2 seconds between Discogs API calls
+        const now = Date.now();
+        const timeSinceLastCall = now - lastDiscogsCall;
+        if (timeSinceLastCall < 2000) {
+          await new Promise(resolve => setTimeout(resolve, 2000 - timeSinceLastCall));
+        }
+        lastDiscogsCall = Date.now();
+        
+        const discogsData = await fetchDiscogsRelease(releaseId);
+        if (discogsData && discogsData.masterId) {
+          const discogsMasterId = discogsData.masterId;
+          
+          // Check if this master ID has already been used in this import batch
+          if (usedMasterIds.has(discogsMasterId)) {
+            console.log(`Skipping duplicate master ${discogsMasterId} for ${artist} - ${recordName}, marking as custom`);
+            // This master was already used, so treat this record as custom
+            masterId = null;
+            isCustom = true;
+          } else {
+            // Check if master already exists in our database
+            if (!masterCache.has(discogsMasterId)) {
+              const [masterRows] = await pool.execute(
+                `SELECT id FROM Master WHERE id = ? LIMIT 1`,
+                [discogsMasterId]
+              );
+              if (masterRows.length > 0) {
+                masterCache.set(discogsMasterId, masterRows[0].id);
+              } else {
+                // Master doesn't exist, create it
+                const masterCover = await fetchLastFmCover(artist, recordName);
+                const [masterInsert] = await pool.execute(
+                  `INSERT INTO Master (id, name, artist, cover, release_year, created) VALUES (?, ?, ?, ?, ?, UTC_TIMESTAMP())`,
+                  [discogsMasterId, recordName, artist, masterCover || null, release]
+                );
+                masterCache.set(discogsMasterId, discogsMasterId);
+                console.log(`Created master ${discogsMasterId} for ${artist} - ${recordName}`);
+              }
+            }
+            
+            masterId = masterCache.get(discogsMasterId);
+            isCustom = false;
+            usedMasterIds.add(discogsMasterId);
+          }
+        }
+      }
+
+      // Fetch cover for the record
       const cover = await fetchLastFmCover(artist, recordName);
       if (!cover) {
         withoutCover += 1;
@@ -3657,8 +3763,8 @@ app.post('/api/import/discogs', requireAuth, async (req, res) => {
     : formatUtcDateTime(new Date());
   const addedAtUtc = addedAtUtcRaw ?? formatUtcDateTime(new Date());
       const [insertResult] = await pool.execute(
-        `INSERT INTO Record (name, artist, cover, rating, release_year, tableId, userUuid, added) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [recordName, artist, cover || null, rating, release, tableId, req.userUuid, addedAtUtc]
+        `INSERT INTO Record (name, artist, cover, rating, release_year, tableId, userUuid, added, masterId, isCustom) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [recordName, artist, cover || null, rating, release, tableId, req.userUuid, addedAtUtc, masterId, isCustom]
       );
       const newRecordId = insertResult.insertId;
       created += 1;
@@ -3690,6 +3796,7 @@ app.post('/api/import/discogs', requireAuth, async (req, res) => {
     }
 
     res.json({ success: true, created, skipped, withoutCover });
+    console.log('Discogs import completed. Created:', created, 'Skipped:', skipped, 'Without cover:', withoutCover);
   } catch (err) {
     console.error('Discogs import failed', err);
     res.status(500).json({ error: 'Failed to import Discogs collection' });
