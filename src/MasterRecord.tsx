@@ -68,6 +68,8 @@ interface MasterInfo {
   ratingCounts: number[] | null;
   userCollections: UserCollectionEntry[];
   userLists: UserListEntry[];
+  genres: string[];
+  styles: string[];
   // indicates whether the master exists in the local server DB
   inDb?: boolean;
 }
@@ -615,6 +617,19 @@ export default function MasterRecord() {
               )
           : [];
 
+        const genresValue = Array.isArray(data?.genres)
+          ? data.genres.filter(
+              (g: unknown): g is string =>
+                typeof g === "string" && g.trim().length > 0
+            )
+          : [];
+        const stylesValue = Array.isArray(data?.styles)
+          ? data.styles.filter(
+              (s: unknown): s is string =>
+                typeof s === "string" && s.trim().length > 0
+            )
+          : [];
+
         const normalized: MasterInfo = {
           masterId:
             Number.isInteger(masterIdValue) && masterIdValue > 0
@@ -635,6 +650,8 @@ export default function MasterRecord() {
               : null,
           userCollections: userCollectionsValue,
           userLists: userListsValue,
+          genres: genresValue,
+          styles: stylesValue,
           inDb: data?.inDb === true,
         };
 
@@ -815,6 +832,8 @@ export default function MasterRecord() {
           masterReleaseYear: masterInfo?.releaseYear ?? null,
           masterCover: payloadMasterCover,
           review: reviewPayload,
+          genres: masterInfo?.genres ?? [],
+          styles: masterInfo?.styles ?? [],
         };
         const res = await fetch(apiUrl("/api/records/create"), {
           method: "POST",
@@ -1033,6 +1052,8 @@ export default function MasterRecord() {
             rating: Number.isFinite(Number(rating))
               ? Math.trunc(Number(rating))
               : null,
+            genres: masterInfo?.genres ?? [],
+            styles: masterInfo?.styles ?? [],
           }),
         });
         if (!response.ok) {
@@ -1170,7 +1191,7 @@ export default function MasterRecord() {
         icon: <HeadphonesIcon />,
       }
     : {
-        label: "Listen",
+        label: "Listened",
         variant: "outlined" as const,
         disabled: adding,
         onClick: handleAddListenedRecord,

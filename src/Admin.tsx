@@ -104,6 +104,9 @@ type AdminMaster = {
   cover: string | null;
   releaseYear: number | null;
   ratingAverage: number | null;
+  genreCount: number;
+  genres?: string[];
+  styles?: string[];
 };
 
 type AdminTagOwner = {
@@ -1496,7 +1499,12 @@ function MastersTab() {
   const [artistInput, setArtistInput] = useState("");
   const [coverInput, setCoverInput] = useState("");
   const [releaseYearInput, setReleaseYearInput] = useState("");
+  const [genresInput, setGenresInput] = useState<string[]>([]);
+  const [stylesInput, setStylesInput] = useState<string[]>([]);
+  const [genreInputText, setGenreInputText] = useState("");
+  const [styleInputText, setStyleInputText] = useState("");
   const [saving, setSaving] = useState(false);
+  const [loadingGenres, setLoadingGenres] = useState(false);
 
   const fetchMasters = useCallback(
     async (startOffset: number, append: boolean) => {
@@ -1583,6 +1591,10 @@ function MastersTab() {
       setArtistInput("");
       setCoverInput("");
       setReleaseYearInput("");
+      setGenresInput([]);
+      setStylesInput([]);
+      setGenreInputText("");
+      setStyleInputText("");
       return;
     }
     setNameInput(editing.name);
@@ -1593,6 +1605,29 @@ function MastersTab() {
         ? String(editing.releaseYear)
         : ""
     );
+
+    // Load genres and styles
+    const loadGenres = async () => {
+      setLoadingGenres(true);
+      try {
+        const response = await fetch(
+          apiUrl(`/api/admin/masters/${editing.id}/genres`),
+          { credentials: "include" }
+        );
+        if (response.ok) {
+          const data = await response.json();
+          const genres = Array.isArray(data.genres) ? data.genres : [];
+          const styles = Array.isArray(data.styles) ? data.styles : [];
+          setGenresInput(genres);
+          setStylesInput(styles);
+        }
+      } catch (err) {
+        console.error("Failed to load genres", err);
+      } finally {
+        setLoadingGenres(false);
+      }
+    };
+    loadGenres();
   }, [editing]);
 
   const handleSave = async () => {
@@ -1625,6 +1660,10 @@ function MastersTab() {
       }
       body.releaseYear = releaseValue;
     }
+
+    // Use genres and styles arrays directly
+    body.genres = genresInput;
+    body.styles = stylesInput;
 
     try {
       const response = await fetch(apiUrl(`/api/admin/masters/${editing.id}`), {
@@ -1739,6 +1778,7 @@ function MastersTab() {
               <TableCell>Artist</TableCell>
               <TableCell>Release Year</TableCell>
               <TableCell>Average Rating</TableCell>
+              <TableCell>Genres</TableCell>
               <TableCell align="right">Actions</TableCell>
             </TableRow>
           </TableHead>
@@ -1759,6 +1799,9 @@ function MastersTab() {
                   master.ratingAverage !== undefined
                     ? master.ratingAverage.toFixed(1)
                     : "—"}
+                </TableCell>
+                <TableCell>
+                  {master.genreCount > 0 ? master.genreCount : "—"}
                 </TableCell>
                 <TableCell align="right">
                   <Stack direction="row" spacing={1} justifyContent="flex-end">
@@ -1789,7 +1832,7 @@ function MastersTab() {
             ))}
             {!loading && masters.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} align="center">
+                <TableCell colSpan={7} align="center">
                   No masters found.
                 </TableCell>
               </TableRow>
@@ -1856,6 +1899,78 @@ function MastersTab() {
             helperText="Leave blank to clear"
             size="small"
           />
+          <Box>
+            <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
+              Genres
+            </Typography>
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, mb: 1 }}>
+              {genresInput.map((genre, index) => (
+                <Chip
+                  key={index}
+                  label={genre}
+                  onDelete={() => {
+                    setGenresInput(genresInput.filter((_, i) => i !== index));
+                  }}
+                  size="small"
+                  disabled={loadingGenres}
+                />
+              ))}
+            </Box>
+            <TextField
+              placeholder="Add genre and press Enter"
+              value={genreInputText}
+              onChange={(event) => setGenreInputText(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && genreInputText.trim()) {
+                  event.preventDefault();
+                  const trimmed = genreInputText.trim();
+                  if (!genresInput.includes(trimmed)) {
+                    setGenresInput([...genresInput, trimmed]);
+                  }
+                  setGenreInputText("");
+                }
+              }}
+              size="small"
+              fullWidth
+              disabled={loadingGenres}
+            />
+          </Box>
+          <Box>
+            <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
+              Styles
+            </Typography>
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, mb: 1 }}>
+              {stylesInput.map((style, index) => (
+                <Chip
+                  key={index}
+                  label={style}
+                  onDelete={() => {
+                    setStylesInput(stylesInput.filter((_, i) => i !== index));
+                  }}
+                  size="small"
+                  disabled={loadingGenres}
+                />
+              ))}
+            </Box>
+            <TextField
+              placeholder="Add style and press Enter"
+              value={styleInputText}
+              onChange={(event) => setStyleInputText(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && styleInputText.trim()) {
+                  event.preventDefault();
+                  const trimmed = styleInputText.trim();
+                  if (!stylesInput.includes(trimmed)) {
+                    setStylesInput([...stylesInput, trimmed]);
+                  }
+                  setStyleInputText("");
+                }
+              }}
+              size="small"
+              fullWidth
+              disabled={loadingGenres}
+            />
+          </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setEditing(null)} disabled={saving}>

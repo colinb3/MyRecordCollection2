@@ -714,6 +714,10 @@ async function lookupDiscogsByBarcode(barcode) {
         : typeof prioritized?.thumb === "string" && prioritized.thumb.trim()
         ? prioritized.thumb.trim()
         : null;
+    
+    // Extract genres and styles from search result
+    const genres = Array.isArray(prioritized?.genre) ? prioritized.genre : [];
+    const styles = Array.isArray(prioritized?.style) ? prioritized.style : [];
 
     // Remove trailing (digit) from artist name
     const cleanedArtist = artist
@@ -726,6 +730,8 @@ async function lookupDiscogsByBarcode(barcode) {
       record: record || null,
       releaseYear,
       discogsCover: cover,
+      genres,
+      styles,
     };
   } catch (error) {
     console.warn("Discogs barcode lookup failed", error);
@@ -788,15 +794,98 @@ async function lookupDiscogsMaster(artist, record) {
         : typeof matchingResult?.thumb === "string" && matchingResult.thumb.trim()
         ? matchingResult.thumb.trim()
         : null;
+    
+    // Extract genres and styles from the search result
+    const genres = Array.isArray(matchingResult?.genre) ? matchingResult.genre : [];
+    const styles = Array.isArray(matchingResult?.style) ? matchingResult.style : [];
 
     return {
       masterId: Number.isInteger(masterId) && masterId > 0 ? masterId : null,
       releaseYear,
       cover,
+      genres,
+      styles,
     };
   } catch (error) {
     console.warn("Discogs lookup failed", error);
     throw error;
+  }
+}
+
+/**
+ * Fetches full master details from Discogs API including genres and styles
+ */
+async function fetchDiscogsMasterDetails(masterId) {
+  if (!Number.isInteger(masterId) || masterId <= 0) {
+    return null;
+  }
+
+  const url = new URL(`https://api.discogs.com/masters/${masterId}`);
+  if (DISCOGS_API_KEY && DISCOGS_API_SECRET) {
+    url.searchParams.set("key", DISCOGS_API_KEY);
+    url.searchParams.set("secret", DISCOGS_API_SECRET);
+  }
+
+  try {
+    const response = await fetch(url.toString(), {
+      headers: {
+        "User-Agent": DISCOGS_USER_AGENT,
+        Accept: "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return null;
+      }
+      console.warn(`Discogs master API returned ${response.status} for master ${masterId}`);
+      return null;
+    }
+
+    const data = await response.json();
+    const genres = Array.isArray(data.genres) ? data.genres : [];
+    const styles = Array.isArray(data.styles) ? data.styles : [];
+
+    return { genres, styles };
+  } catch (error) {
+    console.warn(`Failed to fetch Discogs master ${masterId}`, error);
+    return null;
+  }
+}
+
+/**
+ * Inserts genres and styles into MasterGenre table
+ */
+async function insertMasterGenres(pool, masterId, genres, styles) {
+  if (!Number.isInteger(masterId) || masterId <= 0) {
+    return;
+  }
+
+  const genresArray = Array.isArray(genres) ? genres : [];
+  const stylesArray = Array.isArray(styles) ? styles : [];
+
+  try {
+    // Insert genres
+    for (const genre of genresArray) {
+      if (typeof genre === "string" && genre.trim()) {
+        await pool.execute(
+          `INSERT IGNORE INTO MasterGenre (masterId, genre, isStyle) VALUES (?, ?, ?)`,
+          [masterId, genre.trim(), false]
+        );
+      }
+    }
+
+    // Insert styles
+    for (const style of stylesArray) {
+      if (typeof style === "string" && style.trim()) {
+        await pool.execute(
+          `INSERT IGNORE INTO MasterGenre (masterId, genre, isStyle) VALUES (?, ?, ?)`,
+          [masterId, style.trim(), true]
+        );
+      }
+    }
+  } catch (error) {
+    console.error(`Failed to insert genres for master ${masterId}`, error);
   }
 }
 
@@ -1445,6 +1534,78 @@ app.get("/api/compare/:username", async (req, res) => {
   }
 });
 
+// Compare genre interests between authenticated user and target user
+app.get("/api/compare/:username/genres", async (req, res) => {
+  const targetUsername = req.params.username;
+  console.log(`Comparing genre interests with user: ${targetUsername}`);
+  
+  // Get authenticated user
+  let authenticatedUserUuid = null;
+  const token = req.cookies?.token;
+  if (token) {
+    try {
+      const payload = jwt.verify(token, JWT_SECRET);
+      if (payload && typeof payload.userUuid === "string") {
+        authenticatedUserUuid = payload.userUuid;
+      }
+    } catch {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+  } else {
+    return res.status(401).json({ error: "Authentication required" });
+  }
+
+  try {
+    const pool = await getPool();
+    
+    // Get target user info
+    const targetUser = await getUserByUsername(pool, targetUsername);
+    if (!targetUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    
+    const targetUserUuid = targetUser.uuid;
+    
+    if (authenticatedUserUuid === targetUserUuid) {
+      return res.status(400).json({ error: "Cannot compare with yourself" });
+    }
+    
+    // Fetch authenticated user's genre interests (only genres, not styles)
+    const [myGenres] = await pool.query(
+      `SELECT genre, rating, collectionPercent 
+       FROM UserGenreInterest 
+       WHERE userUuid = ? AND isStyle = FALSE
+       ORDER BY genre`,
+      [authenticatedUserUuid]
+    );
+    
+    // Fetch target user's genre interests (only genres, not styles)
+    const [theirGenres] = await pool.query(
+      `SELECT genre, rating, collectionPercent 
+       FROM UserGenreInterest 
+       WHERE userUuid = ? AND isStyle = FALSE
+       ORDER BY genre`,
+      [targetUserUuid]
+    );
+    
+    res.json({ 
+      myGenres: myGenres.map(g => ({
+        genre: g.genre,
+        rating: g.rating,
+        collectionPercent: Number(g.collectionPercent) || 0
+      })),
+      theirGenres: theirGenres.map(g => ({
+        genre: g.genre,
+        rating: g.rating,
+        collectionPercent: Number(g.collectionPercent) || 0
+      }))
+    });
+  } catch (err) {
+    console.error("Failed to compare genre interests", err);
+    res.status(500).json({ error: "Failed to compare genre interests" });
+  }
+});
+
 app.get("/api/records/master-info", async (req, res) => {
   console.log("Fetching master info...");
 
@@ -1654,6 +1815,8 @@ app.get("/api/records/master-info", async (req, res) => {
       userCollections,
       userLists,
       inDb: !!ratingAveRow,
+      genres: result.genres || [],
+      styles: result.styles || [],
     });
   } catch (error) {
     console.error("Failed to load master info", error);
@@ -3620,6 +3783,10 @@ app.post('/api/records/create', requireAuth, async (req, res) => {
   const masterCoverRaw = req.body?.masterCover;
   const masterCover = typeof masterCoverRaw === "string" && masterCoverRaw.trim() ? masterCoverRaw.trim() : null;
   const cleanCover = typeof cover === "string" && cover.trim() ? cover.trim() : null;
+  
+  // Extract genres and styles from request body
+  const genres = Array.isArray(req.body?.genres) ? req.body.genres : [];
+  const styles = Array.isArray(req.body?.styles) ? req.body.styles : [];
 
   try {
     const pool = await getPool();
@@ -3661,6 +3828,9 @@ app.post('/api/records/create', requireAuth, async (req, res) => {
            release_year = COALESCE(VALUES(release_year), release_year)`,
         [masterId, artistName, masterCoverValue, recordName, masterReleaseYear]
       );
+      
+      // Insert genres and styles
+      await insertMasterGenres(pool, masterId, genres, styles);
     }
 
   const nameToInsert = recordName || DEFAULT_NEW_RECORD_NAME;
@@ -3944,6 +4114,13 @@ app.post('/api/import/discogs', requireAuth, async (req, res) => {
                 );
                 masterCache.set(discogsMasterId, discogsMasterId);
                 console.log(`Created master ${discogsMasterId} for ${artist} - ${recordName}`);
+                
+                // Fetch and insert genres/styles for the newly created master
+                const genreData = await fetchDiscogsMasterDetails(discogsMasterId);
+                if (genreData && (genreData.genres.length > 0 || genreData.styles.length > 0)) {
+                  await insertMasterGenres(pool, discogsMasterId, genreData.genres, genreData.styles);
+                  console.log(`Added ${genreData.genres.length} genres and ${genreData.styles.length} styles for master ${discogsMasterId}`);
+                }
               }
             }
             
@@ -4773,6 +4950,10 @@ app.post('/api/lists/:listId/records', requireAuth, async (req, res) => {
       ? req.body.review.trim()
       : null;
   
+  // Extract genres and styles from request body
+  const genres = Array.isArray(req.body?.genres) ? req.body.genres : [];
+  const styles = Array.isArray(req.body?.styles) ? req.body.styles : [];
+  
   // Allow optional sortOrder for undo operations
   const requestedSortOrder = Number(req.body?.sortOrder);
   const hasSortOrder = Number.isInteger(requestedSortOrder) && requestedSortOrder > 0;
@@ -4839,6 +5020,10 @@ app.post('/api/lists/:listId/records', requireAuth, async (req, res) => {
                 : null;
             const discogsYear = Number(discogsData.year);
             const discogsReleaseYear = Number.isInteger(discogsYear) ? discogsYear : null;
+            
+            // Extract genres and styles from Discogs data
+            const discogsGenres = Array.isArray(discogsData.genres) ? discogsData.genres : [];
+            const discogsStyles = Array.isArray(discogsData.styles) ? discogsData.styles : [];
 
             // Insert the master into the database
             await pool.execute(
@@ -4846,6 +5031,9 @@ app.post('/api/lists/:listId/records', requireAuth, async (req, res) => {
                ON DUPLICATE KEY UPDATE name = VALUES(name), artist = VALUES(artist), cover = VALUES(cover), release_year = VALUES(release_year)`,
               [masterId, discogsName, discogsArtist, discogsCover, discogsReleaseYear]
             );
+            
+            // Insert genres and styles
+            await insertMasterGenres(pool, masterId, discogsGenres, discogsStyles);
 
             // Use the Discogs data for this request
             if (!recordName) {
@@ -4891,6 +5079,11 @@ app.post('/api/lists/:listId/records', requireAuth, async (req, res) => {
           if (Number.isInteger(parsed)) {
             releaseYearValue = parsed;
           }
+        }
+        
+        // Insert genres/styles if provided and master exists
+        if ((genres.length > 0 || styles.length > 0)) {
+          await insertMasterGenres(pool, masterId, genres, styles);
         }
       }
     }
@@ -5228,7 +5421,6 @@ app.delete('/api/lists/:listId/like', requireAuth, async (req, res) => {
 
 // Admin management endpoints
 app.get('/api/admin/users', requireAuth, requireAdmin, async (req, res) => {
-  console.log('Admin listing users...');
   const rawSearch = typeof req.query.q === 'string' ? req.query.q.trim() : '';
   const limitRaw = Number(req.query.limit);
   const offsetRaw = Number(req.query.offset);
@@ -5236,6 +5428,7 @@ app.get('/api/admin/users', requireAuth, requireAdmin, async (req, res) => {
   const offset = Number.isFinite(offsetRaw) && offsetRaw >= 0 ? Math.trunc(offsetRaw) : 0;
   const searchTerm = rawSearch.slice(0, 64);
   const params = [];
+  console.log('Admin listing users...', { searchTerm, limit, offset });
   let whereClause = '';
   if (searchTerm) {
     const like = `%${escapeForLike(searchTerm)}%`;
@@ -5595,7 +5788,6 @@ app.delete('/api/admin/users/:userUuid', requireAuth, requireAdmin, async (req, 
 });
 
 app.get('/api/admin/records', requireAuth, requireAdmin, async (req, res) => {
-  console.log('Admin listing records...');
   const rawSearch = typeof req.query.q === 'string' ? req.query.q.trim() : '';
   const rawOwner = typeof req.query.user === 'string' ? req.query.user.trim() : '';
   const rawMasterId = typeof req.query.masterId === 'string' ? req.query.masterId.trim() : '';
@@ -5606,6 +5798,7 @@ app.get('/api/admin/records', requireAuth, requireAdmin, async (req, res) => {
   const searchTerm = rawSearch.slice(0, 64);
   const conditions = [];
   const params = [];
+  console.log('Admin listing records...', { searchTerm, rawOwner, rawMasterId, limit, offset });
 
   if (rawOwner) {
     conditions.push('u.username = ?');
@@ -5910,7 +6103,6 @@ app.delete('/api/admin/records/:recordId', requireAuth, requireAdmin, async (req
 });
 
 app.get('/api/admin/masters', requireAuth, requireAdmin, async (req, res) => {
-  console.log('Admin listing masters...');
   const rawSearch = typeof req.query.q === 'string' ? req.query.q.trim() : '';
   const limitRaw = Number(req.query.limit);
   const offsetRaw = Number(req.query.offset);
@@ -5918,6 +6110,7 @@ app.get('/api/admin/masters', requireAuth, requireAdmin, async (req, res) => {
   const offset = Number.isFinite(offsetRaw) && offsetRaw >= 0 ? Math.trunc(offsetRaw) : 0;
   const searchTerm = rawSearch.slice(0, 64);
   const params = [];
+  console.log('Admin listing masters...', { searchTerm, limit, offset });
   let whereClause = '';
   if (searchTerm) {
     const like = `%${escapeForLike(searchTerm)}%`;
@@ -5933,7 +6126,8 @@ app.get('/api/admin/masters', requireAuth, requireAdmin, async (req, res) => {
               m.artist,
               m.cover,
               m.release_year,
-              m.ratingAve
+              m.ratingAve,
+              (SELECT COUNT(*) FROM MasterGenre mg WHERE mg.masterId = m.id) AS genreCount
          FROM Master m
          ${whereClause}
          ORDER BY m.id DESC
@@ -5952,6 +6146,7 @@ app.get('/api/admin/masters', requireAuth, requireAdmin, async (req, res) => {
       cover: row.cover ?? null,
       releaseYear: row.release_year !== null && row.release_year !== undefined ? Number(row.release_year) : null,
       ratingAverage: row.ratingAve !== null && row.ratingAve !== undefined ? Number(row.ratingAve) : null,
+      genreCount: Number(row.genreCount) || 0,
     }));
     res.json({ masters, total, limit, offset });
   } catch (error) {
@@ -6017,7 +6212,7 @@ app.patch('/api/admin/masters/:masterId', requireAuth, requireAdmin, async (req,
     }
   }
 
-  if (updates.length === 0) {
+  if (updates.length === 0 && req.body.genres === undefined && req.body.styles === undefined) {
     return res.status(400).json({ error: 'No changes supplied' });
   }
 
@@ -6031,8 +6226,23 @@ app.patch('/api/admin/masters/:masterId', requireAuth, requireAdmin, async (req,
       return res.status(404).json({ error: 'Master not found' });
     }
 
-    params.push(masterId);
-    await pool.execute(`UPDATE Master SET ${updates.join(', ')} WHERE id = ?`, params);
+    // Update master fields if any
+    if (updates.length > 0) {
+      params.push(masterId);
+      await pool.execute(`UPDATE Master SET ${updates.join(', ')} WHERE id = ?`, params);
+    }
+
+    // Update genres and styles if provided
+    if (req.body.genres !== undefined || req.body.styles !== undefined) {
+      const genres = Array.isArray(req.body.genres) ? req.body.genres : [];
+      const styles = Array.isArray(req.body.styles) ? req.body.styles : [];
+      
+      // Delete existing genres/styles for this master
+      await pool.execute('DELETE FROM MasterGenre WHERE masterId = ?', [masterId]);
+      
+      // Insert new genres/styles
+      await insertMasterGenres(pool, masterId, genres, styles);
+    }
 
     const [rows] = await pool.query(
       `SELECT m.id,
@@ -6040,7 +6250,8 @@ app.patch('/api/admin/masters/:masterId', requireAuth, requireAdmin, async (req,
               m.artist,
               m.cover,
               m.release_year,
-              m.ratingAve
+              m.ratingAve,
+              (SELECT COUNT(*) FROM MasterGenre mg WHERE mg.masterId = m.id) AS genreCount
          FROM Master m
          WHERE m.id = ?
          LIMIT 1`,
@@ -6058,11 +6269,44 @@ app.patch('/api/admin/masters/:masterId', requireAuth, requireAdmin, async (req,
         cover: row.cover ?? null,
         releaseYear: row.release_year !== null && row.release_year !== undefined ? Number(row.release_year) : null,
         ratingAverage: row.ratingAve !== null && row.ratingAve !== undefined ? Number(row.ratingAve) : null,
+        genreCount: Number(row.genreCount) || 0,
       },
     });
   } catch (error) {
     console.error('Failed to update master as admin', error);
     res.status(500).json({ error: 'Failed to update master' });
+  }
+});
+
+// Get genres for a specific master (admin only)
+app.get('/api/admin/masters/:masterId/genres', requireAuth, requireAdmin, async (req, res) => {
+  const masterId = Number(req.params.masterId);
+  if (!Number.isInteger(masterId) || masterId <= 0) {
+    return res.status(400).json({ error: 'Invalid masterId' });
+  }
+
+  try {
+    const pool = await getPool();
+    const [rows] = await pool.query(
+      `SELECT genre, isStyle FROM MasterGenre WHERE masterId = ? ORDER BY isStyle, genre`,
+      [masterId]
+    );
+    
+    const genres = [];
+    const styles = [];
+    
+    for (const row of rows) {
+      if (row.isStyle) {
+        styles.push(row.genre);
+      } else {
+        genres.push(row.genre);
+      }
+    }
+    
+    res.json({ genres, styles });
+  } catch (error) {
+    console.error('Failed to fetch master genres', error);
+    res.status(500).json({ error: 'Failed to fetch genres' });
   }
 });
 
@@ -6087,7 +6331,6 @@ app.delete('/api/admin/masters/:masterId', requireAuth, requireAdmin, async (req
 });
 
 app.get('/api/admin/tags', requireAuth, requireAdmin, async (req, res) => {
-  console.log('Admin listing tags...');
   const rawSearch = typeof req.query.q === 'string' ? req.query.q.trim() : '';
   const rawOwner = typeof req.query.user === 'string' ? req.query.user.trim() : '';
   const limitRaw = Number(req.query.limit);
@@ -6097,6 +6340,7 @@ app.get('/api/admin/tags', requireAuth, requireAdmin, async (req, res) => {
   const searchTerm = rawSearch.slice(0, 64);
   const conditions = [];
   const params = [];
+  console.log('Admin listing tags...', { searchTerm, rawOwner, limit, offset });
 
   if (searchTerm) {
     const like = `%${escapeForLike(searchTerm)}%`;
@@ -6240,7 +6484,6 @@ app.delete('/api/admin/tags/:tagId', requireAuth, requireAdmin, async (req, res)
 
 // Admin list endpoints
 app.get('/api/admin/lists', requireAuth, requireAdmin, async (req, res) => {
-  console.log('Admin listing lists...');
   const rawSearch = typeof req.query.q === 'string' ? req.query.q.trim() : '';
   const rawOwner = typeof req.query.user === 'string' ? req.query.user.trim() : '';
   const limitRaw = Number(req.query.limit);
@@ -6250,6 +6493,7 @@ app.get('/api/admin/lists', requireAuth, requireAdmin, async (req, res) => {
   const searchTerm = rawSearch.slice(0, 128);
   const conditions = [];
   const params = [];
+  console.log('Admin listing lists...', { searchTerm, rawOwner, limit, offset });
 
   if (searchTerm) {
     const like = `%${escapeForLike(searchTerm)}%`;

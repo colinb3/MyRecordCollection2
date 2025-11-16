@@ -161,6 +161,24 @@ CREATE TABLE Master (
     ratingAve DECIMAL(3,1) NULL COMMENT 'Average of ratings 1-10 (weighted)'
 );
 
+CREATE TABLE MasterGenre (
+    masterId INT,
+    genre VARCHAR(100),
+    isStyle BOOLEAN,
+    PRIMARY KEY (masterId, genre),
+    FOREIGN KEY (masterId) REFERENCES Master(id) ON DELETE CASCADE
+);
+
+CREATE TABLE UserGenreInterest (
+    userUuid CHAR(36),
+    genre VARCHAR(100),
+    isStyle BOOLEAN,
+    rating DECIMAL(4,2),
+    collectionPercent DECIMAL(5,2),
+    PRIMARY KEY (userUuid, genre),
+    FOREIGN KEY (userUuid) REFERENCES User(uuid) ON DELETE CASCADE
+);
+
 -- Keep Master rating tallies (rating1..rating10) and ratingAve in sync with Record changes
 DELIMITER $$
 
@@ -221,8 +239,14 @@ CREATE TRIGGER trg_record_after_insert
 AFTER INSERT ON Record
 FOR EACH ROW
 BEGIN
+    -- Update master ratings
     IF NEW.masterId IS NOT NULL THEN
         CALL update_master_ratings(NEW.masterId);
+    END IF;
+    
+    -- Update user genre interests
+    IF NEW.masterId IS NOT NULL AND (NEW.isCustom IS NULL OR NEW.isCustom = FALSE) THEN
+        CALL update_user_all_genre_interests(NEW.userUuid);
     END IF;
 END $$
 
@@ -231,11 +255,24 @@ CREATE TRIGGER trg_record_after_update
 AFTER UPDATE ON Record
 FOR EACH ROW
 BEGIN
+    -- Update master ratings
     IF OLD.masterId IS NOT NULL AND OLD.masterId <> NEW.masterId THEN
         CALL update_master_ratings(OLD.masterId);
     END IF;
     IF NEW.masterId IS NOT NULL THEN
         CALL update_master_ratings(NEW.masterId);
+    END IF;
+    
+    -- Update user genre interests if relevant fields changed
+    IF (OLD.masterId IS NULL AND NEW.masterId IS NOT NULL) OR
+       (OLD.masterId IS NOT NULL AND NEW.masterId IS NULL) OR
+       (OLD.masterId <> NEW.masterId) OR
+       (OLD.rating <> NEW.rating) OR
+       (OLD.isCustom <> NEW.isCustom) THEN
+        
+        IF (OLD.isCustom IS NULL OR OLD.isCustom = FALSE) OR (NEW.isCustom IS NULL OR NEW.isCustom = FALSE) THEN
+            CALL update_user_all_genre_interests(NEW.userUuid);
+        END IF;
     END IF;
 END $$
 
@@ -244,8 +281,14 @@ CREATE TRIGGER trg_record_after_delete
 AFTER DELETE ON Record
 FOR EACH ROW
 BEGIN
+    -- Update master ratings
     IF OLD.masterId IS NOT NULL THEN
         CALL update_master_ratings(OLD.masterId);
+    END IF;
+    
+    -- Update user genre interests
+    IF OLD.masterId IS NOT NULL AND (OLD.isCustom IS NULL OR OLD.isCustom = FALSE) THEN
+        CALL update_user_all_genre_interests(OLD.userUuid);
     END IF;
 END $$
 
@@ -270,6 +313,107 @@ BEGIN
         ELSE 0
     END
     WHERE id = OLD.recordId;
+END $$
+
+-- Update UserGenreInterest for a specific user and genre
+-- NOTE: Currently only tracks genres (isStyle = FALSE). To include styles in the future:
+--   1. Change all "mg.isStyle = FALSE" to "TRUE" for styles, or remove the condition for both
+--   2. Update the INSERT/DELETE statements to use the appropriate isStyle value
+--   3. Consider creating separate procedures for genres vs styles, or add an isStyle parameter
+DROP PROCEDURE IF EXISTS update_user_genre_interest $$
+CREATE PROCEDURE update_user_genre_interest(IN p_user_uuid CHAR(36), IN p_genre VARCHAR(100))
+BEGIN
+    DECLARE avg_rating DECIMAL(4,2);
+    DECLARE genre_count INT;
+    DECLARE genre_count_all INT;
+    DECLARE total_count INT;
+    DECLARE collection_pct DECIMAL(5,2);
+    
+    -- Calculate average rating for records with this genre (only rated 1-10, excluding 0)
+    SELECT 
+        AVG(r.rating)
+    INTO avg_rating
+    FROM Record r
+    INNER JOIN MasterGenre mg ON r.masterId = mg.masterId
+    WHERE r.userUuid = p_user_uuid
+        AND mg.genre = p_genre
+        AND mg.isStyle = FALSE
+        AND (r.isCustom IS NULL OR r.isCustom = FALSE)
+        AND r.rating BETWEEN 1 AND 10;
+    
+    -- Count ALL records with this genre (including those with rating 0 or NULL)
+    SELECT COUNT(DISTINCT r.id)
+    INTO genre_count_all
+    FROM Record r
+    INNER JOIN MasterGenre mg ON r.masterId = mg.masterId
+    WHERE r.userUuid = p_user_uuid
+        AND mg.genre = p_genre
+        AND mg.isStyle = FALSE
+        AND (r.isCustom IS NULL OR r.isCustom = FALSE);
+    
+    -- Get total number of records in user's collection (non-custom only)
+    SELECT COUNT(*)
+    INTO total_count
+    FROM Record r
+    WHERE r.userUuid = p_user_uuid
+        AND (r.isCustom IS NULL OR r.isCustom = FALSE);
+    
+    -- Calculate percentage using ALL genre records
+    IF total_count > 0 AND genre_count_all > 0 THEN
+        SET collection_pct = (genre_count_all / total_count) * 100;
+        
+        -- Insert or update the UserGenreInterest entry
+        INSERT INTO UserGenreInterest (userUuid, genre, isStyle, rating, collectionPercent)
+        VALUES (p_user_uuid, p_genre, FALSE, ROUND(avg_rating, 2), collection_pct)
+        ON DUPLICATE KEY UPDATE
+            rating = ROUND(VALUES(rating), 2),
+            collectionPercent = VALUES(collectionPercent);
+    ELSE
+        -- Remove entry if user has no records with this genre
+        DELETE FROM UserGenreInterest
+        WHERE userUuid = p_user_uuid AND genre = p_genre AND isStyle = FALSE;
+    END IF;
+END $$
+
+-- Update all genre interests for a specific user
+DROP PROCEDURE IF EXISTS update_user_all_genre_interests $$
+CREATE PROCEDURE update_user_all_genre_interests(IN p_user_uuid CHAR(36))
+BEGIN
+    DECLARE done INT DEFAULT FALSE;
+    DECLARE v_genre VARCHAR(100);
+    DECLARE genre_cursor CURSOR FOR
+        SELECT DISTINCT mg.genre
+        FROM Record r
+        INNER JOIN MasterGenre mg ON r.masterId = mg.masterId
+        WHERE r.userUuid = p_user_uuid
+            AND mg.isStyle = FALSE
+            AND (r.isCustom IS NULL OR r.isCustom = FALSE);
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = TRUE;
+    
+    -- Clean up genres that user no longer has
+    DELETE ugi FROM UserGenreInterest ugi
+    WHERE ugi.userUuid = p_user_uuid
+        AND ugi.isStyle = FALSE
+        AND NOT EXISTS (
+            SELECT 1
+            FROM Record r
+            INNER JOIN MasterGenre mg ON r.masterId = mg.masterId
+            WHERE r.userUuid = p_user_uuid
+                AND mg.genre = ugi.genre
+                AND mg.isStyle = FALSE
+                AND (r.isCustom IS NULL OR r.isCustom = FALSE)
+        );
+    
+    -- Update each genre the user has
+    OPEN genre_cursor;
+    read_loop: LOOP
+        FETCH genre_cursor INTO v_genre;
+        IF done THEN
+            LEAVE read_loop;
+        END IF;
+        CALL update_user_genre_interest(p_user_uuid, v_genre);
+    END LOOP;
+    CLOSE genre_cursor;
 END $$
 
 DELIMITER ;

@@ -38,6 +38,20 @@ interface ComparedRecord {
   theirCollection?: string;
 }
 
+interface GenreInterest {
+  genre: string;
+  rating: number | null;
+  collectionPercent: number;
+}
+
+interface GenreComparison {
+  genre: string;
+  myRating: number | null;
+  theirRating: number | null;
+  myPercent: number;
+  theirPercent: number;
+}
+
 export default function Compare() {
   const navigate = useNavigate();
   const params = useParams<{ username: string }>();
@@ -70,6 +84,11 @@ export default function Compare() {
   const [error, setError] = useState<string | null>(null);
   const [targetProfilePic, setTargetProfilePic] = useState<string | null>(null);
   const [targetDisplayName, setTargetDisplayName] = useState<string>("");
+  const [genreComparisons, setGenreComparisons] = useState<GenreComparison[]>(
+    []
+  );
+  const [loadingGenres, setLoadingGenres] = useState(false);
+  const [genreError, setGenreError] = useState<string | null>(null);
 
   const targetProfileAlt =
     targetDisplayName || targetUsername || "Record owner";
@@ -178,6 +197,113 @@ export default function Compare() {
     }
   };
 
+  const fetchGenreComparisons = useCallback(async () => {
+    if (!username || !targetUsername) return;
+
+    console.log("🎵 fetchGenreComparisons START", { username, targetUsername });
+    setLoadingGenres(true);
+    setGenreError(null);
+
+    try {
+      const res = await fetch(
+        apiUrl(`/api/compare/${encodeURIComponent(targetUsername)}/genres`),
+        { credentials: "include" }
+      );
+
+      console.log("🎵 Genre fetch response:", res.status, res.ok);
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to load genre comparison");
+      }
+
+      const data = await res.json();
+      console.log("🎵 Genre data received:", data);
+
+      const myGenres: Record<string, GenreInterest> = {};
+      const theirGenres: Record<string, GenreInterest> = {};
+
+      // Map my genres
+      if (Array.isArray(data.myGenres)) {
+        data.myGenres.forEach((g: GenreInterest) => {
+          myGenres[g.genre] = {
+            genre: g.genre,
+            rating: g.rating !== null ? Number(g.rating) : null,
+            collectionPercent: Number(g.collectionPercent),
+          };
+        });
+      }
+
+      // Map their genres
+      if (Array.isArray(data.theirGenres)) {
+        data.theirGenres.forEach((g: GenreInterest) => {
+          theirGenres[g.genre] = {
+            genre: g.genre,
+            rating: g.rating !== null ? Number(g.rating) : null,
+            collectionPercent: Number(g.collectionPercent),
+          };
+        });
+      }
+
+      // Get all unique genres from both users
+      const allGenres = new Set<string>([
+        ...Object.keys(myGenres),
+        ...Object.keys(theirGenres),
+      ]);
+
+      console.log("🎵 All genres:", Array.from(allGenres));
+
+      // Create comparison array for all genres
+      const comparisons: GenreComparison[] = Array.from(allGenres).map(
+        (genre) => ({
+          genre,
+          myRating: myGenres[genre]?.rating ?? null,
+          theirRating: theirGenres[genre]?.rating ?? null,
+          myPercent: myGenres[genre]?.collectionPercent ?? 0,
+          theirPercent: theirGenres[genre]?.collectionPercent ?? 0,
+        })
+      );
+
+      console.log("🎵 Comparisons created:", comparisons);
+
+      // Sort by combined presence (sum of both percentages)
+      comparisons.sort((a, b) => {
+        const aTotal = a.myPercent + a.theirPercent;
+        const bTotal = b.myPercent + b.theirPercent;
+        return bTotal - aTotal;
+      });
+
+      console.log("🎵 Setting genreComparisons, count:", comparisons.length);
+      setGenreComparisons(comparisons);
+    } catch (err) {
+      console.error("🎵 Failed to load genre comparison", err);
+      setGenreError(
+        err instanceof Error ? err.message : "Failed to load genre comparison"
+      );
+      setGenreComparisons([]);
+    } finally {
+      console.log("🎵 fetchGenreComparisons DONE");
+      setLoadingGenres(false);
+    }
+  }, [username, targetUsername]);
+
+  useEffect(() => {
+    if (username && targetUsername) {
+      fetchGenreComparisons();
+    }
+  }, [username, targetUsername, fetchGenreComparisons]);
+
+  console.log("🎵 Compare component render", {
+    username,
+    targetUsername,
+    loading,
+    error,
+    recordsCount: records.length,
+    loadingGenres,
+    genreError,
+    genreComparisonsCount: genreComparisons.length,
+  });
+
   return (
     <ThemeProvider theme={darkTheme}>
       <CssBaseline />
@@ -187,6 +313,7 @@ export default function Compare() {
           height: "100vh",
           display: "flex",
           flexDirection: "column",
+          overflowY: "hidden",
         }}
       >
         <TopBar
@@ -323,10 +450,10 @@ export default function Compare() {
                       </ToggleButton>
                       <ToggleButton
                         value="collection"
-                        aria-label="collections"
+                        aria-label="collection"
                         sx={{ fontSize: "0.75em" }}
                       >
-                        Collections{" "}
+                        Collection{" "}
                         {filter === "collection" &&
                           !loading &&
                           `(${records.length})`}
@@ -343,10 +470,10 @@ export default function Compare() {
                       </ToggleButton>
                       <ToggleButton
                         value="wishlist"
-                        aria-label="wishlists"
+                        aria-label="wishlist"
                         sx={{ fontSize: "0.75em" }}
                       >
-                        Wishlists{" "}
+                        Wishlist{" "}
                         {filter === "wishlist" &&
                           !loading &&
                           `(${records.length})`}
@@ -569,6 +696,181 @@ export default function Compare() {
                   )}
                 </Paper>
               </Box>
+            </Paper>
+
+            {/* Genre Comparison Section */}
+            <Paper variant="outlined" sx={{ borderRadius: 2, mt: 2, p: 3 }}>
+              <Typography variant="h6" sx={{ mb: 2 }}>
+                Genre Makeup and Average Rating
+              </Typography>
+
+              {loadingGenres ? (
+                <Box
+                  display="flex"
+                  justifyContent="center"
+                  alignItems="center"
+                  py={4}
+                >
+                  <CircularProgress size={24} />
+                </Box>
+              ) : genreError ? (
+                <Typography color="error" align="center" py={2}>
+                  {genreError}
+                </Typography>
+              ) : genreComparisons.length === 0 ? (
+                <Typography color="text.secondary" align="center" py={2}>
+                  No genre data available
+                </Typography>
+              ) : (
+                <Box
+                  sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}
+                >
+                  {genreComparisons
+                    .filter((g) => g.myPercent > 0 || g.theirPercent > 0)
+                    .map((genre) => (
+                      <Box key={genre.genre}>
+                        <Box
+                          sx={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            mb: 0.5,
+                          }}
+                        >
+                          <Typography
+                            variant="body2"
+                            sx={{ fontWeight: 500, minWidth: 180 }}
+                          >
+                            {genre.genre}
+                          </Typography>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              gap: 2,
+                              alignItems: "center",
+                            }}
+                          >
+                            {genre.myRating !== null && (
+                              <Tooltip title="Your avg rating">
+                                <Box
+                                  sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 0.5,
+                                  }}
+                                >
+                                  <Avatar
+                                    src={profilePicUrl || undefined}
+                                    sx={{ width: 20, height: 20 }}
+                                  >
+                                    {profileInitial}
+                                  </Avatar>
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ minWidth: 28 }}
+                                  >
+                                    {genre.myRating.toFixed(1)}
+                                  </Typography>
+                                </Box>
+                              </Tooltip>
+                            )}
+                            {genre.theirRating !== null && (
+                              <Tooltip title={`${targetUsername}'s avg rating`}>
+                                <Box
+                                  sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 0.5,
+                                  }}
+                                >
+                                  <Avatar
+                                    src={targetProfilePic || undefined}
+                                    sx={{ width: 20, height: 20 }}
+                                  >
+                                    {targetInitial}
+                                  </Avatar>
+                                  <Typography
+                                    variant="caption"
+                                    sx={{ minWidth: 28 }}
+                                  >
+                                    {genre.theirRating.toFixed(1)}
+                                  </Typography>
+                                </Box>
+                              </Tooltip>
+                            )}
+                          </Box>
+                        </Box>
+                        <Box
+                          sx={{
+                            display: "flex",
+                            gap:
+                              genre.myPercent > 0 && genre.theirPercent > 0
+                                ? 1
+                                : 0,
+                            alignItems: "center",
+                          }}
+                        >
+                          {genre.myPercent > 0 && (
+                            <Tooltip title="You">
+                              <Box
+                                sx={{
+                                  flex: genre.myPercent,
+                                  minWidth: 20,
+                                  height: 24,
+                                  bgcolor: "primary.main",
+                                  borderRadius: 1,
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                }}
+                              >
+                                {genre.myPercent > 0 && (
+                                  <Typography
+                                    variant="caption"
+                                    sx={{
+                                      color: "primary.contrastText",
+                                      fontSize: "0.7rem",
+                                    }}
+                                  >
+                                    {genre.myPercent.toFixed(0)}%
+                                  </Typography>
+                                )}
+                              </Box>
+                            </Tooltip>
+                          )}
+                          {genre.theirPercent > 0 && (
+                            <Tooltip title={targetUsername}>
+                              <Box
+                                sx={{
+                                  flex: genre.theirPercent,
+                                  minWidth: 20,
+                                  height: 24,
+                                  bgcolor: "secondary.main",
+                                  borderRadius: 1,
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                }}
+                              >
+                                {genre.theirPercent >= 3 && (
+                                  <Typography
+                                    variant="caption"
+                                    sx={{
+                                      color: "secondary.contrastText",
+                                      fontSize: "0.7rem",
+                                    }}
+                                  >
+                                    {genre.theirPercent.toFixed(0)}%
+                                  </Typography>
+                                )}
+                              </Box>
+                            </Tooltip>
+                          )}
+                        </Box>
+                      </Box>
+                    ))}
+                </Box>
+              )}
             </Paper>
           </Box>
         </Box>
