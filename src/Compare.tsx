@@ -11,6 +11,9 @@ import {
   Avatar,
   Divider,
   Tooltip,
+  ButtonBase,
+  Stack,
+  Button,
 } from "@mui/material";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import TopBar from "./components/TopBar";
@@ -19,6 +22,8 @@ import { getCachedUserInfo, loadUserInfo } from "./userInfo";
 import apiUrl from "./api";
 import { performLogout } from "./logout";
 import { loadPublicUserProfile } from "./communityUsers";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import CompareArrowsIcon from "@mui/icons-material/CompareArrows";
 
 type CollectionFilter = "all" | "collection" | "listened" | "wishlist";
 
@@ -46,6 +51,9 @@ export default function Compare() {
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
     cachedUser?.profilePicUrl ?? null
   );
+  const profileInitial = (displayName || username || "?")
+    .charAt(0)
+    .toUpperCase();
 
   const targetUsername = params.username ?? "";
 
@@ -62,6 +70,18 @@ export default function Compare() {
   const [records, setRecords] = useState<ComparedRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [targetProfilePic, setTargetProfilePic] = useState<string | null>(null);
+  const [targetDisplayName, setTargetDisplayName] = useState<string>("");
+
+  const targetProfileAlt =
+    targetDisplayName || targetUsername || "Record owner";
+  const targetInitial = (targetDisplayName || targetUsername || "?")
+    .charAt(0)
+    .toUpperCase();
+
+  const handleBack = useCallback(() => {
+    // Simply use browser history for consistent back navigation
+    navigate(-1);
+  }, [navigate]);
 
   useEffect(() => {
     let cancelled = false;
@@ -138,6 +158,7 @@ export default function Compare() {
         const profile = await loadPublicUserProfile(targetUsername, false);
         if (!cancelled) {
           setTargetProfilePic(profile.profilePicUrl || null);
+          setTargetDisplayName(profile.displayName || "");
         }
       } catch (err) {
         console.error("Failed to load target user profile", err);
@@ -196,6 +217,77 @@ export default function Compare() {
                   p: { xs: 2, md: 3 },
                 }}
               >
+                <Stack
+                  direction="row"
+                  justifyContent="space-between"
+                  alignItems="center"
+                  sx={{ width: "100%", mb: 1 }}
+                >
+                  <Button
+                    variant="outlined"
+                    startIcon={<ArrowBackIcon />}
+                    onClick={handleBack}
+                    sx={{ alignSelf: "flex-start", mb: 1.5, px: 1.9 }}
+                  >
+                    Back
+                  </Button>
+                  <Stack direction={"row"} alignItems={"center"} spacing={1.25}>
+                    <Avatar
+                      src={
+                        profilePicUrl
+                          ? profilePicUrl.startsWith("http")
+                            ? profilePicUrl
+                            : apiUrl(profilePicUrl)
+                          : undefined
+                      }
+                      alt={profilePicUrl ? displayName || username : "Profile"}
+                      onClick={() =>
+                        navigate(`/community/${encodeURIComponent(username)}`)
+                      }
+                      sx={{
+                        width: 40,
+                        height: 40,
+                        flexShrink: 0,
+                        bgcolor: "grey.700",
+                        "&:hover": {
+                          opacity: 0.8,
+                        },
+                        cursor: "pointer",
+                      }}
+                    >
+                      {profileInitial}
+                    </Avatar>
+                    <CompareArrowsIcon />
+                    <Avatar
+                      src={
+                        targetProfilePic
+                          ? targetProfilePic.startsWith("http")
+                            ? targetProfilePic
+                            : apiUrl(targetProfilePic)
+                          : undefined
+                      }
+                      alt={targetProfileAlt}
+                      onClick={() =>
+                        navigate(
+                          `/community/${encodeURIComponent(targetUsername)}`
+                        )
+                      }
+                      sx={{
+                        width: 40,
+                        height: 40,
+                        flexShrink: 0,
+                        bgcolor: "grey.700",
+                        "&:hover": {
+                          opacity: 0.8,
+                        },
+                        cursor: "pointer",
+                      }}
+                    >
+                      {targetInitial}
+                    </Avatar>
+                  </Stack>
+                </Stack>
+
                 <Paper
                   sx={{
                     p: 2,

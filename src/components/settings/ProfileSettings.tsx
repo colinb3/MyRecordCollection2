@@ -1166,6 +1166,8 @@ export default function ProfileSettings({
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
           Set what record you're currently listening to. This will be displayed
           on your profile.
+          <br />
+          Note: If you can't find a record, add it to your collection first.
         </Typography>
 
         {listeningTo && (
