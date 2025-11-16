@@ -695,189 +695,202 @@ export default function Compare() {
                     </Box>
                   )}
                 </Paper>
-              </Box>
-            </Paper>
 
-            {/* Genre Comparison Section */}
-            <Paper variant="outlined" sx={{ borderRadius: 2, mt: 2, p: 3 }}>
-              <Typography variant="h6" sx={{ mb: 2 }}>
-                Genre Make Up and Average Rating
-              </Typography>
+                {/* Genre Comparison Section */}
+                <Paper
+                  sx={{
+                    mt: 3,
+                    p: 2,
+                    display: "flex",
+                    flexDirection: "column",
+                  }}
+                >
+                  <Typography variant="h6" sx={{ mb: 2 }}>
+                    Genre Make Up and Average Rating
+                  </Typography>
 
-              {loadingGenres ? (
-                <Box
-                  display="flex"
-                  justifyContent="center"
-                  alignItems="center"
-                  py={4}
-                >
-                  <CircularProgress size={24} />
-                </Box>
-              ) : genreError ? (
-                <Typography color="error" align="center" py={2}>
-                  {genreError}
-                </Typography>
-              ) : genreComparisons.length === 0 ? (
-                <Typography color="text.secondary" align="center" py={2}>
-                  No genre data available
-                </Typography>
-              ) : (
-                <Box
-                  sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}
-                >
-                  {genreComparisons
-                    .filter((g) => g.myPercent > 0 || g.theirPercent > 0)
-                    .map((genre) => (
-                      <Box key={genre.genre}>
-                        <Box
-                          sx={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            mb: 0.5,
-                          }}
-                        >
-                          <Typography
-                            variant="body2"
-                            sx={{ fontWeight: 500, minWidth: 180 }}
-                          >
-                            {genre.genre}
-                          </Typography>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              gap: 2,
-                              alignItems: "center",
-                            }}
-                          >
-                            {genre.myRating !== null && (
-                              <Tooltip title="Your avg rating">
-                                <Box
-                                  sx={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 0.5,
-                                  }}
-                                >
-                                  <Avatar
-                                    src={profilePicUrl || undefined}
-                                    sx={{ width: 20, height: 20 }}
+                  {loadingGenres ? (
+                    <Box
+                      display="flex"
+                      justifyContent="center"
+                      alignItems="center"
+                      py={4}
+                    >
+                      <CircularProgress size={24} />
+                    </Box>
+                  ) : genreError ? (
+                    <Typography color="error" align="center" py={2}>
+                      {genreError}
+                    </Typography>
+                  ) : genreComparisons.length === 0 ? (
+                    <Typography color="text.secondary" align="center" py={2}>
+                      No genre data available
+                    </Typography>
+                  ) : (
+                    <Box
+                      sx={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 1.5,
+                      }}
+                    >
+                      {genreComparisons
+                        .filter((g) => g.myPercent > 0 || g.theirPercent > 0)
+                        .map((genre) => (
+                          <Box key={genre.genre}>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                mb: 0.5,
+                              }}
+                            >
+                              <Typography
+                                variant="body2"
+                                sx={{ fontWeight: 500, minWidth: 180 }}
+                              >
+                                {genre.genre}
+                              </Typography>
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  gap: 2,
+                                  alignItems: "center",
+                                }}
+                              >
+                                {genre.myRating !== null && (
+                                  <Tooltip title="Your avg rating">
+                                    <Box
+                                      sx={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 0.5,
+                                      }}
+                                    >
+                                      <Avatar
+                                        src={profilePicUrl || undefined}
+                                        sx={{ width: 20, height: 20 }}
+                                      >
+                                        {profileInitial}
+                                      </Avatar>
+                                      <Typography
+                                        variant="caption"
+                                        sx={{ minWidth: 28 }}
+                                      >
+                                        {genre.myRating.toFixed(1)}
+                                      </Typography>
+                                    </Box>
+                                  </Tooltip>
+                                )}
+                                {genre.theirRating !== null && (
+                                  <Tooltip
+                                    title={`${targetUsername}'s avg rating`}
                                   >
-                                    {profileInitial}
-                                  </Avatar>
-                                  <Typography
-                                    variant="caption"
-                                    sx={{ minWidth: 28 }}
+                                    <Box
+                                      sx={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 0.5,
+                                      }}
+                                    >
+                                      <Avatar
+                                        src={targetProfilePic || undefined}
+                                        sx={{ width: 20, height: 20 }}
+                                      >
+                                        {targetInitial}
+                                      </Avatar>
+                                      <Typography
+                                        variant="caption"
+                                        sx={{ minWidth: 28 }}
+                                      >
+                                        {genre.theirRating.toFixed(1)}
+                                      </Typography>
+                                    </Box>
+                                  </Tooltip>
+                                )}
+                              </Box>
+                            </Box>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                gap:
+                                  genre.myPercent > 0 && genre.theirPercent > 0
+                                    ? 1
+                                    : 0,
+                                alignItems: "center",
+                                width: "100%",
+                              }}
+                            >
+                              {genre.myPercent > 0 && (
+                                <Tooltip title="You">
+                                  <Box
+                                    sx={{
+                                      flex:
+                                        genre.theirPercent > 0
+                                          ? genre.myPercent
+                                          : 1,
+                                      minWidth: 20,
+                                      height: 24,
+                                      bgcolor: "primary.main",
+                                      borderRadius: 1,
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                    }}
                                   >
-                                    {genre.myRating.toFixed(1)}
-                                  </Typography>
-                                </Box>
-                              </Tooltip>
-                            )}
-                            {genre.theirRating !== null && (
-                              <Tooltip title={`${targetUsername}'s avg rating`}>
-                                <Box
-                                  sx={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 0.5,
-                                  }}
-                                >
-                                  <Avatar
-                                    src={targetProfilePic || undefined}
-                                    sx={{ width: 20, height: 20 }}
+                                    {genre.myPercent > 0 && (
+                                      <Typography
+                                        variant="caption"
+                                        sx={{
+                                          color: "primary.contrastText",
+                                          fontSize: "0.7rem",
+                                        }}
+                                      >
+                                        {genre.myPercent.toFixed(0)}%
+                                      </Typography>
+                                    )}
+                                  </Box>
+                                </Tooltip>
+                              )}
+                              {genre.theirPercent > 0 && (
+                                <Tooltip title={targetUsername}>
+                                  <Box
+                                    sx={{
+                                      flex:
+                                        genre.myPercent > 0
+                                          ? genre.theirPercent
+                                          : 1,
+                                      minWidth: 20,
+                                      height: 24,
+                                      bgcolor: "secondary.main",
+                                      borderRadius: 1,
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                    }}
                                   >
-                                    {targetInitial}
-                                  </Avatar>
-                                  <Typography
-                                    variant="caption"
-                                    sx={{ minWidth: 28 }}
-                                  >
-                                    {genre.theirRating.toFixed(1)}
-                                  </Typography>
-                                </Box>
-                              </Tooltip>
-                            )}
+                                    {genre.theirPercent >= 0 && (
+                                      <Typography
+                                        variant="caption"
+                                        sx={{
+                                          color: "secondary.contrastText",
+                                          fontSize: "0.7rem",
+                                        }}
+                                      >
+                                        {genre.theirPercent.toFixed(0)}%
+                                      </Typography>
+                                    )}
+                                  </Box>
+                                </Tooltip>
+                              )}
+                            </Box>
                           </Box>
-                        </Box>
-                        <Box
-                          sx={{
-                            display: "flex",
-                            gap:
-                              genre.myPercent > 0 && genre.theirPercent > 0
-                                ? 1
-                                : 0,
-                            alignItems: "center",
-                            width: "100%",
-                          }}
-                        >
-                          {genre.myPercent > 0 && (
-                            <Tooltip title="You">
-                              <Box
-                                sx={{
-                                  flex:
-                                    genre.theirPercent > 0
-                                      ? genre.myPercent
-                                      : 1,
-                                  minWidth: 20,
-                                  height: 24,
-                                  bgcolor: "primary.main",
-                                  borderRadius: 1,
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                }}
-                              >
-                                {genre.myPercent > 0 && (
-                                  <Typography
-                                    variant="caption"
-                                    sx={{
-                                      color: "primary.contrastText",
-                                      fontSize: "0.7rem",
-                                    }}
-                                  >
-                                    {genre.myPercent.toFixed(0)}%
-                                  </Typography>
-                                )}
-                              </Box>
-                            </Tooltip>
-                          )}
-                          {genre.theirPercent > 0 && (
-                            <Tooltip title={targetUsername}>
-                              <Box
-                                sx={{
-                                  flex:
-                                    genre.myPercent > 0
-                                      ? genre.theirPercent
-                                      : 1,
-                                  minWidth: 20,
-                                  height: 24,
-                                  bgcolor: "secondary.main",
-                                  borderRadius: 1,
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                }}
-                              >
-                                {genre.theirPercent >= 0 && (
-                                  <Typography
-                                    variant="caption"
-                                    sx={{
-                                      color: "secondary.contrastText",
-                                      fontSize: "0.7rem",
-                                    }}
-                                  >
-                                    {genre.theirPercent.toFixed(0)}%
-                                  </Typography>
-                                )}
-                              </Box>
-                            </Tooltip>
-                          )}
-                        </Box>
-                      </Box>
-                    ))}
-                </Box>
-              )}
+                        ))}
+                    </Box>
+                  )}
+                </Paper>
+              </Box>
             </Paper>
           </Box>
         </Box>
