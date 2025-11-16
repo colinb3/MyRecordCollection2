@@ -127,6 +127,7 @@ export default function TopBar({
       >
         <Typography
           variant="h4"
+          fontSize={"1.6em"}
           sx={{
             mr: "auto",
             fontWeight: "bold",
@@ -171,7 +172,6 @@ export default function TopBar({
             size="large"
             aria-label="account menu"
             aria-haspopup="true"
-            onMouseEnter={handleMenuOpen}
             onClick={handleMenuOpen}
             color="inherit"
           >
@@ -201,9 +201,6 @@ export default function TopBar({
             }}
             open={open}
             onClose={handleMenuClose}
-            slotProps={{
-              paper: { onMouseLeave: handleMenuClose },
-            }}
           >
             {username
               ? [
