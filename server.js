@@ -1344,6 +1344,107 @@ app.get("/api/users/:username/records", async (req, res) => {
   }
 });
 
+app.get("/api/compare/:username", async (req, res) => {
+  const targetUsername = req.params.username;
+  const filter = req.query.filter || "all"; // all, collection, listened, wishlist
+  console.log(`Comparing collections with user: ${targetUsername}, filter: ${filter}`);
+  
+  // Get authenticated user
+  let authenticatedUserUuid = null;
+  const token = req.cookies?.token;
+  if (token) {
+    try {
+      const payload = jwt.verify(token, JWT_SECRET);
+      if (payload && typeof payload.userUuid === "string") {
+        authenticatedUserUuid = payload.userUuid;
+      }
+    } catch {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+  } else {
+    return res.status(401).json({ error: "Authentication required" });
+  }
+
+  try {
+    const pool = await getPool();
+    
+    // Get target user info
+    const targetUser = await getUserByUsername(pool, targetUsername);
+    if (!targetUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    
+    const targetUserUuid = targetUser.uuid;
+    
+    if (authenticatedUserUuid === targetUserUuid) {
+      return res.status(400).json({ error: "Cannot compare with yourself" });
+    }
+    
+    // Build collection name filter based on filter param
+    let collectionFilter = "";
+    let collectionFilter2 = "";
+    if (filter === "collection") {
+      collectionFilter = `AND t1.name = '${DEFAULT_COLLECTION_NAME}'`;
+      collectionFilter2 = `AND t2.name = '${DEFAULT_COLLECTION_NAME}'`;
+    } else if (filter === "listened") {
+      collectionFilter = `AND t1.name = '${LISTENED_COLLECTION_NAME}'`;
+      collectionFilter2 = `AND t2.name = '${LISTENED_COLLECTION_NAME}'`;
+    } else if (filter === "wishlist") {
+      collectionFilter = `AND t1.name = '${WISHLIST_COLLECTION_NAME}'`;
+      collectionFilter2 = `AND t2.name = '${WISHLIST_COLLECTION_NAME}'`;
+    }
+    
+    // Find shared records by matching masterId
+    // Only include records from public collections for both users
+    const query = `
+      SELECT 
+        r1.id as myRecordId,
+        r1.masterId,
+        m.name as record,
+        m.artist,
+        m.cover,
+        r1.rating as myRating,
+        t1.name as myCollection,
+        MAX(r2.rating) as theirRating,
+        MAX(t2.name) as theirCollection
+      FROM Record r1
+      INNER JOIN RecTable t1 ON r1.tableId = t1.id
+      INNER JOIN Record r2 ON r1.masterId = r2.masterId
+      INNER JOIN RecTable t2 ON r2.tableId = t2.id
+      LEFT JOIN Master m ON r1.masterId = m.id
+      WHERE r1.userUuid = ? 
+        AND r2.userUuid = ?
+        AND r1.masterId IS NOT NULL
+        AND r2.masterId IS NOT NULL
+        AND t1.isPrivate = 0
+        AND t2.isPrivate = 0
+        ${collectionFilter}
+        ${collectionFilter2}
+      GROUP BY r1.id, r1.masterId, m.name, m.artist, m.cover, r1.rating, t1.name
+      ORDER BY m.name
+    `;
+    
+    const [rows] = await pool.query(query, [authenticatedUserUuid, targetUserUuid]);
+    
+    const comparedRecords = rows.map((r) => ({
+      id: r.myRecordId,
+      masterId: r.masterId,
+      record: r.record,
+      artist: r.artist,
+      cover: r.cover,
+      myRating: r.myRating || 0,
+      theirRating: r.theirRating || 0,
+      myCollection: r.myCollection,
+      theirCollection: r.theirCollection,
+    }));
+    
+    res.json({ records: comparedRecords });
+  } catch (err) {
+    console.error("Failed to compare collections", err);
+    res.status(500).json({ error: "Failed to compare collections" });
+  }
+});
+
 app.get("/api/records/master-info", async (req, res) => {
   console.log("Fetching master info...");
 

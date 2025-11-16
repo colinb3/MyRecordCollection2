@@ -23,6 +23,7 @@ import {
   Avatar,
   ListItemText,
   Button,
+  Stack,
 } from "@mui/material";
 import CoverImage from "./components/CoverImage";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -590,7 +591,7 @@ export default function Search() {
             mt: 1,
           }}
         >
-          <Box maxWidth={860} mx="auto" sx={{ height: { md: "100%" } }}>
+          <Box maxWidth={860} mx="auto" sx={{ height: { xs: "100%" } }}>
             <Paper
               variant="outlined"
               sx={{
@@ -714,21 +715,29 @@ export default function Search() {
                           );
                         })}
                         {recordHasMore && !recordLoading && (
-                          <Box
+                          <Stack
                             sx={{
                               display: "flex",
-                              justifyContent: "center",
+                              justifySelf: "center",
+                              gap: 1.5,
                               py: 2,
                             }}
                           >
-                            <Button
-                              variant="outlined"
-                              onClick={handleRecordsLoadMore}
-                              disabled={recordLoadingMore}
+                            <Box sx={{ mx: "auto" }}>
+                              <Button
+                                variant="outlined"
+                                onClick={handleRecordsLoadMore}
+                                disabled={recordLoadingMore}
+                              >
+                                {recordLoadingMore ? "Loading..." : "Load More"}
+                              </Button>
+                            </Box>
+                            <Typography
+                              sx={{ mx: "auto", color: "text.secondary" }}
                             >
-                              {recordLoadingMore ? "Loading..." : "Load More"}
-                            </Button>
-                          </Box>
+                              Tip: Search by the album name
+                            </Typography>
+                          </Stack>
                         )}
                       </List>
                     )}

@@ -16,6 +16,8 @@ import {
   ButtonBase,
   CircularProgress,
   IconButton,
+  Tooltip,
+  Stack,
 } from "@mui/material";
 import Grid from "@mui/material/Grid";
 import { useNavigate, useParams } from "react-router-dom";
@@ -32,7 +34,9 @@ import {
   unfollowUser,
 } from "./communityUsers";
 import SettingsIcon from "@mui/icons-material/Settings";
+import CompareArrowsIcon from "@mui/icons-material/CompareArrows";
 import ShareButton from "./components/ShareButton";
+import VisibilityIcon from "@mui/icons-material/Visibility";
 import { performLogout } from "./logout";
 
 const OWN_PREVIEW_LIMIT = 3;
@@ -330,9 +334,6 @@ export default function CommunityProfile() {
     setFollowPending(false);
   }, [profile?.username]);
 
-  const seeCollectionLabel = isViewingOwnProfile
-    ? "Go to My Collection"
-    : "View Collection";
   const highlightEmptyCopy = isViewingOwnProfile
     ? "No Highlights Set"
     : "No highlights shared yet.";
@@ -340,25 +341,15 @@ export default function CommunityProfile() {
     ? "No recent additions yet."
     : "No recent additions available.";
   const showRecentSection = isViewingOwnProfile || !profile?.collectionPrivate;
-  const wishlistTitle = isViewingOwnProfile ? "My Wishlist" : "Wishlist";
   const wishlistEmptyCopy = isViewingOwnProfile
     ? "No wishlist records yet."
     : "No wishlist shared yet.";
   const showWishlistSection = isViewingOwnProfile || !profile?.wishlistPrivate;
-  const seeWishlistLabel = isViewingOwnProfile
-    ? "Go to Wishlist"
-    : "View Wishlist";
 
   const showListenedSection = isViewingOwnProfile || !profile?.listenedPrivate;
-  const listenedTitle = isViewingOwnProfile
-    ? "Recently Listened"
-    : `${targetDisplayName}'s Recently Listened`;
   const listenedEmptyCopy = isViewingOwnProfile
     ? "No listened records yet. Add albums you have played."
     : `${targetDisplayName} hasn’t shared any listened records yet.`;
-  const seeListenedLabel = isViewingOwnProfile
-    ? "View My Listened"
-    : "View Listened";
 
   return (
     <ThemeProvider theme={darkTheme}>
@@ -431,15 +422,22 @@ export default function CommunityProfile() {
                           gap: 0.5,
                         }}
                       >
-                        <ShareButton
-                          title={`${
-                            profile.displayName || profile.username
-                          }'s Profile`}
-                          text={`Check out ${
-                            profile.displayName || profile.username
-                          }'s profile!`}
-                        />
-                        {isViewingOwnProfile && (
+                        {!isViewingOwnProfile ? (
+                          <Tooltip title="Compare collections">
+                            <IconButton
+                              color="inherit"
+                              size="medium"
+                              aria-label="Compare collections"
+                              onClick={() =>
+                                navigate(
+                                  `/community/${profileUsername}/compare`
+                                )
+                              }
+                            >
+                              <CompareArrowsIcon />
+                            </IconButton>
+                          </Tooltip>
+                        ) : (
                           <IconButton
                             color="inherit"
                             aria-label="Open profile settings"
@@ -448,6 +446,14 @@ export default function CommunityProfile() {
                             <SettingsIcon />
                           </IconButton>
                         )}
+                        <ShareButton
+                          title={`${
+                            profile.displayName || profile.username
+                          }'s Profile`}
+                          text={`Check out ${
+                            profile.displayName || profile.username
+                          }'s profile!`}
+                        />
                       </Box>
                       <Avatar
                         variant="rounded"
@@ -669,14 +675,28 @@ export default function CommunityProfile() {
                     )}
                     {(!loading && recentRecords.length > 0) ||
                     isViewingOwnProfile ? (
-                      <Box>
+                      <Stack direction="row" gap={1} flexWrap={"wrap"}>
                         <Button
                           variant="contained"
                           onClick={handleSeeCollection}
+                          startIcon={<VisibilityIcon />}
                         >
-                          {seeCollectionLabel}
+                          View
                         </Button>
-                      </Box>
+                        {!isViewingOwnProfile && (
+                          <Button
+                            variant="outlined"
+                            startIcon={<CompareArrowsIcon />}
+                            onClick={() =>
+                              navigate(
+                                `/community/${profileUsername}/compare?filter=collection`
+                              )
+                            }
+                          >
+                            Compare
+                          </Button>
+                        )}
+                      </Stack>
                     ) : null}
                   </SectionCard>
                 </Grid>
@@ -684,7 +704,7 @@ export default function CommunityProfile() {
 
               {showListenedSection && (
                 <Grid size={{ xs: 12 }}>
-                  <SectionCard title={listenedTitle}>
+                  <SectionCard title="Recently Listened">
                     {loading ? (
                       <Box
                         sx={{ display: "flex", alignItems: "center", gap: 2 }}
@@ -709,11 +729,28 @@ export default function CommunityProfile() {
                     )}
                     {(!loading && listenedRecords.length > 0) ||
                     isViewingOwnProfile ? (
-                      <Box>
-                        <Button variant="contained" onClick={handleSeeListened}>
-                          {seeListenedLabel}
+                      <Stack direction="row" gap={1} flexWrap={"wrap"}>
+                        <Button
+                          variant="contained"
+                          onClick={handleSeeListened}
+                          startIcon={<VisibilityIcon />}
+                        >
+                          View
                         </Button>
-                      </Box>
+                        {!isViewingOwnProfile && (
+                          <Button
+                            variant="outlined"
+                            startIcon={<CompareArrowsIcon />}
+                            onClick={() =>
+                              navigate(
+                                `/community/${profileUsername}/compare?filter=listened`
+                              )
+                            }
+                          >
+                            Compare
+                          </Button>
+                        )}
+                      </Stack>
                     ) : null}
                   </SectionCard>
                 </Grid>
@@ -721,7 +758,7 @@ export default function CommunityProfile() {
 
               {showWishlistSection && (
                 <Grid size={{ xs: 12 }}>
-                  <SectionCard title={wishlistTitle}>
+                  <SectionCard title="Wishlist">
                     {loading ? (
                       <Box
                         sx={{ display: "flex", alignItems: "center", gap: 2 }}
@@ -746,11 +783,28 @@ export default function CommunityProfile() {
 
                     {(!loading && wishlistRecords.length > 0) ||
                     isViewingOwnProfile ? (
-                      <Box>
-                        <Button variant="contained" onClick={handleSeeWishlist}>
-                          {seeWishlistLabel}
+                      <Stack direction="row" gap={1} flexWrap={"wrap"}>
+                        <Button
+                          variant="contained"
+                          onClick={handleSeeWishlist}
+                          startIcon={<VisibilityIcon />}
+                        >
+                          View
                         </Button>
-                      </Box>
+                        {!isViewingOwnProfile && (
+                          <Button
+                            variant="outlined"
+                            startIcon={<CompareArrowsIcon />}
+                            onClick={() =>
+                              navigate(
+                                `/community/${profileUsername}/compare?filter=wishlist`
+                              )
+                            }
+                          >
+                            Compare
+                          </Button>
+                        )}
+                      </Stack>
                     ) : null}
                   </SectionCard>
                 </Grid>
