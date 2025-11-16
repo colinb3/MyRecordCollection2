@@ -852,7 +852,7 @@ export default function Compare() {
                                   justifyContent: "center",
                                 }}
                               >
-                                {genre.theirPercent >= 3 && (
+                                {genre.theirPercent >= 0 && (
                                   <Typography
                                     variant="caption"
                                     sx={{
