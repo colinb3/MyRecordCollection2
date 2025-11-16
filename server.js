@@ -1243,6 +1243,107 @@ app.get("/api/records", requireAuth, async (req, res) => {
   }
 });
 
+// Get all records for a user across all collections
+app.get("/api/users/:username/records", async (req, res) => {
+  const targetUsername = req.params.username;
+  console.log(`Fetching all records for user: ${targetUsername}`);
+  
+  let authenticatedUserUuid = null;
+  const token = req.cookies?.token;
+  if (token) {
+    try {
+      const payload = jwt.verify(token, JWT_SECRET);
+      if (payload && typeof payload.userUuid === "string") {
+        authenticatedUserUuid = payload.userUuid;
+      }
+    } catch {
+      // ignore invalid tokens
+    }
+  }
+
+  try {
+    const pool = await getPool();
+    
+    // Get target user info
+    const targetUser = await getUserByUsername(pool, targetUsername);
+    if (!targetUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    
+    const targetUserUuid = targetUser.uuid;
+    const isOwnRecords = authenticatedUserUuid === targetUserUuid;
+    
+    // Build query based on privacy
+    let query;
+    let params;
+    
+    if (isOwnRecords) {
+      // User requesting their own records - return all
+      query = `
+        SELECT r.id, r.name as record, r.artist, r.cover, r.rating, 
+               r.release_year as 'release', r.added as added, r.tableId, 
+               r.isCustom as isCustom, r.masterId as masterId,
+               t.name as collectionName
+        FROM Record r
+        LEFT JOIN RecTable t ON r.tableId = t.id
+        WHERE r.userUuid = ?
+        ORDER BY r.name
+      `;
+      params = [targetUserUuid];
+    } else {
+      // Another user requesting - only return records from public collections
+      query = `
+        SELECT r.id, r.name as record, r.artist, r.cover, r.rating, 
+               r.release_year as 'release', r.added as added, r.tableId, 
+               r.isCustom as isCustom, r.masterId as masterId, r.review as review,
+               t.name as collectionName
+        FROM Record r
+        LEFT JOIN RecTable t ON r.tableId = t.id
+        WHERE r.userUuid = ? AND t.isPrivate = 0
+        ORDER BY r.added DESC
+      `;
+      params = [targetUserUuid];
+    }
+    
+    const [rows] = await pool.query(query, params);
+    
+    if (!rows || rows.length === 0) {
+      return res.json({ records: [] });
+    }
+    
+    // Fetch tags for all records
+    const recordIds = rows.map((r) => r.id);
+    const tagsByRecord = {};
+    
+    if (recordIds.length > 0) {
+      const placeholders = recordIds.map(() => "?").join(", ");
+      const [tagRows] = await pool.query(
+        `SELECT t.name, tg.recordId 
+         FROM Tag t 
+         JOIN Tagged tg ON t.id = tg.tagId 
+         WHERE tg.recordId IN (${placeholders})`,
+        recordIds
+      );
+      
+      for (const tr of tagRows) {
+        const rid = tr.recordId;
+        tagsByRecord[rid] = tagsByRecord[rid] || [];
+        tagsByRecord[rid].push(tr.name);
+      }
+    }
+    
+    const records = rows.map((r) => ({
+      ...r,
+      tags: tagsByRecord[r.id] || [],
+    }));
+    
+    res.json({ records });
+  } catch (err) {
+    console.error("Failed to fetch user records", err);
+    res.status(500).json({ error: "Failed to fetch records" });
+  }
+});
+
 app.get("/api/records/master-info", async (req, res) => {
   console.log("Fetching master info...");
 

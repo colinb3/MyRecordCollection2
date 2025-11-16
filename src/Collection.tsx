@@ -372,7 +372,7 @@ export default function Collection({ tableName, title }: CollectionProps) {
             }}
           />
           <Button
-            variant="contained"
+            variant="outlined"
             color="primary"
             startIcon={<AddIcon />}
             sx={{ whiteSpace: "nowrap" }}

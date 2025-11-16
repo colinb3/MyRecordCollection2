@@ -22,7 +22,7 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import ImageNotSupportedIcon from "@mui/icons-material/ImageNotSupported";
-import { loadCollectionRecords } from "../../collectionRecords";
+import { normalizeApiRecord } from "../../collectionRecords";
 import {
   loadProfileHighlights,
   setCachedProfileHighlights,
@@ -53,12 +53,6 @@ const ALLOWED_PROFILE_MIME_TYPES = [
   "image/webp",
   "image/avif",
 ];
-
-const HIGHLIGHT_SOURCE_COLLECTIONS = [
-  "My Collection",
-  "Wishlist",
-  "Listened",
-] as const;
 
 export default function ProfileSettings({
   username,
@@ -209,33 +203,24 @@ export default function ProfileSettings({
     setCandidatesLoading(true);
     setCandidateError(null);
     try {
-      // Load records from all three collections
-      const results = await Promise.all(
-        HIGHLIGHT_SOURCE_COLLECTIONS.map((collectionName) =>
-          loadCollectionRecords(collectionName, true)
-        )
-      );
-
-      // Deduplicate records by ID and attach collection source
-      const deduped: MrcRecord[] = [];
-      const seenIds = new Set<number>();
-
-      results.forEach((records, index) => {
-        const sourceCollection = HIGHLIGHT_SOURCE_COLLECTIONS[index];
-        records.forEach((record) => {
-          if (seenIds.has(record.id)) {
-            return;
-          }
-          seenIds.add(record.id);
-          deduped.push({
-            ...record,
-            tags: [...record.tags],
-            collectionName: record.collectionName ?? sourceCollection,
-          });
-        });
+      // Load all records from the user's collections
+      const res = await fetch(apiUrl(`/api/users/${username}/records`), {
+        credentials: "include",
       });
 
-      setAvailableRecords(deduped);
+      if (!res.ok) {
+        throw new Error("Failed to load records");
+      }
+
+      const data = await res.json().catch(() => ({ records: [] }));
+      const records = Array.isArray(data.records) ? data.records : [];
+
+      // Normalize records
+      const normalized = records
+        .map((item: unknown) => normalizeApiRecord(item))
+        .filter((record: unknown): record is MrcRecord => record !== null);
+
+      setAvailableRecords(normalized);
       setHasLoadedCandidates(true);
     } catch (error) {
       console.warn("Failed to load available records", error);
@@ -245,7 +230,7 @@ export default function ProfileSettings({
     } finally {
       setCandidatesLoading(false);
     }
-  }, []);
+  }, [username]);
 
   const handleCandidatePickerOpen = useCallback(() => {
     if (hasLoadedCandidates || candidatesLoading) {

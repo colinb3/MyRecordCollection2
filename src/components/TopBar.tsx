@@ -127,7 +127,7 @@ export default function TopBar({
       >
         <Typography
           variant="h4"
-          fontSize={"1.6em"}
+          fontSize={{ xs: "1.5em", sm: "1.8em", md: "2em" }}
           sx={{
             mr: "auto",
             fontWeight: "bold",
