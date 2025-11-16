@@ -19,7 +19,6 @@ import { getCachedUserInfo, loadUserInfo } from "./userInfo";
 import apiUrl from "./api";
 import { performLogout } from "./logout";
 import { loadPublicUserProfile } from "./communityUsers";
-import { fontSize } from "@mui/system";
 
 type CollectionFilter = "all" | "collection" | "listened" | "wishlist";
 
