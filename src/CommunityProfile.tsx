@@ -339,7 +339,7 @@ export default function CommunityProfile() {
     : "No highlights shared yet.";
   const recentEmptyCopy = isViewingOwnProfile
     ? "No recent additions yet."
-    : "No recent additions available.";
+    : "No recent additions shared yet.";
   const showRecentSection = isViewingOwnProfile || !profile?.collectionPrivate;
   const wishlistEmptyCopy = isViewingOwnProfile
     ? "No wishlist records yet."
@@ -348,8 +348,8 @@ export default function CommunityProfile() {
 
   const showListenedSection = isViewingOwnProfile || !profile?.listenedPrivate;
   const listenedEmptyCopy = isViewingOwnProfile
-    ? "No listened records yet. Add albums you have played."
-    : `${targetDisplayName} hasn’t shared any listened records yet.`;
+    ? "No listened records yet."
+    : "No listened records shared yet.";
 
   return (
     <ThemeProvider theme={darkTheme}>

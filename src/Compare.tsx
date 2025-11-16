@@ -227,28 +227,38 @@ export default function Compare() {
                         aria-label="all collections"
                         sx={{ fontSize: "0.75em" }}
                       >
-                        All
+                        All{" "}
+                        {filter === "all" && !loading && `(${records.length})`}
                       </ToggleButton>
                       <ToggleButton
                         value="collection"
                         aria-label="collections"
                         sx={{ fontSize: "0.75em" }}
                       >
-                        Collections
+                        Collections{" "}
+                        {filter === "collection" &&
+                          !loading &&
+                          `(${records.length})`}
                       </ToggleButton>
                       <ToggleButton
                         value="listened"
                         aria-label="listened"
                         sx={{ fontSize: "0.75em" }}
                       >
-                        Listened
+                        Listened{" "}
+                        {filter === "listened" &&
+                          !loading &&
+                          `(${records.length})`}
                       </ToggleButton>
                       <ToggleButton
                         value="wishlist"
                         aria-label="wishlists"
                         sx={{ fontSize: "0.75em" }}
                       >
-                        Wishlists
+                        Wishlists{" "}
+                        {filter === "wishlist" &&
+                          !loading &&
+                          `(${records.length})`}
                       </ToggleButton>
                     </ToggleButtonGroup>
                   </Box>
