@@ -808,13 +808,17 @@ export default function Compare() {
                                 ? 1
                                 : 0,
                             alignItems: "center",
+                            width: "100%",
                           }}
                         >
                           {genre.myPercent > 0 && (
                             <Tooltip title="You">
                               <Box
                                 sx={{
-                                  flex: genre.myPercent,
+                                  flex:
+                                    genre.theirPercent > 0
+                                      ? genre.myPercent
+                                      : 1,
                                   minWidth: 20,
                                   height: 24,
                                   bgcolor: "primary.main",
@@ -842,7 +846,10 @@ export default function Compare() {
                             <Tooltip title={targetUsername}>
                               <Box
                                 sx={{
-                                  flex: genre.theirPercent,
+                                  flex:
+                                    genre.myPercent > 0
+                                      ? genre.theirPercent
+                                      : 1,
                                   minWidth: 20,
                                   height: 24,
                                   bgcolor: "secondary.main",
