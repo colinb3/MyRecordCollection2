@@ -701,7 +701,7 @@ export default function Compare() {
             {/* Genre Comparison Section */}
             <Paper variant="outlined" sx={{ borderRadius: 2, mt: 2, p: 3 }}>
               <Typography variant="h6" sx={{ mb: 2 }}>
-                Genre Makeup and Average Rating
+                Genre Make Up and Average Rating
               </Typography>
 
               {loadingGenres ? (
