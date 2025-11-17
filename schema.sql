@@ -13,12 +13,9 @@ CREATE TABLE User (
 
 CREATE TABLE ListeningTo (
     userUuid CHAR(36) PRIMARY KEY,
-    artist VARCHAR(255),
-    cover VARCHAR(255),
-    name VARCHAR(255) NOT NULL,
-    masterId INT,
+    masterId INT NOT NULL,
     created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (masterId) REFERENCES Master(id) ON DELETE SET NULL,
+    FOREIGN KEY (masterId) REFERENCES Master(id) ON DELETE CASCADE,
     FOREIGN KEY (userUuid) REFERENCES User(uuid) ON DELETE CASCADE
 );
 

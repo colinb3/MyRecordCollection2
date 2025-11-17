@@ -2241,7 +2241,10 @@ app.get("/api/community/users/:username", async (req, res) => {
     // Fetch listening to record
     let listeningTo = null;
     const [listeningToRows] = await pool.query(
-      `SELECT artist, cover, name, masterId FROM ListeningTo WHERE userUuid = ? LIMIT 1`,
+      `SELECT m.artist, m.cover, m.name, lt.masterId 
+       FROM ListeningTo lt
+       JOIN Master m ON m.id = lt.masterId
+       WHERE lt.userUuid = ? LIMIT 1`,
       [userRow.uuid]
     );
     if (listeningToRows && listeningToRows.length > 0) {
@@ -2559,11 +2562,12 @@ app.get("/api/activity", requireAuth, async (req, res) => {
       // Get listening to from followed users
       [listeningToRows] = await pool.query(
         `SELECT 'listening-to' as activityType, lt.created as timestamp, lt.masterId,
-                lt.name as recordName, lt.artist, lt.cover,
+                m.name as recordName, m.artist, m.cover,
                 u.username as listenerUsername, u.displayName as listenerDisplayName, u.profilePic as listenerProfilePic
            FROM ListeningTo lt
            JOIN Follows f ON f.followsUuid = lt.userUuid
            JOIN User u ON u.uuid = lt.userUuid
+           JOIN Master m ON m.id = lt.masterId
           WHERE f.userUuid = ?`,
         [req.userUuid]
       );
@@ -2626,10 +2630,11 @@ app.get("/api/activity", requireAuth, async (req, res) => {
       // Get user's own listening to
       [listeningToRows] = await pool.query(
         `SELECT 'listening-to' as activityType, lt.created as timestamp, lt.masterId,
-                lt.name as recordName, lt.artist, lt.cover,
+                m.name as recordName, m.artist, m.cover,
                 u.username as listenerUsername, u.displayName as listenerDisplayName, u.profilePic as listenerProfilePic
            FROM ListeningTo lt
            JOIN User u ON u.uuid = lt.userUuid
+           JOIN Master m ON m.id = lt.masterId
           WHERE lt.userUuid = ?`,
         [req.userUuid]
       );
@@ -6782,7 +6787,10 @@ app.get("/api/user/listening-to", requireAuth, async (req, res) => {
   try {
     const pool = await getPool();
     const [rows] = await pool.query(
-      `SELECT artist, cover, name, masterId FROM ListeningTo WHERE userUuid = ? LIMIT 1`,
+      `SELECT m.artist, m.cover, m.name, lt.masterId 
+       FROM ListeningTo lt
+       JOIN Master m ON m.id = lt.masterId
+       WHERE lt.userUuid = ? LIMIT 1`,
       [req.userUuid]
     );
 
@@ -6819,7 +6827,7 @@ app.put("/api/user/listening-to", requireAuth, async (req, res) => {
   try {
     const pool = await getPool();
     
-    // Fetch master details
+    // Verify master exists
     const [masterRows] = await pool.query(
       `SELECT id, name, artist, cover FROM Master WHERE id = ? LIMIT 1`,
       [masterIdNum]
@@ -6836,15 +6844,12 @@ app.put("/api/user/listening-to", requireAuth, async (req, res) => {
 
     // Insert or update listening to
     await pool.execute(
-      `INSERT INTO ListeningTo (userUuid, artist, cover, name, masterId, created)
-       VALUES (?, ?, ?, ?, ?, UTC_TIMESTAMP())
+      `INSERT INTO ListeningTo (userUuid, masterId, created)
+       VALUES (?, ?, UTC_TIMESTAMP())
        ON DUPLICATE KEY UPDATE
-         artist = VALUES(artist),
-         cover = VALUES(cover),
-         name = VALUES(name),
          masterId = VALUES(masterId),
          created = UTC_TIMESTAMP()`,
-      [req.userUuid, artist, cover, name, masterIdNum]
+      [req.userUuid, masterIdNum]
     );
 
     res.json({
