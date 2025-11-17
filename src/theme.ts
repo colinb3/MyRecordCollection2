@@ -10,6 +10,9 @@ export const darkTheme = createTheme({
     primary: {
       main: '#1e73ff', // MRC blue
     },
+    secondary: {
+      main: '#91bbffff', // light blue
+    },
     // Map success to primary so any success usage (e.g. Alert severity="success") adopts the same blue
     success: {
       main: '#1e73ff',
