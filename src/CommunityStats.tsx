@@ -87,7 +87,7 @@ export default function CommunityStats() {
   }, [targetDisplayName, targetUsername]);
 
   // Responsive chart sizing
-  const chartHeight = isMobile ? 300 : isTablet ? 325 : 350;
+  const chartHeight = isMobile ? 325 : isTablet ? 350 : 375;
   const chartRadius = isMobile ? 75 : isTablet ? 100 : 120;
 
   const handleOpenOwnerProfile = useCallback(() => {
