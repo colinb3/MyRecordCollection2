@@ -199,7 +199,9 @@ export default function CommunityStats() {
           <Typography variant="body2" color="text.secondary">
             {payload[0].value.toFixed(1)}% of collection
             <br />
-            {payload[0].payload.recordCount} records
+            {payload[0].payload.recordCount === 1
+              ? "1 record"
+              : `${payload[0].payload.recordCount} records`}
             <br />
             {`Avg. Rating: ${payload[0].payload.rating}`}
           </Typography>
