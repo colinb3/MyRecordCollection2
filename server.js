@@ -5528,6 +5528,7 @@ app.get('/api/admin/users', requireAuth, requireAdmin, async (req, res) => {
     const [rows] = await pool.query(
       `SELECT u.uuid AS userUuid,
               u.username,
+              u.email,
               u.displayName,
               u.bio,
               u.created,
@@ -5551,6 +5552,7 @@ app.get('/api/admin/users', requireAuth, requireAdmin, async (req, res) => {
     const users = rows.map((row) => ({
       userUuid: row.userUuid,
       username: row.username,
+      email: row.email ?? null,
       displayName: row.displayName ?? null,
       bio: row.bio ?? null,
       joinedDate: normalizeDateOnly(row.created),

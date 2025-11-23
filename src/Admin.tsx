@@ -68,6 +68,7 @@ const TAB_OPTIONS: { label: string; value: AdminTabKey }[] = [
 type AdminUser = {
   userUuid: string;
   username: string;
+  email: string | null;
   displayName: string | null;
   bio: string | null;
   joinedDate: string | null;
@@ -615,6 +616,7 @@ function UsersTab({ permissions, currentUserUuid }: UsersTabProps) {
           <TableHead>
             <TableRow>
               <TableCell>Username</TableCell>
+              <TableCell>Email</TableCell>
               <TableCell>Display Name</TableCell>
               <TableCell>Joined</TableCell>
               <TableCell>Followers</TableCell>
@@ -628,6 +630,7 @@ function UsersTab({ permissions, currentUserUuid }: UsersTabProps) {
             {users.map((user) => (
               <TableRow hover key={user.userUuid}>
                 <TableCell>{user.username}</TableCell>
+                <TableCell>{user.email ?? "—"}</TableCell>
                 <TableCell>{user.displayName ?? "—"}</TableCell>
                 <TableCell>{user.joinedDate ?? "—"}</TableCell>
                 <TableCell>{user.followersCount}</TableCell>
@@ -800,7 +803,11 @@ function UsersTab({ permissions, currentUserUuid }: UsersTabProps) {
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={closeAccessDialog} disabled={savingAccess}>
+          <Button
+            onClick={closeAccessDialog}
+            disabled={savingAccess}
+            variant="outlined"
+          >
             Cancel
           </Button>
           <Button
@@ -869,6 +876,7 @@ function UsersTab({ permissions, currentUserUuid }: UsersTabProps) {
           <Button
             onClick={() => setEditUserDialog(null)}
             disabled={savingUserEdit}
+            variant="outlined"
           >
             Cancel
           </Button>
@@ -1472,7 +1480,11 @@ function RecordsTab() {
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setEditing(null)} disabled={saving}>
+          <Button
+            onClick={() => setEditing(null)}
+            disabled={saving}
+            variant="outlined"
+          >
             Cancel
           </Button>
           <Button onClick={handleSave} disabled={saving} variant="contained">
@@ -1973,7 +1985,11 @@ function MastersTab() {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setEditing(null)} disabled={saving}>
+          <Button
+            onClick={() => setEditing(null)}
+            disabled={saving}
+            variant="outlined"
+          >
             Cancel
           </Button>
           <Button onClick={handleSave} disabled={saving} variant="contained">
@@ -2433,7 +2449,11 @@ function ListsTab() {
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setEditing(null)} disabled={saving}>
+          <Button
+            onClick={() => setEditing(null)}
+            disabled={saving}
+            variant="outlined"
+          >
             Cancel
           </Button>
           <Button onClick={handleSave} disabled={saving} variant="contained">
@@ -2808,7 +2828,11 @@ function TagsTab() {
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setEditing(null)} disabled={saving}>
+          <Button
+            onClick={() => setEditing(null)}
+            disabled={saving}
+            variant="outlined"
+          >
             Cancel
           </Button>
           <Button onClick={handleSave} disabled={saving} variant="contained">
