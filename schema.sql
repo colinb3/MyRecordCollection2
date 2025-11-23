@@ -173,6 +173,7 @@ CREATE TABLE UserGenreInterest (
     isStyle BOOLEAN,
     rating DECIMAL(4,2),
     collectionPercent DECIMAL(5,2),
+    recordCount INT DEFAULT 0,
     PRIMARY KEY (userUuid, genre),
     FOREIGN KEY (userUuid) REFERENCES User(uuid) ON DELETE CASCADE
 );
@@ -361,11 +362,12 @@ BEGIN
         SET collection_pct = (genre_count_all / total_count) * 100;
         
         -- Insert or update the UserGenreInterest entry
-        INSERT INTO UserGenreInterest (userUuid, genre, isStyle, rating, collectionPercent)
-        VALUES (p_user_uuid, p_genre, FALSE, ROUND(avg_rating, 2), collection_pct)
+        INSERT INTO UserGenreInterest (userUuid, genre, isStyle, rating, collectionPercent, recordCount)
+        VALUES (p_user_uuid, p_genre, FALSE, ROUND(avg_rating, 2), collection_pct, genre_count_all)
         ON DUPLICATE KEY UPDATE
             rating = ROUND(VALUES(rating), 2),
-            collectionPercent = VALUES(collectionPercent);
+            collectionPercent = VALUES(collectionPercent),
+            recordCount = VALUES(recordCount);
     ELSE
         -- Remove entry if user has no records with this genre
         DELETE FROM UserGenreInterest

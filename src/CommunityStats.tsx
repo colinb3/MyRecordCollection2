@@ -33,6 +33,7 @@ interface GenreInterest {
   genre: string;
   rating: number | null;
   collectionPercent: number;
+  recordCount: number;
 }
 
 const COLORS = [
@@ -184,6 +185,8 @@ export default function CommunityStats() {
     .map((g) => ({
       name: g.genre,
       value: g.collectionPercent,
+      recordCount: g.recordCount,
+      rating: g.rating,
     }));
 
   const CustomTooltip = ({ active, payload }: any) => {
@@ -195,6 +198,10 @@ export default function CommunityStats() {
           </Typography>
           <Typography variant="body2" color="text.secondary">
             {payload[0].value.toFixed(1)}% of collection
+            <br />
+            {payload[0].payload.recordCount} records
+            <br />
+            {`Avg. Rating: ${payload[0].payload.rating}`}
           </Typography>
         </Paper>
       );
@@ -409,6 +416,8 @@ export default function CommunityStats() {
                                 variant="caption"
                                 color="text.secondary"
                               >
+                                {genre.recordCount} record
+                                {genre.recordCount !== 1 ? "s" : ""} ·{" "}
                                 {genre.collectionPercent.toFixed(1)}% of
                                 collection
                               </Typography>

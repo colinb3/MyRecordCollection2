@@ -2666,7 +2666,7 @@ app.get(
 
       // Get genre interests from UserGenreInterest table
       const [rows] = await pool.query(
-        `SELECT genre, rating, collectionPercent
+        `SELECT genre, rating, collectionPercent, recordCount
          FROM UserGenreInterest
          WHERE userUuid = ?
          ORDER BY collectionPercent DESC`,
@@ -2677,6 +2677,7 @@ app.get(
         genre: row.genre,
         rating: row.rating !== null ? Number(row.rating) : null,
         collectionPercent: Number(row.collectionPercent),
+        recordCount: Number(row.recordCount) || 0,
       }));
 
       res.json({
