@@ -35,6 +35,7 @@ interface ProfileSettingsProps {
   displayName: string;
   bio: string;
   profilePicUrl: string | null;
+  email: string | null;
   onProfileUpdated?: (user: {
     username: string;
     displayName: string;
@@ -59,6 +60,7 @@ export default function ProfileSettings({
   displayName,
   bio,
   profilePicUrl,
+  email,
   onProfileUpdated,
 }: ProfileSettingsProps) {
   const [usernameValue, setUsernameValue] = useState(username);
@@ -87,6 +89,19 @@ export default function ProfileSettings({
     const normalizedPath = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
     return apiUrl(normalizedPath);
   }, []);
+
+  // Email change state
+  const [emailValue, setEmailValue] = useState(email || "");
+  const [emailPassword, setEmailPassword] = useState("");
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [emailPasswordError, setEmailPasswordError] = useState<string | null>(
+    null
+  );
+  const [emailAlert, setEmailAlert] = useState<string | null>(null);
+  const [emailSuccess, setEmailSuccess] = useState<string | null>(null);
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [showEmailPassword, setShowEmailPassword] = useState(false);
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -800,6 +815,63 @@ export default function ProfileSettings({
     }
   };
 
+  const handleChangeEmail = async () => {
+    setEmailSuccess(null);
+    setEmailAlert(null);
+    setEmailError(null);
+    setEmailPasswordError(null);
+
+    let hasError = false;
+
+    // Validate email format
+    const trimmedEmail = emailValue.trim();
+    if (!trimmedEmail) {
+      setEmailError("Email is required");
+      hasError = true;
+    } else if (!emailRegex.test(trimmedEmail)) {
+      setEmailError("Please enter a valid email address");
+      hasError = true;
+    }
+
+    // Require password
+    if (!emailPassword) {
+      setEmailPasswordError("Password is required to change email");
+      hasError = true;
+    }
+
+    if (hasError) return;
+
+    setEmailLoading(true);
+    try {
+      const res = await fetch(apiUrl("/api/profile/email"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          email: trimmedEmail,
+          password: emailPassword,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (res.status === 401) {
+          setEmailPasswordError(data.error || "Incorrect password");
+        } else if (res.status === 409) {
+          setEmailError(data.error || "Email already in use");
+        } else {
+          setEmailAlert(data.error || "Failed to update email");
+        }
+        return;
+      }
+      setEmailSuccess("Email updated successfully");
+      setEmailPassword("");
+    } catch {
+      setEmailAlert("Network error");
+    } finally {
+      setEmailLoading(false);
+    }
+  };
+
   return (
     <Box display="flex" flexDirection="column" gap={4}>
       <Box>
@@ -929,6 +1001,74 @@ export default function ProfileSettings({
         >
           {profileLoading ? "Saving..." : "Save changes"}
         </Button>
+      </Box>
+
+      <Divider />
+
+      <Box>
+        <Typography variant="h6" sx={{ mb: 1 }}>
+          Email
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
+          Update the email address associated with your account. You will need
+          to confirm this change with your current password.
+        </Typography>
+        <Stack spacing={2}>
+          <TextField
+            label="Email address"
+            type="email"
+            value={emailValue}
+            onChange={(e) => {
+              setEmailValue(e.target.value);
+              setEmailAlert(null);
+              setEmailSuccess(null);
+              setEmailError(null);
+            }}
+            size="small"
+            autoComplete="email"
+            error={!!emailError}
+            helperText={emailError}
+            placeholder="email@example.com"
+            required
+          />
+          <TextField
+            label="Confirm with password"
+            type={showEmailPassword ? "text" : "password"}
+            value={emailPassword}
+            onChange={(e) => {
+              setEmailPassword(e.target.value);
+              setEmailAlert(null);
+              setEmailSuccess(null);
+              setEmailPasswordError(null);
+            }}
+            size="small"
+            autoComplete="current-password"
+            error={!!emailPasswordError}
+            helperText={emailPasswordError}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    aria-label="toggle password visibility"
+                    onClick={() => setShowEmailPassword((prev) => !prev)}
+                    edge="end"
+                  >
+                    {showEmailPassword ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+          />
+          {emailAlert && <Alert severity="error">{emailAlert}</Alert>}
+          <Button
+            variant="outlined"
+            onClick={handleChangeEmail}
+            disabled={emailLoading || !emailPassword}
+            sx={{ alignSelf: "flex-start" }}
+          >
+            {emailLoading ? "Updating..." : "Update email"}
+          </Button>
+        </Stack>
       </Box>
 
       <Divider />
@@ -1469,6 +1609,20 @@ export default function ProfileSettings({
           variant="filled"
         >
           {passwordSuccess}
+        </Alert>
+      </Snackbar>
+      <Snackbar
+        open={!!emailSuccess}
+        autoHideDuration={4000}
+        onClose={() => setEmailSuccess(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          severity="success"
+          onClose={() => setEmailSuccess(null)}
+          variant="filled"
+        >
+          {emailSuccess}
         </Alert>
       </Snackbar>
       <Snackbar

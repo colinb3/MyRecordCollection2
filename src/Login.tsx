@@ -127,7 +127,7 @@ export default function Login() {
             sx={{ width: "100%", maxWidth: 360 }}
           >
             <TextField
-              label="Username"
+              label="Username or Email"
               fullWidth
               size="small"
               margin="normal"

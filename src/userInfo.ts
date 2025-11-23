@@ -53,6 +53,7 @@ export async function loadUserInfo(
         unknown
       >;
       const username = typeof data.username === "string" ? data.username : "";
+      const email = typeof data.email === "string" ? data.email : null;
       const displayName =
         typeof data.displayName === "string" ? data.displayName : null;
       const userUuid = typeof data.userUuid === "string" ? data.userUuid : "";
@@ -99,6 +100,7 @@ export async function loadUserInfo(
       }
       const normalized: UserInfo = {
         username,
+        email,
         displayName,
         userUuid,
         bio,

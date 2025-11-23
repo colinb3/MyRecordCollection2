@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 import Box from "@mui/material/Box";
+import Skeleton from "@mui/material/Skeleton";
 import CoverImage from "./CoverImage";
 import {
   type Record,
@@ -17,6 +18,30 @@ const columns: GridColDef[] = [
     width: 116,
     sortable: false,
     renderCell: (params) => {
+      // Show skeleton square when loading
+      if (params.row.isLoading) {
+        return (
+          <Box
+            sx={{
+              ml: -0.5,
+              width: 100,
+              height: 100,
+            }}
+          >
+            <Skeleton
+              variant="rounded"
+              animation="pulse"
+              sx={{
+                width: 100,
+                height: 100,
+                borderRadius: 1,
+                bgcolor: "action.hover",
+              }}
+            />
+          </Box>
+        );
+      }
+
       const title = params.row.record ?? "cover";
       const coverUrl =
         typeof params.row.cover === "string" && params.row.cover.trim()
@@ -52,11 +77,16 @@ const columns: GridColDef[] = [
     minWidth: 120,
     hideable: false,
     cellClassName: "wrapCell",
-    renderCell: (params) => (
-      <div className="wrapText" style={{ width: "100%" }}>
-        {params.value}
-      </div>
-    ),
+    renderCell: (params) => {
+      if (params.row.isLoading) {
+        return <Skeleton animation="pulse" width="80%" height={24} />;
+      }
+      return (
+        <div className="wrapText" style={{ width: "100%" }}>
+          {params.value}
+        </div>
+      );
+    },
   },
   {
     field: "artist",
@@ -64,11 +94,16 @@ const columns: GridColDef[] = [
     flex: 1.25,
     minWidth: 90,
     cellClassName: "wrapCell",
-    renderCell: (params) => (
-      <div className="wrapText" style={{ width: "100%" }}>
-        {params.value}
-      </div>
-    ),
+    renderCell: (params) => {
+      if (params.row.isLoading) {
+        return <Skeleton animation="pulse" width="70%" height={24} />;
+      }
+      return (
+        <div className="wrapText" style={{ width: "100%" }}>
+          {params.value}
+        </div>
+      );
+    },
   },
   {
     field: "rating",
@@ -79,6 +114,12 @@ const columns: GridColDef[] = [
     filterable: false,
     align: "left",
     headerAlign: "left",
+    renderCell: (params) => {
+      if (params.row.isLoading) {
+        return <Skeleton animation="pulse" width="40%" height={24} />;
+      }
+      return params.value;
+    },
   },
   {
     field: "tags",
@@ -89,11 +130,16 @@ const columns: GridColDef[] = [
     filterable: false,
     valueGetter: (value: string[]) => value.join(", "),
     cellClassName: "wrapCell",
-    renderCell: (params) => (
-      <div className="wrapText" style={{ width: "100%" }}>
-        {params.value}
-      </div>
-    ),
+    renderCell: (params) => {
+      if (params.row.isLoading) {
+        return <Skeleton animation="pulse" width="60%" height={24} />;
+      }
+      return (
+        <div className="wrapText" style={{ width: "100%" }}>
+          {params.value}
+        </div>
+      );
+    },
   },
   {
     field: "release",
@@ -105,6 +151,9 @@ const columns: GridColDef[] = [
     headerAlign: "left",
     filterable: false,
     renderCell: (params) => {
+      if (params.row.isLoading) {
+        return <Skeleton animation="pulse" width="50%" height={24} />;
+      }
       const val = params.value;
       if (typeof val === "number") {
         return val > 0 ? val.toString() : "";
@@ -118,6 +167,9 @@ const columns: GridColDef[] = [
     flex: 0.6,
     minWidth: 105,
     renderCell: (params) => {
+      if (params.row.isLoading) {
+        return <Skeleton animation="pulse" width="70%" height={24} />;
+      }
       const val = params.value;
       if (typeof val === "string") {
         const formatted = formatLocalDate(val);
@@ -153,6 +205,25 @@ export default function RecordTable({
   const getRowClassName = (params: { id: number | string }) =>
     params.id == selectedId ? "selected-row" : "";
 
+  // Create skeleton loading rows when loading
+  const displayRows = useMemo(() => {
+    if (loading && records.length === 0) {
+      // Show 5 skeleton rows when loading with no data
+      return Array.from({ length: 5 }, (_, i) => ({
+        id: `skeleton-${i}`,
+        cover: null,
+        record: "",
+        artist: "",
+        rating: null,
+        tags: [],
+        release: null,
+        added: "",
+        isLoading: true,
+      }));
+    }
+    return records;
+  }, [loading, records]);
+
   const gridInitialState = useMemo(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const state: any = {};
@@ -187,9 +258,9 @@ export default function RecordTable({
   return (
     <DataGrid
       key={gridKey}
-      rows={records}
+      rows={displayRows}
       columns={columns}
-      loading={loading}
+      loading={loading && records.length > 0}
       initialState={gridInitialState}
       density="comfortable"
       rowHeight={89}

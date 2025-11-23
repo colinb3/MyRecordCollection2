@@ -20,10 +20,12 @@ import { loadUserInfo } from "./userInfo";
 export default function Register() {
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [password2, setPassword2] = useState("");
   const [error, setError] = useState("");
   const [usernameError, setUsernameError] = useState("");
+  const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [password2Error, setPassword2Error] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -32,6 +34,7 @@ export default function Register() {
 
   const usernameRegex = /^[a-zA-Z0-9_]+$/;
   const passwordRegex = /(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9])/;
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,6 +51,17 @@ export default function Register() {
       hasError = true;
     } else {
       setUsernameError("");
+    }
+
+    // Validate email
+    if (!email.trim()) {
+      setEmailError("Email is required");
+      hasError = true;
+    } else if (!emailRegex.test(email)) {
+      setEmailError("Please enter a valid email address");
+      hasError = true;
+    } else {
+      setEmailError("");
     }
 
     // Validate password
@@ -77,7 +91,11 @@ export default function Register() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({
+          username,
+          password,
+          email: email.trim(),
+        }),
       });
       const data = await res.json();
       if (data.success) {
@@ -172,6 +190,28 @@ export default function Register() {
               }}
               error={!!usernameError}
               helperText={usernameError}
+              required
+            />
+            <TextField
+              label="Email"
+              type="email"
+              fullWidth
+              margin="normal"
+              size="small"
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setEmailError("");
+              }}
+              onBlur={(e) => {
+                if (!e.target.value.trim()) {
+                  setEmailError("Email is required");
+                } else if (!emailRegex.test(e.target.value)) {
+                  setEmailError("Please enter a valid email address");
+                }
+              }}
+              error={!!emailError}
+              helperText={emailError}
               required
             />
             <TextField

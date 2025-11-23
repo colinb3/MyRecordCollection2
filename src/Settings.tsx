@@ -35,6 +35,7 @@ export default function Settings() {
   const location = useLocation();
   const cachedUser = getCachedUserInfo();
   const [username, setUsername] = useState<string>(cachedUser?.username ?? "");
+  const [email, setEmail] = useState<string | null>(cachedUser?.email ?? null);
   const [displayName, setDisplayName] = useState<string>(
     cachedUser?.displayName ?? ""
   );
@@ -65,6 +66,7 @@ export default function Settings() {
         return;
       }
       setUsername(info.username);
+      setEmail(info.email ?? null);
       setDisplayName(info.displayName ?? "");
       setUserUuid(info.userUuid);
       setBio(info.bio ?? "");
@@ -91,6 +93,7 @@ export default function Settings() {
         return (
           <ProfileSettings
             username={username}
+            email={email}
             displayName={displayName}
             bio={bio}
             profilePicUrl={profilePicUrl}
@@ -108,6 +111,7 @@ export default function Settings() {
               if (uuid) {
                 setCachedUserInfo({
                   username: newUsername,
+                  email: email,
                   displayName: newDisplayName,
                   bio: newBio ?? null,
                   profilePicUrl: newProfilePic ?? null,
@@ -133,6 +137,7 @@ export default function Settings() {
   }, [
     selectedSection,
     username,
+    email,
     displayName,
     bio,
     profilePicUrl,

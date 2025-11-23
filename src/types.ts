@@ -110,6 +110,7 @@ export interface AdminPermissions {
 
 export interface UserInfo {
   username: string;
+  email: string | null;
   displayName: string | null;
   userUuid: string;
   bio: string | null;

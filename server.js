@@ -3024,9 +3024,12 @@ app.delete(
 // Register endpoint
 app.post('/api/register', async (req, res) => {
   console.log("Registering user...");
-  const { username, password, displayName: rawDisplayName } = req.body;
+  const { username, password, email, displayName: rawDisplayName } = req.body;
   if (!username || !password) {
     return res.status(400).json({ error: 'Username and password required.' });
+  }
+  if (!email || typeof email !== 'string') {
+    return res.status(400).json({ error: 'Email is required.' });
   }
   if (username.length < 3 || username.length > 30) {
     return res.status(400).json({ error: 'Username must be 3-30 characters.' });
@@ -3040,17 +3043,36 @@ app.post('/api/register', async (req, res) => {
   if (!/(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9])/.test(password)) {
     return res.status(400).json({ error: 'Password must contain at least one letter, one number, and one special character.' });
   }
+  
+  // Validate email format
+  const emailValue = email.trim();
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(emailValue)) {
+    return res.status(400).json({ error: 'Invalid email address.' });
+  }
+  
   try {
+    const pool = await getPool();
+    
+    // Check if email already exists
+    const [emailRows] = await pool.execute(
+      'SELECT uuid FROM User WHERE email = ?',
+      [emailValue]
+    );
+    if (emailRows.length > 0) {
+      return res.status(409).json({ error: 'Email already registered.' });
+    }
+    
     const hashedPassword = await bcrypt.hash(password, 10);
     const userUuid = uuidv4();
     const displayName =
       typeof rawDisplayName === "string" && rawDisplayName.trim()
         ? rawDisplayName.trim().slice(0, 50)
         : username;
-    const pool = await getPool();
+    
     await pool.execute(
-      'INSERT INTO User (uuid, username, displayName, password, bio, profilePic, created) VALUES (?, ?, ?, ?, ?, ?, UTC_TIMESTAMP())',
-      [userUuid, username.toLowerCase(), displayName, hashedPassword, null, null]
+      'INSERT INTO User (uuid, username, displayName, password, email, bio, profilePic, created) VALUES (?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP())',
+      [userUuid, username.toLowerCase(), displayName, hashedPassword, emailValue, null, null]
     );
     await pool.execute(
       `INSERT INTO RecTable (name, userUuid, isPrivate) VALUES (?, ?, ?), (?, ?, ?), (?, ?, ?)`,
@@ -3071,6 +3093,9 @@ app.post('/api/register', async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     if (err.code === 'ER_DUP_ENTRY') {
+      if (err.message.includes('email')) {
+        return res.status(409).json({ error: 'Email already registered.' });
+      }
       return res.status(409).json({ error: 'Username already exists.' });
     }
     res.status(500).json({ error: 'Registration failed.' });
@@ -3082,13 +3107,17 @@ app.post('/api/login', async (req, res) => {
   console.log("Logging in...");
   const { username, password } = req.body;
   if (!username || !password) {
-    return res.status(400).json({ error: 'Username and password required.' });
+    return res.status(400).json({ error: 'Username/email and password required.' });
   }
   try {
     const pool = await getPool();
+    // Check if input is email or username
+    const isEmail = username.includes('@');
     const [rows] = await pool.execute(
-      'SELECT uuid, password FROM User WHERE username = ?',
-      [username]
+      isEmail 
+        ? 'SELECT uuid, password FROM User WHERE email = ?'
+        : 'SELECT uuid, password FROM User WHERE username = ?',
+      [isEmail ? username : username.toLowerCase()]
     );
     if (rows.length === 0) {
       return res.status(401).json({ error: 'Invalid credentials.' });
@@ -3119,6 +3148,7 @@ app.get('/api/me', requireAuth, async (req, res) => {
     const pool = await getPool();
     const [rows] = await pool.execute(
       `SELECT u.username,
+              u.email,
               u.displayName,
               u.bio,
               u.profilePic,
@@ -3156,6 +3186,7 @@ app.get('/api/me', requireAuth, async (req, res) => {
 
     res.json({
       username: userRow.username,
+      email: userRow.email ?? null,
       displayName: userRow.displayName,
       bio: userRow.bio ?? null,
       profilePicUrl,
@@ -3376,6 +3407,57 @@ app.post('/api/profile/password', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('Password change failed', err);
     res.status(500).json({ error: 'Failed to change password' });
+  }
+});
+
+app.post('/api/profile/email', requireAuth, async (req, res) => {
+  console.log("Changing email...");
+  const { email, password } = req.body || {};
+  
+  // Password is always required
+  if (!password) {
+    return res.status(400).json({ error: 'Password is required to change email.' });
+  }
+
+  // Email is required
+  if (!email || typeof email !== 'string') {
+    return res.status(400).json({ error: 'Email is required.' });
+  }
+
+  // Validate email format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const emailValue = email.trim();
+  
+  if (!emailRegex.test(emailValue)) {
+    return res.status(400).json({ error: 'Invalid email address.' });
+  }
+
+  try {
+    const pool = await getPool();
+    
+    // Verify password
+    const [userRows] = await pool.execute('SELECT password FROM User WHERE uuid = ?', [req.userUuid]);
+    if (userRows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    const hash = userRows[0].password;
+    const matches = await bcrypt.compare(password, hash);
+    if (!matches) {
+      return res.status(401).json({ error: 'Incorrect password.' });
+    }
+
+    // Check if email is already taken by another user
+    const [emailRows] = await pool.execute('SELECT uuid FROM User WHERE email = ? AND uuid != ?', [emailValue, req.userUuid]);
+    if (emailRows.length > 0) {
+      return res.status(409).json({ error: 'Email already in use by another account.' });
+    }
+
+    // Update email
+    await pool.execute('UPDATE User SET email = ? WHERE uuid = ?', [emailValue, req.userUuid]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Email change failed', err);
+    res.status(500).json({ error: 'Failed to change email' });
   }
 });
 
