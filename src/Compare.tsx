@@ -838,6 +838,15 @@ export default function Compare() {
                             >
                               {genre.myPercent > 0 && (
                                 <Box
+                                  onClick={() =>
+                                    navigate(
+                                      `/community/${encodeURIComponent(
+                                        username
+                                      )}/genre?g=${encodeURIComponent(
+                                        genre.genre
+                                      )}`
+                                    )
+                                  }
                                   sx={{
                                     flex:
                                       genre.theirPercent > 0
@@ -850,6 +859,10 @@ export default function Compare() {
                                     display: "flex",
                                     alignItems: "center",
                                     justifyContent: "center",
+                                    cursor: "pointer",
+                                    "&:hover": {
+                                      opacity: 0.8,
+                                    },
                                   }}
                                 >
                                   {genre.myPercent > 0 && (
@@ -867,6 +880,15 @@ export default function Compare() {
                               )}
                               {genre.theirPercent > 0 && (
                                 <Box
+                                  onClick={() =>
+                                    navigate(
+                                      `/community/${encodeURIComponent(
+                                        targetUsername
+                                      )}/genre?g=${encodeURIComponent(
+                                        genre.genre
+                                      )}`
+                                    )
+                                  }
                                   sx={{
                                     flex:
                                       genre.myPercent > 0
@@ -879,6 +901,10 @@ export default function Compare() {
                                     display: "flex",
                                     alignItems: "center",
                                     justifyContent: "center",
+                                    cursor: "pointer",
+                                    "&:hover": {
+                                      opacity: 0.8,
+                                    },
                                   }}
                                 >
                                   {genre.theirPercent >= 0 && (

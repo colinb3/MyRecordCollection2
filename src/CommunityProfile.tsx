@@ -35,6 +35,7 @@ import {
 } from "./communityUsers";
 import SettingsIcon from "@mui/icons-material/Settings";
 import CompareArrowsIcon from "@mui/icons-material/CompareArrows";
+import BarChartIcon from "@mui/icons-material/BarChart";
 import ShareButton from "./components/ShareButton";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import { performLogout } from "./logout";
@@ -419,7 +420,7 @@ export default function CommunityProfile() {
                           top: 16,
                           right: 16,
                           display: "flex",
-                          gap: 0.5,
+                          gap: 0.25,
                         }}
                       >
                         {!isViewingOwnProfile ? (
@@ -446,6 +447,18 @@ export default function CommunityProfile() {
                             <SettingsIcon />
                           </IconButton>
                         )}
+                        <Tooltip title="View stats">
+                          <IconButton
+                            color="inherit"
+                            size="medium"
+                            aria-label="View stats"
+                            onClick={() =>
+                              navigate(`/community/${profileUsername}/stats`)
+                            }
+                          >
+                            <BarChartIcon />
+                          </IconButton>
+                        </Tooltip>
                         <ShareButton
                           title={`${
                             profile.displayName || profile.username

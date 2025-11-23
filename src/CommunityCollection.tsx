@@ -13,7 +13,7 @@ import {
 } from "@mui/material";
 import Grid from "@mui/material/Grid";
 import FilterListAltIcon from "@mui/icons-material/FilterListAlt";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import TopBar from "./components/TopBar";
 import { darkTheme } from "./theme";
 import { getCachedUserInfo, loadUserInfo } from "./userInfo";
@@ -22,6 +22,7 @@ import RecordTable from "./components/RecordTable";
 import type { PublicUserProfile, Record as MrcRecord, Filters } from "./types";
 import {
   loadPublicUserCollection,
+  loadPublicUserCollectionByGenre,
   loadPublicUserProfile,
 } from "./communityUsers";
 import FilterSidebar from "./components/FilterSidebar";
@@ -46,6 +47,8 @@ export default function CommunityCollection({
 }: CommunityCollectionProps) {
   const navigate = useNavigate();
   const params = useParams<{ username: string }>();
+  const [searchParams] = useSearchParams();
+  const genreFilter = searchParams.get("g") || null;
   const cachedUser = getCachedUserInfo();
   const [username, setUsername] = useState<string>(cachedUser?.username ?? "");
   const [displayName, setDisplayName] = useState<string>(
@@ -120,10 +123,12 @@ export default function CommunityCollection({
     setFilters(createInitialFilters());
     setAllTags([]);
 
-    Promise.all([
-      loadPublicUserProfile(targetUsername),
-      loadPublicUserCollection(targetUsername, activeTableName),
-    ])
+    // If genre filter is present, use the genre-specific endpoint
+    const collectionPromise = genreFilter
+      ? loadPublicUserCollectionByGenre(targetUsername, genreFilter)
+      : loadPublicUserCollection(targetUsername, activeTableName);
+
+    Promise.all([loadPublicUserProfile(targetUsername), collectionPromise])
       .then(([profileData, collectionData]) => {
         if (cancelled) return;
         setProfile(profileData);
@@ -154,7 +159,7 @@ export default function CommunityCollection({
     return () => {
       cancelled = true;
     };
-  }, [targetUsername, activeTableName]);
+  }, [targetUsername, activeTableName, genreFilter]);
 
   const handleLogout = useCallback(async () => {
     await performLogout(navigate);
@@ -174,6 +179,9 @@ export default function CommunityCollection({
 
   const filteredRecords = useMemo(() => {
     let next = records;
+
+    // Genre filtering is now done server-side via the API endpoint
+    // No need to filter by genre on the frontend
 
     const query = searchTerm.trim().toLowerCase();
     if (query) {
@@ -331,7 +339,9 @@ export default function CommunityCollection({
                 </Avatar>
                 <Box>
                   <Typography variant="h5" sx={{ lineHeight: 1.2 }}>
-                    {isWishlistView
+                    {genreFilter
+                      ? `${targetDisplayName}'s ${genreFilter} Records`
+                      : isWishlistView
                       ? `${targetDisplayName}'s Wishlist`
                       : isListenedView
                       ? `${targetDisplayName}'s Listened`

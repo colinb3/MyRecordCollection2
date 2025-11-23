@@ -414,4 +414,53 @@ BEGIN
     CLOSE genre_cursor;
 END $$
 
+-- Update genre interests for all users who have records with a specific master
+DROP PROCEDURE IF EXISTS update_genre_interests_for_master $$
+CREATE PROCEDURE update_genre_interests_for_master(IN p_master_id INT)
+BEGIN
+    DECLARE done INT DEFAULT FALSE;
+    DECLARE v_user_uuid CHAR(36);
+    DECLARE user_cursor CURSOR FOR
+        SELECT DISTINCT r.userUuid
+        FROM Record r
+        WHERE r.masterId = p_master_id
+            AND (r.isCustom IS NULL OR r.isCustom = FALSE);
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = TRUE;
+    
+    -- Update genre interests for each user who has this master
+    OPEN user_cursor;
+    update_loop: LOOP
+        FETCH user_cursor INTO v_user_uuid;
+        IF done THEN
+            LEAVE update_loop;
+        END IF;
+        CALL update_user_all_genre_interests(v_user_uuid);
+    END LOOP;
+    CLOSE user_cursor;
+END $$
+
+-- Trigger when a genre is added to a master
+DROP TRIGGER IF EXISTS trg_mastergenre_after_insert $$
+CREATE TRIGGER trg_mastergenre_after_insert
+AFTER INSERT ON MasterGenre
+FOR EACH ROW
+BEGIN
+    -- Only update for genres (not styles) since UserGenreInterest only tracks genres
+    IF NEW.isStyle = FALSE THEN
+        CALL update_genre_interests_for_master(NEW.masterId);
+    END IF;
+END $$
+
+-- Trigger when a genre is removed from a master
+DROP TRIGGER IF EXISTS trg_mastergenre_after_delete $$
+CREATE TRIGGER trg_mastergenre_after_delete
+AFTER DELETE ON MasterGenre
+FOR EACH ROW
+BEGIN
+    -- Only update for genres (not styles) since UserGenreInterest only tracks genres
+    IF OLD.isStyle = FALSE THEN
+        CALL update_genre_interests_for_master(OLD.masterId);
+    END IF;
+END $$
+
 DELIMITER ;

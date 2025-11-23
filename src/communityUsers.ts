@@ -852,6 +852,69 @@ export async function loadPublicUserCollection(
   return fetchPromise;
 }
 
+export async function loadPublicUserCollectionByGenre(
+  username: string,
+  genre: string,
+  forceRefresh = false
+): Promise<MrcRecord[]> {
+  const normalizedUser = username.trim().toLowerCase();
+  if (!normalizedUser) {
+    const error: ApiError = new Error("Username is required");
+    error.status = 400;
+    throw error;
+  }
+  
+  const normalizedGenre = genre.trim();
+  if (!normalizedGenre) {
+    const error: ApiError = new Error("Genre is required");
+    error.status = 400;
+    throw error;
+  }
+
+  const cacheKey = `${normalizedUser}::genre::${normalizedGenre.toLowerCase()}`;
+  if (!forceRefresh) {
+    if (collectionCache.has(cacheKey)) {
+      return cloneRecords(collectionCache.get(cacheKey)!);
+    }
+    if (collectionInFlight.has(cacheKey)) {
+      return collectionInFlight.get(cacheKey)!;
+    }
+  }
+
+  const endpoint = `/api/community/users/${username}/genre/${encodeURIComponent(normalizedGenre)}`;
+
+  const fetchPromise = (async () => {
+    try {
+      const res = await fetch(
+        apiUrl(endpoint),
+        { credentials: "include" }
+      );
+      if (!res.ok) {
+        const message = await res
+          .json()
+          .catch(() => ({}))
+          .then((data: AnyObject) => (typeof data?.error === 'string' ? data.error : "Failed to load collection by genre"));
+        const error: ApiError = new Error(message);
+        error.status = res.status;
+        throw error;
+      }
+      const data = await res.json().catch(() => []);
+      const normalized = normalizeRecords(data);
+      collectionCache.set(cacheKey, cloneRecords(normalized));
+      return normalized;
+    } finally {
+      if (!forceRefresh) {
+        collectionInFlight.delete(cacheKey);
+      }
+    }
+  })();
+
+  if (!forceRefresh) {
+    collectionInFlight.set(cacheKey, fetchPromise);
+  }
+  return fetchPromise;
+}
+
 export async function loadUserFollows(username: string): Promise<UserFollowLists> {
   const normalizedUser = username.trim().toLowerCase();
   if (!normalizedUser) {

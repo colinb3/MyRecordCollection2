@@ -224,7 +224,7 @@ export default function TopBar({
                           `/community/${encodeURIComponent(trimmedUsername)}`
                         );
                       } else {
-                        navigate("/activity");
+                        navigate("/community");
                       }
                       handleMenuClose();
                     }}
@@ -235,16 +235,16 @@ export default function TopBar({
                     <ListItemText>Profile</ListItemText>
                   </MenuItem>,
                   <MenuItem
-                    key="activity"
+                    key="community"
                     onClick={() => {
-                      navigate("/activity");
+                      navigate("/community");
                       handleMenuClose();
                     }}
                   >
                     <ListItemIcon>
                       <PeopleAltIcon />
                     </ListItemIcon>
-                    <ListItemText>Activity</ListItemText>
+                    <ListItemText>Community</ListItemText>
                   </MenuItem>,
                   <MenuItem key="lists" onClick={() => navigate("/lists")}>
                     <ListItemIcon>

@@ -16,10 +16,11 @@ import RequireAuth from "./RequireAuth";
 import RequireAdmin from "./RequireAdmin";
 const NotFound = lazy(() => import("./NotFound"));
 const Settings = lazy(() => import("./Settings"));
-const Activity = lazy(() => import("./Activity"));
+const Community = lazy(() => import("./Community"));
 const CommunityProfile = lazy(() => import("./CommunityProfile"));
 const CommunityCollection = lazy(() => import("./CommunityCollection"));
 const CommunityFollows = lazy(() => import("./CommunityFollows"));
+const CommunityStats = lazy(() => import("./CommunityStats"));
 import { loadUserInfo } from "./userInfo";
 const MasterRecordPage = lazy(() => import("./MasterRecord"));
 const RecordDetails = lazy(() => import("./Record"));
@@ -183,11 +184,11 @@ export default function AppRouter() {
           }
         />
         <Route
-          path="/activity"
+          path="/community"
           element={
             <RequireAuth>
               <Suspense fallback={<div />}>
-                <Activity />
+                <Community />
               </Suspense>
             </RequireAuth>
           }
@@ -225,10 +226,26 @@ export default function AppRouter() {
           }
         />
         <Route
+          path="/community/:username/genre"
+          element={
+            <Suspense fallback={<div />}>
+              <CommunityCollection tableName="My Collection" />
+            </Suspense>
+          }
+        />
+        <Route
           path="/community/:username/follows"
           element={
             <Suspense fallback={<div />}>
               <CommunityFollows />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/community/:username/stats"
+          element={
+            <Suspense fallback={<div />}>
+              <CommunityStats />
             </Suspense>
           }
         />

@@ -889,6 +889,81 @@ async function insertMasterGenres(pool, masterId, genres, styles) {
   }
 }
 
+/**
+ * Syncs genres and styles in MasterGenre table - adds new ones and removes ones not in the provided arrays
+ */
+async function syncMasterGenres(pool, masterId, genres, styles) {
+  if (!Number.isInteger(masterId) || masterId <= 0) {
+    return;
+  }
+
+  const genresArray = Array.isArray(genres) ? genres : [];
+  const stylesArray = Array.isArray(styles) ? styles : [];
+
+  // Normalize to trimmed strings
+  const normalizedGenres = genresArray
+    .filter(g => typeof g === "string" && g.trim())
+    .map(g => g.trim());
+  const normalizedStyles = stylesArray
+    .filter(s => typeof s === "string" && s.trim())
+    .map(s => s.trim());
+
+  // Skip if both arrays are empty (happens when loading master directly without Discogs data)
+  if (normalizedGenres.length === 0 && normalizedStyles.length === 0) {
+    return;
+  }
+
+  try {
+    // Insert new genres (INSERT IGNORE will skip duplicates)
+    for (const genre of normalizedGenres) {
+      await pool.execute(
+        `INSERT IGNORE INTO MasterGenre (masterId, genre, isStyle) VALUES (?, ?, ?)`,
+        [masterId, genre, false]
+      );
+    }
+
+    // Insert new styles
+    for (const style of normalizedStyles) {
+      await pool.execute(
+        `INSERT IGNORE INTO MasterGenre (masterId, genre, isStyle) VALUES (?, ?, ?)`,
+        [masterId, style, true]
+      );
+    }
+
+    // Remove genres that are not in the provided list
+    if (normalizedGenres.length > 0) {
+      const placeholders = normalizedGenres.map(() => '?').join(',');
+      await pool.execute(
+        `DELETE FROM MasterGenre WHERE masterId = ? AND isStyle = FALSE AND genre NOT IN (${placeholders})`,
+        [masterId, ...normalizedGenres]
+      );
+    } else {
+      // If no genres provided, remove all genres (but keep styles)
+      await pool.execute(
+        `DELETE FROM MasterGenre WHERE masterId = ? AND isStyle = FALSE`,
+        [masterId]
+      );
+    }
+
+    // Remove styles that are not in the provided list
+    if (normalizedStyles.length > 0) {
+      const placeholders = normalizedStyles.map(() => '?').join(',');
+      await pool.execute(
+        `DELETE FROM MasterGenre WHERE masterId = ? AND isStyle = TRUE AND genre NOT IN (${placeholders})`,
+        [masterId, ...normalizedStyles]
+      );
+    } else {
+      // If no styles provided, remove all styles (but keep genres)
+      await pool.execute(
+        `DELETE FROM MasterGenre WHERE masterId = ? AND isStyle = TRUE`,
+        [masterId]
+      );
+    }
+  } catch (error) {
+    console.error(`Failed to sync genres for master ${masterId}`, error);
+  }
+}
+
 async function getUserFollowCounts(pool, userUuid) {
   const [rows] = await pool.query(
     `SELECT
@@ -2457,6 +2532,94 @@ app.get(
 );
 
 app.get(
+  "/api/community/users/:username/genre/:genreName",
+  async (req, res) => {
+    const targetUsername = req.params.username;
+    const genreName = req.params.genreName;
+    console.log(`Fetching ${targetUsername}'s collection by genre '${genreName}'...`);
+    
+    if (!targetUsername) {
+      return res.status(400).json({ error: "Username is required" });
+    }
+    
+    if (!genreName) {
+      return res.status(400).json({ error: "Genre is required" });
+    }
+    
+    // Optional auth - extract userUuid from token if present
+    let authenticatedUserUuid = null;
+    const token = req.cookies.token;
+    if (token) {
+      try {
+        const payload = jwt.verify(token, JWT_SECRET);
+        authenticatedUserUuid = payload.userUuid;
+      } catch {
+        // Invalid token, continue as unauthenticated
+      }
+    }
+    
+    try {
+      const pool = await getPool();
+      const userRow = await getUserByUsername(pool, targetUsername);
+      if (!userRow) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Get all three tables (Collection, Wishlist, Listened) for the user
+      const [collectionTable, wishlistTable, listenedTable] = await Promise.all([
+        getUserTableRow(pool, userRow.uuid, DEFAULT_COLLECTION_NAME),
+        getUserTableRow(pool, userRow.uuid, WISHLIST_COLLECTION_NAME),
+        getUserTableRow(pool, userRow.uuid, LISTENED_COLLECTION_NAME),
+      ]);
+
+      const isOwner = authenticatedUserUuid && userRow.uuid === authenticatedUserUuid;
+      
+      // Build a list of accessible table IDs
+      const tableIds = [];
+      if (collectionTable && (!collectionTable.isPrivate || isOwner)) {
+        tableIds.push(collectionTable.id);
+      }
+      if (wishlistTable && (!wishlistTable.isPrivate || isOwner)) {
+        tableIds.push(wishlistTable.id);
+      }
+      if (listenedTable && (!listenedTable.isPrivate || isOwner)) {
+        tableIds.push(listenedTable.id);
+      }
+
+      if (tableIds.length === 0) {
+        return res.json([]);
+      }
+
+      // Query records that match the genre (join with MasterGenre where isStyle = 0)
+      const placeholders = tableIds.map(() => '?').join(',');
+      const [rows] = await pool.query(
+        `SELECT DISTINCT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', 
+                r.added as added, r.tableId, r.isCustom as isCustom, r.masterId as masterId, r.review as review
+         FROM Record r
+         INNER JOIN MasterGenre mg ON r.masterId = mg.masterId
+         WHERE r.userUuid = ? 
+           AND r.tableId IN (${placeholders})
+           AND mg.genre = ?
+           AND mg.isStyle = FALSE
+         ORDER BY r.added DESC`,
+        [userRow.uuid, ...tableIds, genreName]
+      );
+
+      const recordIds = rows.map((row) => row.id);
+      const tagsByRecord = await fetchTagsByRecordIds(pool, recordIds);
+      const response = rows.map((row) => ({
+        ...row,
+        tags: tagsByRecord[row.id] || [],
+      }));
+      res.json(response);
+    } catch (error) {
+      console.error("Failed to load collection by genre", error);
+      res.status(500).json({ error: "Failed to load collection by genre" });
+    }
+  }
+);
+
+app.get(
   "/api/community/users/:username/follows",
   async (req, res) => {
     console.log("Fetching followers/following...");
@@ -2481,6 +2644,49 @@ app.get(
     } catch (error) {
       console.error("Failed to load follows", error);
       res.status(500).json({ error: "Failed to load follows" });
+    }
+  }
+);
+
+app.get(
+  "/api/community/users/:username/genre-interests",
+  async (req, res) => {
+    console.log("Fetching user genre interests...");
+    const targetUsername = req.params.username;
+    if (!targetUsername) {
+      return res.status(400).json({ error: "Username is required" });
+    }
+
+    try {
+      const pool = await getPool();
+      const userRow = await getUserByUsername(pool, targetUsername);
+      if (!userRow) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Get genre interests from UserGenreInterest table
+      const [rows] = await pool.query(
+        `SELECT genre, rating, collectionPercent
+         FROM UserGenreInterest
+         WHERE userUuid = ?
+         ORDER BY collectionPercent DESC`,
+        [userRow.uuid]
+      );
+
+      const genres = rows.map((row) => ({
+        genre: row.genre,
+        rating: row.rating !== null ? Number(row.rating) : null,
+        collectionPercent: Number(row.collectionPercent),
+      }));
+
+      res.json({
+        genres,
+        displayName: userRow.displayName || userRow.username,
+        profilePicUrl: buildProfilePicPublicPath(userRow.profilePic) || null,
+      });
+    } catch (error) {
+      console.error("Failed to load genre interests", error);
+      res.status(500).json({ error: "Failed to load genre interests" });
     }
   }
 );
@@ -3916,8 +4122,8 @@ app.post('/api/records/create', requireAuth, async (req, res) => {
         [masterId, artistName, masterCoverValue, recordName, masterReleaseYear]
       );
       
-      // Insert genres and styles
-      await insertMasterGenres(pool, masterId, genres, styles);
+      // Sync genres and styles (add new ones and remove ones not in the list)
+      await syncMasterGenres(pool, masterId, genres, styles);
     }
 
   const nameToInsert = recordName || DEFAULT_NEW_RECORD_NAME;

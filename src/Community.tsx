@@ -44,7 +44,7 @@ import { Grid } from "@mui/system";
 import { formatRelativeTime } from "./dateUtils";
 import { performLogout } from "./logout";
 
-type ActivityView = "friends" | "you";
+type CommunityView = "friends" | "you";
 type FeedStatus = "idle" | "loading" | "error" | "ready";
 
 interface ActivityFeedState {
@@ -53,7 +53,7 @@ interface ActivityFeedState {
   error: string | null;
 }
 
-export default function Activity() {
+export default function Community() {
   const navigate = useNavigate();
   const cachedUser = getCachedUserInfo();
   const [username, setUsername] = useState<string>(cachedUser?.username ?? "");
@@ -66,7 +66,7 @@ export default function Activity() {
 
   const [searchParams, setSearchParams] = useSearchParams();
   const rawView = searchParams.get("view");
-  const activeView: ActivityView = rawView === "you" ? "you" : "friends";
+  const activeView: CommunityView = rawView === "you" ? "you" : "friends";
 
   const updateSearchParams = useCallback(
     (updates: Record<string, string | null>) => {
@@ -187,7 +187,7 @@ export default function Activity() {
   }, [activeView, youFeed.status, setYouFeed]);
 
   const handleTabChange = useCallback(
-    (_event: SyntheticEvent, value: ActivityView) => {
+    (_event: SyntheticEvent, value: CommunityView) => {
       updateSearchParams({ view: value === "friends" ? null : value });
       if (value === "you") {
         setYouFeed((prev) =>
@@ -482,7 +482,7 @@ export default function Activity() {
         }}
       >
         <TopBar
-          title="Activity"
+          title="Community"
           username={username}
           displayName={displayName}
           profilePicUrl={profilePicUrl ?? undefined}
