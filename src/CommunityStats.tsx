@@ -349,12 +349,7 @@ export default function CommunityStats() {
                             outerRadius={chartRadius}
                             fill="#8884d8"
                             dataKey="value"
-                            onClick={(data: any) => {
-                              if (data && data.name) {
-                                handleGenreClick(data.name);
-                              }
-                            }}
-                            style={{ cursor: "pointer", outline: "none" }}
+                            style={{ outline: "none" }}
                           >
                             {pieChartData.map((_entry, index) => (
                               <Cell
@@ -384,7 +379,7 @@ export default function CommunityStats() {
                       sx={{
                         display: "flex",
                         flexDirection: "column",
-                        gap: 1.5,
+                        gap: 1,
                       }}
                     >
                       {genreData
@@ -416,8 +411,6 @@ export default function CommunityStats() {
                                 variant="caption"
                                 color="text.secondary"
                               >
-                                {genre.recordCount} record
-                                {genre.recordCount !== 1 ? "s" : ""} ·{" "}
                                 {genre.collectionPercent.toFixed(1)}% of
                                 collection
                               </Typography>
@@ -426,7 +419,7 @@ export default function CommunityStats() {
                               sx={{
                                 display: "flex",
                                 alignItems: "center",
-                                gap: 1,
+                                pl: 0.5,
                               }}
                             >
                               <Box
