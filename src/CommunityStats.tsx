@@ -38,15 +38,15 @@ interface GenreInterest {
 
 const COLORS = [
   "#1976d2", // primary blue
-  "#dc004e", // secondary pink
-  "#9c27b0", // purple
+  "#dc0000ff", // secondary pink
+  "#a15dadff", // purple
   "#f57c00", // orange
   "#388e3c", // green
-  "#d32f2f", // red
-  "#0288d1", // light blue
+  "#fbff00ff", // red
+  "#6bb6de", // light blue
   "#7b1fa2", // deep purple
-  "#c2185b", // pink
-  "#f9a825", // yellow
+  "#fb08beff", // pink
+  "#ffcb78ff", // yellow
   "#00796b", // teal
   "#5d4037", // brown
   "#455a64", // blue grey
@@ -345,9 +345,7 @@ export default function CommunityStats() {
                             cx="50%"
                             cy="50%"
                             labelLine={false}
-                            label={(props: any) =>
-                              `${props.name} (${props.value.toFixed(1)}%)`
-                            }
+                            label={(props: any) => `${props.name}`}
                             outerRadius={chartRadius}
                             fill="#8884d8"
                             dataKey="value"
