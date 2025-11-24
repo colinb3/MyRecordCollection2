@@ -80,15 +80,32 @@ export default function Compare() {
 
   const [filter, setFilter] = useState<CollectionFilter>(initialFilter);
   const [loading, setLoading] = useState(true);
-  const [records, setRecords] = useState<ComparedRecord[]>([]);
+  const [allRecords, setAllRecords] = useState<ComparedRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
+
+  // Filter records based on current filter
+  const records = allRecords.filter((record) => {
+    if (filter === "all") return true;
+    if (filter === "collection") return record.myCollection === "My Collection";
+    if (filter === "wishlist") return record.myCollection === "Wishlist";
+    if (filter === "listened") return record.myCollection === "Listened";
+    return true;
+  });
   const [targetProfilePic, setTargetProfilePic] = useState<string | null>(null);
   const [targetDisplayName, setTargetDisplayName] = useState<string>("");
-  const [genreComparisons, setGenreComparisons] = useState<GenreComparison[]>(
-    []
-  );
+  const [allGenreComparisons, setAllGenreComparisons] = useState<{
+    [key: string]: GenreComparison[];
+  }>({
+    all: [],
+    collection: [],
+    wishlist: [],
+    listened: [],
+  });
   const [loadingGenres, setLoadingGenres] = useState(false);
   const [genreError, setGenreError] = useState<string | null>(null);
+
+  // Get genre comparisons for current filter
+  const genreComparisons = allGenreComparisons[filter] || [];
 
   const targetProfileAlt =
     targetDisplayName || targetUsername || "Record owner";
@@ -134,9 +151,7 @@ export default function Compare() {
 
     try {
       const res = await fetch(
-        apiUrl(
-          `/api/compare/${encodeURIComponent(targetUsername)}?filter=${filter}`
-        ),
+        apiUrl(`/api/compare/${encodeURIComponent(targetUsername)}`),
         {
           credentials: "include",
         }
@@ -148,23 +163,24 @@ export default function Compare() {
       }
 
       const data = await res.json();
-      setRecords(Array.isArray(data.records) ? data.records : []);
+      setAllRecords(Array.isArray(data.records) ? data.records : []);
     } catch (err) {
       console.error("Failed to load comparison", err);
       setError(
         err instanceof Error ? err.message : "Failed to load comparison"
       );
-      setRecords([]);
+      setAllRecords([]);
     } finally {
       setLoading(false);
     }
-  }, [username, targetUsername, filter]);
+  }, [username, targetUsername]);
 
   useEffect(() => {
     if (username && targetUsername) {
       fetchComparedRecords();
     }
-  }, [username, targetUsername, filter, fetchComparedRecords]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [username, targetUsername]);
 
   useEffect(() => {
     if (!targetUsername) return;
@@ -200,7 +216,6 @@ export default function Compare() {
   const fetchGenreComparisons = useCallback(async () => {
     if (!username || !targetUsername) return;
 
-    console.log("🎵 fetchGenreComparisons START", { username, targetUsername });
     setLoadingGenres(true);
     setGenreError(null);
 
@@ -210,79 +225,100 @@ export default function Compare() {
         { credentials: "include" }
       );
 
-      console.log("🎵 Genre fetch response:", res.status, res.ok);
-
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || "Failed to load genre comparison");
       }
 
       const data = await res.json();
-      console.log("🎵 Genre data received:", data);
 
-      const myGenres: Record<string, GenreInterest> = {};
-      const theirGenres: Record<string, GenreInterest> = {};
+      // Map table names from backend to frontend filter values
+      const tableNameMap: Record<string, string> = {
+        All: "all",
+        "My Collection": "collection",
+        Wishlist: "wishlist",
+        Listened: "listened",
+      };
 
-      // Map my genres
-      if (Array.isArray(data.myGenres)) {
-        data.myGenres.forEach((g: GenreInterest) => {
-          myGenres[g.genre] = {
-            genre: g.genre,
-            rating: g.rating !== null ? Number(g.rating) : null,
-            collectionPercent: Number(g.collectionPercent),
-          };
+      const newAllGenreComparisons: { [key: string]: GenreComparison[] } = {
+        all: [],
+        collection: [],
+        wishlist: [],
+        listened: [],
+      };
+
+      // Process each table
+      for (const [tableName, filterKey] of Object.entries(tableNameMap)) {
+        const myGenres: Record<string, GenreInterest> = {};
+        const theirGenres: Record<string, GenreInterest> = {};
+
+        // Map my genres for this table
+        if (
+          data.myGenresByTable &&
+          Array.isArray(data.myGenresByTable[tableName])
+        ) {
+          data.myGenresByTable[tableName].forEach((g: GenreInterest) => {
+            myGenres[g.genre] = {
+              genre: g.genre,
+              rating: g.rating !== null ? Number(g.rating) : null,
+              collectionPercent: Number(g.collectionPercent),
+            };
+          });
+        }
+
+        // Map their genres for this table
+        if (
+          data.theirGenresByTable &&
+          Array.isArray(data.theirGenresByTable[tableName])
+        ) {
+          data.theirGenresByTable[tableName].forEach((g: GenreInterest) => {
+            theirGenres[g.genre] = {
+              genre: g.genre,
+              rating: g.rating !== null ? Number(g.rating) : null,
+              collectionPercent: Number(g.collectionPercent),
+            };
+          });
+        }
+
+        // Get all unique genres from both users for this table
+        const allGenres = new Set<string>([
+          ...Object.keys(myGenres),
+          ...Object.keys(theirGenres),
+        ]);
+
+        // Create comparison array for all genres in this table
+        const comparisons: GenreComparison[] = Array.from(allGenres).map(
+          (genre) => ({
+            genre,
+            myRating: myGenres[genre]?.rating ?? null,
+            theirRating: theirGenres[genre]?.rating ?? null,
+            myPercent: myGenres[genre]?.collectionPercent ?? 0,
+            theirPercent: theirGenres[genre]?.collectionPercent ?? 0,
+          })
+        );
+
+        // Sort by combined presence (sum of both percentages)
+        comparisons.sort((a, b) => {
+          const aTotal = a.myPercent + a.theirPercent;
+          const bTotal = b.myPercent + b.theirPercent;
+          return bTotal - aTotal;
         });
+
+        newAllGenreComparisons[filterKey] = comparisons;
       }
 
-      // Map their genres
-      if (Array.isArray(data.theirGenres)) {
-        data.theirGenres.forEach((g: GenreInterest) => {
-          theirGenres[g.genre] = {
-            genre: g.genre,
-            rating: g.rating !== null ? Number(g.rating) : null,
-            collectionPercent: Number(g.collectionPercent),
-          };
-        });
-      }
-
-      // Get all unique genres from both users
-      const allGenres = new Set<string>([
-        ...Object.keys(myGenres),
-        ...Object.keys(theirGenres),
-      ]);
-
-      console.log("🎵 All genres:", Array.from(allGenres));
-
-      // Create comparison array for all genres
-      const comparisons: GenreComparison[] = Array.from(allGenres).map(
-        (genre) => ({
-          genre,
-          myRating: myGenres[genre]?.rating ?? null,
-          theirRating: theirGenres[genre]?.rating ?? null,
-          myPercent: myGenres[genre]?.collectionPercent ?? 0,
-          theirPercent: theirGenres[genre]?.collectionPercent ?? 0,
-        })
-      );
-
-      console.log("🎵 Comparisons created:", comparisons);
-
-      // Sort by combined presence (sum of both percentages)
-      comparisons.sort((a, b) => {
-        const aTotal = a.myPercent + a.theirPercent;
-        const bTotal = b.myPercent + b.theirPercent;
-        return bTotal - aTotal;
-      });
-
-      console.log("🎵 Setting genreComparisons, count:", comparisons.length);
-      setGenreComparisons(comparisons);
+      setAllGenreComparisons(newAllGenreComparisons);
     } catch (err) {
-      console.error("🎵 Failed to load genre comparison", err);
       setGenreError(
         err instanceof Error ? err.message : "Failed to load genre comparison"
       );
-      setGenreComparisons([]);
+      setAllGenreComparisons({
+        all: [],
+        collection: [],
+        wishlist: [],
+        listened: [],
+      });
     } finally {
-      console.log("🎵 fetchGenreComparisons DONE");
       setLoadingGenres(false);
     }
   }, [username, targetUsername]);
@@ -291,18 +327,8 @@ export default function Compare() {
     if (username && targetUsername) {
       fetchGenreComparisons();
     }
-  }, [username, targetUsername, fetchGenreComparisons]);
-
-  console.log("🎵 Compare component render", {
-    username,
-    targetUsername,
-    loading,
-    error,
-    recordsCount: records.length,
-    loadingGenres,
-    genreError,
-    genreComparisonsCount: genreComparisons.length,
-  });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [username, targetUsername]);
 
   return (
     <ThemeProvider theme={darkTheme}>
@@ -347,7 +373,7 @@ export default function Compare() {
                   direction="row"
                   justifyContent="space-between"
                   alignItems="center"
-                  sx={{ width: "100%", mb: 1 }}
+                  sx={{ width: "100%", mb: 1.4 }}
                 >
                   <Button
                     variant="outlined"
@@ -414,6 +440,62 @@ export default function Compare() {
                   </Stack>
                 </Stack>
 
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "end",
+                    mb: 2,
+                  }}
+                >
+                  <ToggleButtonGroup
+                    value={filter}
+                    exclusive
+                    onChange={handleFilterChange}
+                    size="small"
+                    aria-label="collection filter"
+                    sx={{ flexWrap: "wrap" }}
+                  >
+                    <ToggleButton
+                      value="all"
+                      aria-label="all collections"
+                      sx={{ fontSize: "0.75em" }}
+                    >
+                      All{" "}
+                      {filter === "all" && !loading && `(${records.length})`}
+                    </ToggleButton>
+                    <ToggleButton
+                      value="collection"
+                      aria-label="collection"
+                      sx={{ fontSize: "0.75em" }}
+                    >
+                      Collection{" "}
+                      {filter === "collection" &&
+                        !loading &&
+                        `(${records.length})`}
+                    </ToggleButton>
+                    <ToggleButton
+                      value="listened"
+                      aria-label="listened"
+                      sx={{ fontSize: "0.75em" }}
+                    >
+                      Listened{" "}
+                      {filter === "listened" &&
+                        !loading &&
+                        `(${records.length})`}
+                    </ToggleButton>
+                    <ToggleButton
+                      value="wishlist"
+                      aria-label="wishlist"
+                      sx={{ fontSize: "0.75em" }}
+                    >
+                      Wishlist{" "}
+                      {filter === "wishlist" &&
+                        !loading &&
+                        `(${records.length})`}
+                    </ToggleButton>
+                  </ToggleButtonGroup>
+                </Box>
+
                 <Paper
                   sx={{
                     p: 2,
@@ -421,65 +503,10 @@ export default function Compare() {
                     flexDirection: "column",
                   }}
                 >
-                  <Box
-                    sx={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      mb: 2,
-                      flexWrap: "wrap",
-                      gap: 1,
-                    }}
-                  >
-                    <Typography variant="h6">You Both Have</Typography>
-                    <ToggleButtonGroup
-                      value={filter}
-                      exclusive
-                      onChange={handleFilterChange}
-                      size="small"
-                      aria-label="collection filter"
-                      sx={{ flexWrap: "wrap" }}
-                    >
-                      <ToggleButton
-                        value="all"
-                        aria-label="all collections"
-                        sx={{ fontSize: "0.75em" }}
-                      >
-                        All{" "}
-                        {filter === "all" && !loading && `(${records.length})`}
-                      </ToggleButton>
-                      <ToggleButton
-                        value="collection"
-                        aria-label="collection"
-                        sx={{ fontSize: "0.75em" }}
-                      >
-                        Collection{" "}
-                        {filter === "collection" &&
-                          !loading &&
-                          `(${records.length})`}
-                      </ToggleButton>
-                      <ToggleButton
-                        value="listened"
-                        aria-label="listened"
-                        sx={{ fontSize: "0.75em" }}
-                      >
-                        Listened{" "}
-                        {filter === "listened" &&
-                          !loading &&
-                          `(${records.length})`}
-                      </ToggleButton>
-                      <ToggleButton
-                        value="wishlist"
-                        aria-label="wishlist"
-                        sx={{ fontSize: "0.75em" }}
-                      >
-                        Wishlist{" "}
-                        {filter === "wishlist" &&
-                          !loading &&
-                          `(${records.length})`}
-                      </ToggleButton>
-                    </ToggleButtonGroup>
-                  </Box>
+                  <Typography variant="h6" sx={{ mb: 1.5 }}>
+                    {`You Have`} {records.length}{" "}
+                    {`Record${records.length !== 1 ? "s" : ""} in Common`}
+                  </Typography>
 
                   {loading ? (
                     <Box
@@ -838,15 +865,27 @@ export default function Compare() {
                             >
                               {genre.myPercent > 0 && (
                                 <Box
-                                  onClick={() =>
+                                  onClick={() => {
+                                    const params = new URLSearchParams();
+                                    params.set("g", genre.genre);
+                                    if (filter !== "all") {
+                                      const tableMap: Record<
+                                        CollectionFilter,
+                                        string
+                                      > = {
+                                        all: "",
+                                        collection: "My Collection",
+                                        wishlist: "Wishlist",
+                                        listened: "Listened",
+                                      };
+                                      params.set("t", tableMap[filter]);
+                                    }
                                     navigate(
                                       `/community/${encodeURIComponent(
                                         username
-                                      )}/genre?g=${encodeURIComponent(
-                                        genre.genre
-                                      )}`
-                                    )
-                                  }
+                                      )}/genre?${params.toString()}`
+                                    );
+                                  }}
                                   sx={{
                                     flex:
                                       genre.theirPercent > 0
@@ -880,15 +919,27 @@ export default function Compare() {
                               )}
                               {genre.theirPercent > 0 && (
                                 <Box
-                                  onClick={() =>
+                                  onClick={() => {
+                                    const params = new URLSearchParams();
+                                    params.set("g", genre.genre);
+                                    if (filter !== "all") {
+                                      const tableMap: Record<
+                                        CollectionFilter,
+                                        string
+                                      > = {
+                                        all: "",
+                                        collection: "My Collection",
+                                        wishlist: "Wishlist",
+                                        listened: "Listened",
+                                      };
+                                      params.set("t", tableMap[filter]);
+                                    }
                                     navigate(
                                       `/community/${encodeURIComponent(
                                         targetUsername
-                                      )}/genre?g=${encodeURIComponent(
-                                        genre.genre
-                                      )}`
-                                    )
-                                  }
+                                      )}/genre?${params.toString()}`
+                                    );
+                                  }}
                                   sx={{
                                     flex:
                                       genre.myPercent > 0

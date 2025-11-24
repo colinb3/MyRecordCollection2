@@ -78,11 +78,21 @@ export default function CommunityStats() {
   const [tableFilter, setTableFilter] = useState<TableFilter>("All");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [genreData, setGenreData] = useState<GenreInterest[]>([]);
+  const [allGenreData, setAllGenreData] = useState<{
+    [key: string]: GenreInterest[];
+  }>({
+    All: [],
+    "My Collection": [],
+    Wishlist: [],
+    Listened: [],
+  });
   const [targetDisplayName, setTargetDisplayName] = useState<string>("");
   const [targetProfilePicUrl, setTargetProfilePicUrl] = useState<string | null>(
     null
   );
+
+  // Get the genre data for the current table filter
+  const genreData = allGenreData[tableFilter] || [];
   const targetProfileAlt =
     targetDisplayName ?? targetUsername ?? "Record owner";
   const targetInitial = useMemo(() => {
@@ -135,7 +145,7 @@ export default function CommunityStats() {
           apiUrl(
             `/api/community/users/${encodeURIComponent(
               targetUsername
-            )}/genre-interests?table=${encodeURIComponent(tableFilter)}`
+            )}/genre-interests`
           ),
           { credentials: "include" }
         );
@@ -148,7 +158,14 @@ export default function CommunityStats() {
         const data = await res.json();
         if (cancelled) return;
 
-        setGenreData(data.genres || []);
+        setAllGenreData(
+          data.genresByTable || {
+            All: [],
+            "My Collection": [],
+            Wishlist: [],
+            Listened: [],
+          }
+        );
         setTargetDisplayName(data.displayName || targetUsername);
         setTargetProfilePicUrl(data.profilePicUrl || null);
       } catch (err) {
@@ -164,7 +181,7 @@ export default function CommunityStats() {
     return () => {
       cancelled = true;
     };
-  }, [targetUsername, tableFilter]);
+  }, [targetUsername]);
 
   const handleLogout = useCallback(async () => {
     await performLogout(navigate);

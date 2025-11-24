@@ -1510,8 +1510,7 @@ app.get("/api/users/:username/records", async (req, res) => {
 
 app.get("/api/compare/:username", async (req, res) => {
   const targetUsername = req.params.username;
-  const filter = req.query.filter || "all"; // all, collection, listened, wishlist
-  console.log(`Comparing collections with user: ${targetUsername}, filter: ${filter}`);
+  console.log(`Comparing collections with user: ${targetUsername}`);
   
   // Get authenticated user
   let authenticatedUserUuid = null;
@@ -1544,22 +1543,9 @@ app.get("/api/compare/:username", async (req, res) => {
       return res.status(400).json({ error: "Cannot compare with yourself" });
     }
     
-    // Build collection name filter based on filter param
-    let collectionFilter = "";
-    let collectionFilter2 = "";
-    if (filter === "collection") {
-      collectionFilter = `AND t1.name = '${DEFAULT_COLLECTION_NAME}'`;
-      collectionFilter2 = `AND t2.name = '${DEFAULT_COLLECTION_NAME}'`;
-    } else if (filter === "listened") {
-      collectionFilter = `AND t1.name = '${LISTENED_COLLECTION_NAME}'`;
-      collectionFilter2 = `AND t2.name = '${LISTENED_COLLECTION_NAME}'`;
-    } else if (filter === "wishlist") {
-      collectionFilter = `AND t1.name = '${WISHLIST_COLLECTION_NAME}'`;
-      collectionFilter2 = `AND t2.name = '${WISHLIST_COLLECTION_NAME}'`;
-    }
-    
     // Find shared records by matching masterId
     // Only include records from public collections for both users
+    // Return ALL records without filtering by collection type
     const query = `
       SELECT 
         r1.id as myRecordId,
@@ -1582,8 +1568,6 @@ app.get("/api/compare/:username", async (req, res) => {
         AND r2.masterId IS NOT NULL
         AND t1.isPrivate = 0
         AND t2.isPrivate = 0
-        ${collectionFilter}
-        ${collectionFilter2}
       GROUP BY r1.id, r1.masterId, m.name, m.artist, m.cover, r1.rating, t1.name
       ORDER BY m.name
     `;
@@ -1645,35 +1629,64 @@ app.get("/api/compare/:username/genres", async (req, res) => {
       return res.status(400).json({ error: "Cannot compare with yourself" });
     }
     
-    // Fetch authenticated user's genre interests (only genres, not styles, from 'All' table)
+    // Fetch authenticated user's genre interests (only genres, not styles) for all tables
     const [myGenres] = await pool.query(
-      `SELECT genre, rating, collectionPercent 
+      `SELECT genre, rating, collectionPercent, tableName
        FROM UserGenreInterest 
-       WHERE userUuid = ? AND isStyle = FALSE AND tableName = 'All'
-       ORDER BY genre`,
+       WHERE userUuid = ? AND isStyle = FALSE
+       ORDER BY tableName, genre`,
       [authenticatedUserUuid]
     );
     
-    // Fetch target user's genre interests (only genres, not styles, from 'All' table)
+    // Fetch target user's genre interests (only genres, not styles) for all tables
     const [theirGenres] = await pool.query(
-      `SELECT genre, rating, collectionPercent 
+      `SELECT genre, rating, collectionPercent, tableName
        FROM UserGenreInterest 
-       WHERE userUuid = ? AND isStyle = FALSE AND tableName = 'All'
-       ORDER BY genre`,
+       WHERE userUuid = ? AND isStyle = FALSE
+       ORDER BY tableName, genre`,
       [targetUserUuid]
     );
     
+    // Group by table name
+    const myGenresByTable = {
+      "All": [],
+      "My Collection": [],
+      "Wishlist": [],
+      "Listened": []
+    };
+    
+    const theirGenresByTable = {
+      "All": [],
+      "My Collection": [],
+      "Wishlist": [],
+      "Listened": []
+    };
+    
+    for (const row of myGenres) {
+      const tableName = row.tableName;
+      if (myGenresByTable[tableName]) {
+        myGenresByTable[tableName].push({
+          genre: row.genre,
+          rating: row.rating,
+          collectionPercent: Number(row.collectionPercent) || 0
+        });
+      }
+    }
+    
+    for (const row of theirGenres) {
+      const tableName = row.tableName;
+      if (theirGenresByTable[tableName]) {
+        theirGenresByTable[tableName].push({
+          genre: row.genre,
+          rating: row.rating,
+          collectionPercent: Number(row.collectionPercent) || 0
+        });
+      }
+    }
+    
     res.json({ 
-      myGenres: myGenres.map(g => ({
-        genre: g.genre,
-        rating: g.rating,
-        collectionPercent: Number(g.collectionPercent) || 0
-      })),
-      theirGenres: theirGenres.map(g => ({
-        genre: g.genre,
-        rating: g.rating,
-        collectionPercent: Number(g.collectionPercent) || 0
-      }))
+      myGenresByTable,
+      theirGenresByTable
     });
   } catch (err) {
     console.error("Failed to compare genre interests", err);
@@ -2664,14 +2677,7 @@ app.get(
   "/api/community/users/:username/genre-interests",
   async (req, res) => {
     const targetUsername = req.params.username;
-    const tableName = typeof req.query.table === "string" ? req.query.table : "All";
-    console.log(`Fetching ${targetUsername}'s genre interests for table '${tableName}'...`);
-    
-    // Validate table name
-    const validTables = ["All", "My Collection", "Wishlist", "Listened"];
-    if (!validTables.includes(tableName)) {
-      return res.status(400).json({ error: "Invalid table name" });
-    }
+    console.log(`Fetching ${targetUsername}'s genre interests for all tables...`);
     
     if (!targetUsername) {
       return res.status(400).json({ error: "Username is required" });
@@ -2684,24 +2690,37 @@ app.get(
         return res.status(404).json({ error: "User not found" });
       }
 
-      // Get genre interests from UserGenreInterest table
+      // Get all genre interests from UserGenreInterest table (all tables at once)
       const [rows] = await pool.query(
-        `SELECT genre, rating, collectionPercent, recordCount
+        `SELECT genre, rating, collectionPercent, recordCount, tableName
          FROM UserGenreInterest
-         WHERE userUuid = ? AND tableName = ?
-         ORDER BY collectionPercent DESC`,
-        [userRow.uuid, tableName]
+         WHERE userUuid = ?
+         ORDER BY tableName, collectionPercent DESC`,
+        [userRow.uuid]
       );
 
-      const genres = rows.map((row) => ({
-        genre: row.genre,
-        rating: row.rating !== null ? Number(row.rating) : null,
-        collectionPercent: Number(row.collectionPercent),
-        recordCount: Number(row.recordCount) || 0,
-      }));
+      // Group genres by table name
+      const genresByTable = {
+        "All": [],
+        "My Collection": [],
+        "Wishlist": [],
+        "Listened": []
+      };
+
+      for (const row of rows) {
+        const tableName = row.tableName;
+        if (genresByTable[tableName]) {
+          genresByTable[tableName].push({
+            genre: row.genre,
+            rating: row.rating !== null ? Number(row.rating) : null,
+            collectionPercent: Number(row.collectionPercent),
+            recordCount: Number(row.recordCount) || 0,
+          });
+        }
+      }
 
       res.json({
-        genres,
+        genresByTable,
         displayName: userRow.displayName || userRow.username,
         profilePicUrl: buildProfilePicPublicPath(userRow.profilePic) || null,
       });
