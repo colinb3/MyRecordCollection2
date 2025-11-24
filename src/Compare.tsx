@@ -86,9 +86,21 @@ export default function Compare() {
   // Filter records based on current filter - both users must have record in the same collection type
   const records = allRecords.filter((record) => {
     if (filter === "all") return true;
-    if (filter === "collection") return record.myCollection === "My Collection" && record.theirCollection === "My Collection";
-    if (filter === "wishlist") return record.myCollection === "Wishlist" && record.theirCollection === "Wishlist";
-    if (filter === "listened") return record.myCollection === "Listened" && record.theirCollection === "Listened";
+    if (filter === "collection")
+      return (
+        record.myCollection === "My Collection" &&
+        record.theirCollection === "My Collection"
+      );
+    if (filter === "wishlist")
+      return (
+        record.myCollection === "Wishlist" &&
+        record.theirCollection === "Wishlist"
+      );
+    if (filter === "listened")
+      return (
+        record.myCollection === "Listened" &&
+        record.theirCollection === "Listened"
+      );
     return true;
   });
   const [targetProfilePic, setTargetProfilePic] = useState<string | null>(null);

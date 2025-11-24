@@ -373,72 +373,144 @@ export default function CommunityProfile() {
         />
         <Box sx={{ flex: 1, overflowY: "auto", pb: 3, px: 1 }}>
           <Box maxWidth={860} mx="auto" sx={{ mt: 1 }}>
-            <Grid container spacing={2}>
-              <Grid size={{ xs: 12 }}>
-                <Paper
-                  sx={{
-                    p: { xs: 2, md: 3 },
-                    borderRadius: 2,
-                    display: "flex",
-                    flexDirection: { xs: "column", sm: "row" },
-                    alignItems: "flex-start",
-                    gap: 3,
-                    position: "relative",
-                  }}
-                >
-                  {loading ? (
+            <Paper
+              variant="outlined"
+              sx={{
+                borderRadius: 2,
+                p: { xs: 2, md: 3 },
+              }}
+            >
+              <Box
+                sx={{
+                  p: 1,
+                  display: "flex",
+                  flexDirection: { xs: "column", md: "row" },
+                  alignItems: "flex-start",
+                  gap: 3,
+                  position: "relative",
+                  mb: 0,
+                }}
+              >
+                {loading ? (
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 2,
+                    }}
+                  >
+                    <Avatar
+                      variant="rounded"
+                      sx={{
+                        width: 120,
+                        height: 120,
+                        bgcolor: "grey.700",
+                      }}
+                      src={undefined}
+                    >
+                      {targetAvatarInitial}
+                    </Avatar>
+                    <CircularProgress size={24} />
+                    <Typography color="text.secondary">
+                      Loading profile…
+                    </Typography>
+                  </Box>
+                ) : error ? (
+                  <Typography color="error">{error}</Typography>
+                ) : profile ? (
+                  <>
                     <Box
                       sx={{
+                        position: "absolute",
+                        top: 45,
+                        right: -2.5,
                         display: "flex",
-                        alignItems: "center",
-                        gap: 2,
+                        gap: 0.25,
                       }}
                     >
-                      <Avatar
-                        variant="rounded"
-                        sx={{
-                          width: 120,
-                          height: 120,
-                          bgcolor: "grey.700",
-                        }}
-                        src={undefined}
-                      >
-                        {targetAvatarInitial}
-                      </Avatar>
-                      <CircularProgress size={24} />
-                      <Typography color="text.secondary">
-                        Loading profile…
-                      </Typography>
-                    </Box>
-                  ) : error ? (
-                    <Typography color="error">{error}</Typography>
-                  ) : profile ? (
-                    <>
-                      <Box
-                        sx={{
-                          position: "absolute",
-                          top: 16,
-                          right: 16,
-                          display: "flex",
-                          gap: 0.25,
-                        }}
-                      >
-                        {!isViewingOwnProfile ? (
-                          <Tooltip title="Compare collections">
-                            <IconButton
-                              color="inherit"
-                              size="medium"
-                              aria-label="Compare collections"
-                              onClick={() =>
-                                navigate(
-                                  `/community/${profileUsername}/compare`
-                                )
-                              }
+                      {profile.listeningTo && profile.listeningTo.masterId && (
+                        <Box>
+                          <ButtonBase
+                            onClick={() =>
+                              navigate(
+                                `/master/${profile.listeningTo!.masterId}`
+                              )
+                            }
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1.5,
+                              borderRadius: 1,
+                              p: 0.5,
+                              "&:hover": {
+                                bgcolor: "action.hover",
+                              },
+                              transition: "background-color 0.2s",
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                textAlign: "right",
+                                maxWidth: { xs: 125, sm: 250 },
+                              }}
                             >
-                              <CompareArrowsIcon />
-                            </IconButton>
-                          </Tooltip>
-                        ) : (
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                                sx={{ mb: 0.5 }}
+                                noWrap
+                              >
+                                Listening to:
+                              </Typography>
+                              <Typography
+                                variant="body1"
+                                sx={{ fontWeight: 600 }}
+                                noWrap
+                              >
+                                {profile.listeningTo.name}
+                              </Typography>
+                              {profile.listeningTo.artist && (
+                                <Typography
+                                  variant="body2"
+                                  color="text.secondary"
+                                  noWrap
+                                >
+                                  {profile.listeningTo.artist}
+                                </Typography>
+                              )}
+                            </Box>
+                            <SpinningRecord
+                              coverUrl={profile.listeningTo.cover}
+                              size={80}
+                            />
+                          </ButtonBase>
+                        </Box>
+                      )}
+                    </Box>
+                    <Box
+                      sx={{
+                        position: "absolute",
+                        top: -2.5,
+                        right: -2.5,
+                        display: "flex",
+                        gap: 0.25,
+                      }}
+                    >
+                      {!isViewingOwnProfile ? (
+                        <Tooltip title="Compare collections">
+                          <IconButton
+                            color="inherit"
+                            size="medium"
+                            aria-label="Compare collections"
+                            onClick={() =>
+                              navigate(`/community/${profileUsername}/compare`)
+                            }
+                          >
+                            <CompareArrowsIcon />
+                          </IconButton>
+                        </Tooltip>
+                      ) : (
+                        <Tooltip title="Profile settings">
                           <IconButton
                             color="inherit"
                             aria-label="Open profile settings"
@@ -446,198 +518,135 @@ export default function CommunityProfile() {
                           >
                             <SettingsIcon />
                           </IconButton>
-                        )}
-                        <Tooltip title="View stats">
-                          <IconButton
-                            color="inherit"
-                            size="medium"
-                            aria-label="View stats"
-                            onClick={() =>
-                              navigate(`/community/${profileUsername}/stats`)
-                            }
-                          >
-                            <BarChartIcon />
-                          </IconButton>
                         </Tooltip>
-                        <ShareButton
-                          title={`${
-                            profile.displayName || profile.username
-                          }'s Profile`}
-                          text={`Check out ${
-                            profile.displayName || profile.username
-                          }'s profile!`}
-                        />
-                      </Box>
-                      <Avatar
-                        variant="rounded"
-                        sx={{
-                          width: 120,
-                          height: 120,
-                          bgcolor: "grey.700",
-                        }}
-                        src={profile.profilePicUrl ?? undefined}
-                      >
-                        {!profile.profilePicUrl && targetAvatarInitial}
-                      </Avatar>
-                      <Box>
-                        <Typography
-                          variant="h4"
-                          mt={{ xs: -2, sm: 0 }}
-                          flexWrap={"wrap"}
-                        >
-                          {targetDisplayName}
-                        </Typography>
-                        <Typography
-                          variant="subtitle1"
-                          color="text.secondary"
-                          sx={{ pb: joinedDateDisplay ? 0.3 : 0.8 }}
-                        >
-                          @{profileUsername}
-                        </Typography>
-                        {joinedDateDisplay && (
-                          <Typography
-                            variant="body2"
-                            color="text.secondary"
-                            sx={{ pb: 1 }}
-                          >
-                            Joined {joinedDateDisplay}
-                          </Typography>
-                        )}
-                        <Box
-                          sx={{
-                            display: "flex",
-                            gap: 0.5,
-                            flexWrap: "wrap",
-                            mb: profile?.bio ? 1 : 0,
-                          }}
-                        >
-                          {typeof profile?.isFollowing === "boolean" && (
-                            <Button
-                              variant={
-                                profile.isFollowing ? "outlined" : "contained"
-                              }
-                              size="small"
-                              onClick={handleToggleFollow}
-                              disabled={followPending}
-                              sx={{ textTransform: "none", minWidth: 0, mr: 1 }}
-                            >
-                              {followPending
-                                ? "Updating…"
-                                : profile.isFollowing
-                                ? "Unfollow"
-                                : "Follow"}
-                            </Button>
-                          )}
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            onClick={() => handleViewFollows("followers")}
-                            sx={{ textTransform: "none", minWidth: 0 }}
-                          >
-                            {profile?.followersCount.toLocaleString()} Followers
-                          </Button>
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            onClick={() => handleViewFollows("following")}
-                            sx={{ textTransform: "none", minWidth: 0 }}
-                          >
-                            {profile?.followingCount.toLocaleString()} Following
-                          </Button>
-                        </Box>
-                        {followError && (
-                          <Typography
-                            variant="body2"
-                            color="error"
-                            sx={{ mt: 0.5 }}
-                          >
-                            {followError}
-                          </Typography>
-                        )}
-                        {profile.bio && profile.bio.trim().length > 0 && (
-                          <Typography
-                            variant="body1"
-                            sx={{ whiteSpace: "pre-line" }}
-                            color="text.primary"
-                          >
-                            {profile.bio}
-                          </Typography>
-                        )}
-                      </Box>
-                    </>
-                  ) : (
-                    <Typography color="text.secondary">
-                      No profile information available.
-                    </Typography>
-                  )}
-                </Paper>
-              </Grid>
-              {profile ? (
-                <>
-                  {profile.listeningTo && profile.listeningTo.masterId && (
-                    <Grid size={{ xs: 12 }}>
-                      <Paper
-                        sx={{
-                          p: { xs: 1, md: 2 },
-                          borderRadius: 2,
-                          display: "flex",
-                          flexDirection: { xs: "column", sm: "row" },
-                          alignItems: "flex-start",
-                          gap: 3,
-                          position: "relative",
-                        }}
-                      >
-                        <ButtonBase
+                      )}
+                      <Tooltip title="View stats">
+                        <IconButton
+                          color="inherit"
+                          size="medium"
+                          aria-label="View stats"
                           onClick={() =>
-                            navigate(`/master/${profile.listeningTo!.masterId}`)
+                            navigate(`/community/${profileUsername}/stats`)
                           }
-                          sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 2.5,
-                            borderRadius: 1,
-                            p: 1,
-                            "&:hover": {
-                              bgcolor: "action.hover",
-                            },
-                            transition: "background-color 0.2s",
-                          }}
                         >
-                          <SpinningRecord
-                            coverUrl={profile.listeningTo.cover}
-                            size={80}
-                          />
-                          <Box sx={{ textAlign: "left" }}>
-                            <Typography
-                              variant="body2"
-                              color="text.secondary"
-                              sx={{ mb: 0.5 }}
-                            >
-                              Listening to:
-                            </Typography>
-                            <Typography
-                              variant="body1"
-                              sx={{ fontWeight: 600 }}
-                            >
-                              {profile.listeningTo.name}
-                            </Typography>
-                            {profile.listeningTo.artist && (
-                              <Typography
-                                variant="body2"
-                                color="text.secondary"
-                              >
-                                {profile.listeningTo.artist}
-                              </Typography>
-                            )}
-                          </Box>
-                        </ButtonBase>
-                      </Paper>
-                    </Grid>
-                  )}
-                </>
-              ) : null}
+                          <BarChartIcon />
+                        </IconButton>
+                      </Tooltip>
+                      <ShareButton
+                        title={`${
+                          profile.displayName || profile.username
+                        }'s Profile`}
+                        text={`Check out ${
+                          profile.displayName || profile.username
+                        }'s profile!`}
+                      />
+                    </Box>
+                    <Avatar
+                      variant="rounded"
+                      sx={{
+                        width: 120,
+                        height: 120,
+                        bgcolor: "grey.700",
+                      }}
+                      src={profile.profilePicUrl ?? undefined}
+                    >
+                      {!profile.profilePicUrl && targetAvatarInitial}
+                    </Avatar>
+                    <Box>
+                      <Typography
+                        variant="h4"
+                        mt={{ xs: -2, sm: 0 }}
+                        flexWrap={"wrap"}
+                      >
+                        {targetDisplayName}
+                      </Typography>
+                      <Typography
+                        variant="subtitle1"
+                        color="text.secondary"
+                        sx={{ pb: joinedDateDisplay ? 0.3 : 0.8 }}
+                      >
+                        @{profileUsername}
+                      </Typography>
+                      {joinedDateDisplay && (
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ pb: 1 }}
+                        >
+                          Joined {joinedDateDisplay}
+                        </Typography>
+                      )}
+                      <Box
+                        sx={{
+                          display: "flex",
+                          gap: 0.5,
+                          flexWrap: "wrap",
+                          mb: profile?.bio ? 1 : 0,
+                        }}
+                      >
+                        {typeof profile?.isFollowing === "boolean" && (
+                          <Button
+                            variant={
+                              profile.isFollowing ? "outlined" : "contained"
+                            }
+                            size="small"
+                            onClick={handleToggleFollow}
+                            disabled={followPending}
+                            sx={{ textTransform: "none", minWidth: 0, mr: 1 }}
+                          >
+                            {followPending
+                              ? "Updating…"
+                              : profile.isFollowing
+                              ? "Unfollow"
+                              : "Follow"}
+                          </Button>
+                        )}
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          onClick={() => handleViewFollows("followers")}
+                          sx={{ textTransform: "none", minWidth: 0 }}
+                        >
+                          {profile?.followersCount.toLocaleString()} Followers
+                        </Button>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          onClick={() => handleViewFollows("following")}
+                          sx={{ textTransform: "none", minWidth: 0 }}
+                        >
+                          {profile?.followingCount.toLocaleString()} Following
+                        </Button>
+                      </Box>
+                      {followError && (
+                        <Typography
+                          variant="body2"
+                          color="error"
+                          sx={{ mt: 0.5 }}
+                        >
+                          {followError}
+                        </Typography>
+                      )}
+                      {profile.bio && profile.bio.trim().length > 0 && (
+                        <Typography
+                          variant="body1"
+                          sx={{ whiteSpace: "pre-line" }}
+                          color="text.primary"
+                        >
+                          {profile.bio}
+                        </Typography>
+                      )}
+                    </Box>
+                  </>
+                ) : (
+                  <Typography color="text.secondary">
+                    No profile information available.
+                  </Typography>
+                )}
+              </Box>
+              {profile ? <></> : null}
 
-              <Grid size={{ xs: 12 }}>
+              <Box sx={{ mt: 2 }}>
                 <SectionCard title="Collection Highlights">
                   {loading ? (
                     <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
@@ -659,10 +668,10 @@ export default function CommunityProfile() {
                     />
                   )}
                 </SectionCard>
-              </Grid>
+              </Box>
 
               {showRecentSection && (
-                <Grid size={{ xs: 12 }}>
+                <Box sx={{ mt: 2 }}>
                   <SectionCard title="Recently Collected">
                     {loading ? (
                       <Box
@@ -712,11 +721,11 @@ export default function CommunityProfile() {
                       </Stack>
                     ) : null}
                   </SectionCard>
-                </Grid>
+                </Box>
               )}
 
               {showListenedSection && (
-                <Grid size={{ xs: 12 }}>
+                <Box sx={{ mt: 2 }}>
                   <SectionCard title="Recently Listened">
                     {loading ? (
                       <Box
@@ -766,11 +775,11 @@ export default function CommunityProfile() {
                       </Stack>
                     ) : null}
                   </SectionCard>
-                </Grid>
+                </Box>
               )}
 
               {showWishlistSection && (
-                <Grid size={{ xs: 12 }}>
+                <Box sx={{ mt: 2 }}>
                   <SectionCard title="Wishlist">
                     {loading ? (
                       <Box
@@ -820,9 +829,9 @@ export default function CommunityProfile() {
                       </Stack>
                     ) : null}
                   </SectionCard>
-                </Grid>
+                </Box>
               )}
-            </Grid>
+            </Paper>
           </Box>
         </Box>
       </Box>
