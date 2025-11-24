@@ -12,6 +12,8 @@ import {
   Avatar,
   useMediaQuery,
   useTheme,
+  ToggleButtonGroup,
+  ToggleButton,
 } from "@mui/material";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -28,6 +30,8 @@ import { getCachedUserInfo, loadUserInfo } from "./userInfo";
 import apiUrl from "./api";
 import { performLogout } from "./logout";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+
+type TableFilter = "All" | "My Collection" | "Wishlist" | "Listened";
 
 interface GenreInterest {
   genre: string;
@@ -71,6 +75,7 @@ export default function CommunityStats() {
 
   const targetUsername = params.username ?? "";
 
+  const [tableFilter, setTableFilter] = useState<TableFilter>("All");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [genreData, setGenreData] = useState<GenreInterest[]>([]);
@@ -130,7 +135,7 @@ export default function CommunityStats() {
           apiUrl(
             `/api/community/users/${encodeURIComponent(
               targetUsername
-            )}/genre-interests`
+            )}/genre-interests?table=${encodeURIComponent(tableFilter)}`
           ),
           { credentials: "include" }
         );
@@ -159,7 +164,7 @@ export default function CommunityStats() {
     return () => {
       cancelled = true;
     };
-  }, [targetUsername]);
+  }, [targetUsername, tableFilter]);
 
   const handleLogout = useCallback(async () => {
     await performLogout(navigate);
@@ -171,13 +176,27 @@ export default function CommunityStats() {
 
   const handleGenreClick = useCallback(
     (genreName: string) => {
+      const params = new URLSearchParams();
+      params.set("g", genreName);
+      if (tableFilter !== "All") {
+        params.set("t", tableFilter);
+      }
       navigate(
         `/community/${encodeURIComponent(
           targetUsername
-        )}/genre?g=${encodeURIComponent(genreName)}`
+        )}/genre?${params.toString()}`
       );
     },
-    [navigate, targetUsername]
+    [navigate, targetUsername, tableFilter]
+  );
+
+  const handleTableFilterChange = useCallback(
+    (_event: React.MouseEvent<HTMLElement>, newFilter: TableFilter | null) => {
+      if (newFilter !== null) {
+        setTableFilter(newFilter);
+      }
+    },
+    []
   );
 
   const pieChartData = genreData
@@ -203,7 +222,8 @@ export default function CommunityStats() {
               ? "1 record"
               : `${payload[0].payload.recordCount} records`}
             <br />
-            {`Avg. Rating: ${payload[0].payload.rating}`}
+            {payload[0].payload.rating !== null &&
+              `Avg. Rating: ${payload[0].payload.rating}`}
           </Typography>
         </Paper>
       );
@@ -309,6 +329,53 @@ export default function CommunityStats() {
                 </Box>
               </Stack>
 
+              {/* Table Filter */}
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "end",
+                  mb: 2,
+                }}
+              >
+                <ToggleButtonGroup
+                  value={tableFilter}
+                  exclusive
+                  onChange={handleTableFilterChange}
+                  size="small"
+                  aria-label="table filter"
+                  sx={{ flexWrap: "wrap" }}
+                >
+                  <ToggleButton
+                    value="All"
+                    aria-label="all tables"
+                    sx={{ fontSize: "0.75em" }}
+                  >
+                    All
+                  </ToggleButton>
+                  <ToggleButton
+                    value="My Collection"
+                    aria-label="my collection"
+                    sx={{ fontSize: "0.75em" }}
+                  >
+                    Collection
+                  </ToggleButton>
+                  <ToggleButton
+                    value="Wishlist"
+                    aria-label="wishlist"
+                    sx={{ fontSize: "0.75em" }}
+                  >
+                    Wishlist
+                  </ToggleButton>
+                  <ToggleButton
+                    value="Listened"
+                    aria-label="listened"
+                    sx={{ fontSize: "0.75em" }}
+                  >
+                    Listened
+                  </ToggleButton>
+                </ToggleButtonGroup>
+              </Box>
+
               {loading ? (
                 <Box
                   display="flex"
@@ -350,6 +417,7 @@ export default function CommunityStats() {
                             fill="#8884d8"
                             dataKey="value"
                             style={{ outline: "none" }}
+                            animationDuration={700}
                           >
                             {pieChartData.map((_entry, index) => (
                               <Cell
@@ -383,8 +451,13 @@ export default function CommunityStats() {
                       }}
                     >
                       {genreData
-                        .filter((g) => g.rating !== null)
-                        .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+                        .sort((a, b) => {
+                          // Sort by rating (highest first), putting null ratings at the end
+                          if (a.rating === null && b.rating === null) return 0;
+                          if (a.rating === null) return 1;
+                          if (b.rating === null) return -1;
+                          return b.rating - a.rating;
+                        })
                         .map((genre) => (
                           <Box
                             key={genre.genre}
@@ -415,45 +488,44 @@ export default function CommunityStats() {
                                 collection
                               </Typography>
                             </Box>
-                            <Box
-                              sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                pl: 0.5,
-                              }}
-                            >
+                            {genre.rating !== null && (
                               <Box
                                 sx={{
-                                  width: 100,
-                                  height: 8,
-                                  bgcolor: "grey.800",
-                                  borderRadius: 1,
-                                  overflow: "hidden",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  pl: 0.5,
                                 }}
                               >
                                 <Box
                                   sx={{
-                                    width: `${
-                                      ((genre.rating || 0) / 10) * 100
-                                    }%`,
-                                    height: "100%",
-                                    bgcolor: "primary.main",
+                                    width: 100,
+                                    height: 8,
+                                    bgcolor: "grey.800",
+                                    borderRadius: 1,
+                                    overflow: "hidden",
                                   }}
-                                />
+                                >
+                                  <Box
+                                    sx={{
+                                      width: `${(genre.rating / 10) * 100}%`,
+                                      height: "100%",
+                                      bgcolor: "primary.main",
+                                    }}
+                                  />
+                                </Box>
+                                <Typography
+                                  variant="h6"
+                                  sx={{ minWidth: 45, textAlign: "right" }}
+                                >
+                                  {genre.rating.toFixed(1)}
+                                </Typography>
                               </Box>
-                              <Typography
-                                variant="h6"
-                                sx={{ minWidth: 45, textAlign: "right" }}
-                              >
-                                {genre.rating?.toFixed(1)}
-                              </Typography>
-                            </Box>
+                            )}
                           </Box>
                         ))}
-                      {genreData.filter((g) => g.rating !== null).length ===
-                        0 && (
+                      {genreData.length === 0 && (
                         <Typography color="text.secondary" align="center">
-                          No rated genres
+                          No genres in this collection
                         </Typography>
                       )}
                     </Box>

@@ -170,11 +170,12 @@ CREATE TABLE MasterGenre (
 CREATE TABLE UserGenreInterest (
     userUuid CHAR(36),
     genre VARCHAR(100),
+    tableName VARCHAR(13),
     isStyle BOOLEAN,
     rating DECIMAL(4,2),
     collectionPercent DECIMAL(5,2),
     recordCount INT DEFAULT 0,
-    PRIMARY KEY (userUuid, genre),
+    PRIMARY KEY (userUuid, genre, tableName),
     FOREIGN KEY (userUuid) REFERENCES User(uuid) ON DELETE CASCADE
 );
 
@@ -267,6 +268,7 @@ BEGIN
        (OLD.masterId IS NOT NULL AND NEW.masterId IS NULL) OR
        (OLD.masterId <> NEW.masterId) OR
        (OLD.rating <> NEW.rating) OR
+       (OLD.tableId <> NEW.tableId) OR
        (OLD.isCustom <> NEW.isCustom) THEN
         
         IF (OLD.isCustom IS NULL OR OLD.isCustom = FALSE) OR (NEW.isCustom IS NULL OR NEW.isCustom = FALSE) THEN
@@ -320,58 +322,91 @@ END $$
 --   2. Update the INSERT/DELETE statements to use the appropriate isStyle value
 --   3. Consider creating separate procedures for genres vs styles, or add an isStyle parameter
 DROP PROCEDURE IF EXISTS update_user_genre_interest $$
-CREATE PROCEDURE update_user_genre_interest(IN p_user_uuid CHAR(36), IN p_genre VARCHAR(100))
+CREATE PROCEDURE update_user_genre_interest(IN p_user_uuid CHAR(36), IN p_genre VARCHAR(100), IN p_table_name VARCHAR(13))
 BEGIN
     DECLARE avg_rating DECIMAL(4,2);
-    DECLARE genre_count INT;
     DECLARE genre_count_all INT;
     DECLARE total_count INT;
     DECLARE collection_pct DECIMAL(5,2);
     
-    -- Calculate average rating for records with this genre (only rated 1-10, excluding 0)
-    SELECT 
-        AVG(r.rating)
-    INTO avg_rating
-    FROM Record r
-    INNER JOIN MasterGenre mg ON r.masterId = mg.masterId
-    WHERE r.userUuid = p_user_uuid
-        AND mg.genre = p_genre
-        AND mg.isStyle = FALSE
-        AND (r.isCustom IS NULL OR r.isCustom = FALSE)
-        AND r.rating BETWEEN 1 AND 10;
-    
-    -- Count ALL records with this genre (including those with rating 0 or NULL)
-    SELECT COUNT(DISTINCT r.id)
-    INTO genre_count_all
-    FROM Record r
-    INNER JOIN MasterGenre mg ON r.masterId = mg.masterId
-    WHERE r.userUuid = p_user_uuid
-        AND mg.genre = p_genre
-        AND mg.isStyle = FALSE
-        AND (r.isCustom IS NULL OR r.isCustom = FALSE);
-    
-    -- Get total number of records in user's collection (non-custom only)
-    SELECT COUNT(*)
-    INTO total_count
-    FROM Record r
-    WHERE r.userUuid = p_user_uuid
-        AND (r.isCustom IS NULL OR r.isCustom = FALSE);
+    -- Calculate average rating for records with this genre in specific table or all tables
+    IF p_table_name = 'All' THEN
+        SELECT AVG(r.rating)
+        INTO avg_rating
+        FROM Record r
+        INNER JOIN MasterGenre mg ON r.masterId = mg.masterId
+        WHERE r.userUuid = p_user_uuid
+            AND mg.genre = p_genre
+            AND mg.isStyle = FALSE
+            AND (r.isCustom IS NULL OR r.isCustom = FALSE)
+            AND r.rating BETWEEN 1 AND 10;
+        
+        SELECT COUNT(DISTINCT r.id)
+        INTO genre_count_all
+        FROM Record r
+        INNER JOIN MasterGenre mg ON r.masterId = mg.masterId
+        WHERE r.userUuid = p_user_uuid
+            AND mg.genre = p_genre
+            AND mg.isStyle = FALSE
+            AND (r.isCustom IS NULL OR r.isCustom = FALSE);
+        
+        SELECT COUNT(*)
+        INTO total_count
+        FROM Record r
+        WHERE r.userUuid = p_user_uuid
+            AND (r.isCustom IS NULL OR r.isCustom = FALSE);
+    ELSE
+        -- Join with RecTable to get the correct tableId based on table name
+        SELECT AVG(r.rating)
+        INTO avg_rating
+        FROM Record r
+        INNER JOIN MasterGenre mg ON r.masterId = mg.masterId
+        INNER JOIN RecTable rt ON r.tableId = rt.id
+        WHERE r.userUuid = p_user_uuid
+            AND rt.userUuid = p_user_uuid
+            AND rt.name = p_table_name
+            AND mg.genre = p_genre
+            AND mg.isStyle = FALSE
+            AND (r.isCustom IS NULL OR r.isCustom = FALSE)
+            AND r.rating BETWEEN 1 AND 10;
+        
+        SELECT COUNT(DISTINCT r.id)
+        INTO genre_count_all
+        FROM Record r
+        INNER JOIN MasterGenre mg ON r.masterId = mg.masterId
+        INNER JOIN RecTable rt ON r.tableId = rt.id
+        WHERE r.userUuid = p_user_uuid
+            AND rt.userUuid = p_user_uuid
+            AND rt.name = p_table_name
+            AND mg.genre = p_genre
+            AND mg.isStyle = FALSE
+            AND (r.isCustom IS NULL OR r.isCustom = FALSE);
+        
+        SELECT COUNT(*)
+        INTO total_count
+        FROM Record r
+        INNER JOIN RecTable rt ON r.tableId = rt.id
+        WHERE r.userUuid = p_user_uuid
+            AND rt.userUuid = p_user_uuid
+            AND rt.name = p_table_name
+            AND (r.isCustom IS NULL OR r.isCustom = FALSE);
+    END IF;
     
     -- Calculate percentage using ALL genre records
     IF total_count > 0 AND genre_count_all > 0 THEN
         SET collection_pct = (genre_count_all / total_count) * 100;
         
         -- Insert or update the UserGenreInterest entry
-        INSERT INTO UserGenreInterest (userUuid, genre, isStyle, rating, collectionPercent, recordCount)
-        VALUES (p_user_uuid, p_genre, FALSE, ROUND(avg_rating, 2), collection_pct, genre_count_all)
+        INSERT INTO UserGenreInterest (userUuid, genre, tableName, isStyle, rating, collectionPercent, recordCount)
+        VALUES (p_user_uuid, p_genre, p_table_name, FALSE, ROUND(avg_rating, 2), collection_pct, genre_count_all)
         ON DUPLICATE KEY UPDATE
             rating = ROUND(VALUES(rating), 2),
             collectionPercent = VALUES(collectionPercent),
             recordCount = VALUES(recordCount);
     ELSE
-        -- Remove entry if user has no records with this genre
+        -- Remove entry if user has no records with this genre in this table
         DELETE FROM UserGenreInterest
-        WHERE userUuid = p_user_uuid AND genre = p_genre AND isStyle = FALSE;
+        WHERE userUuid = p_user_uuid AND genre = p_genre AND tableName = p_table_name AND isStyle = FALSE;
     END IF;
 END $$
 
@@ -390,7 +425,7 @@ BEGIN
             AND (r.isCustom IS NULL OR r.isCustom = FALSE);
     DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = TRUE;
     
-    -- Clean up genres that user no longer has
+    -- Clean up genres that user no longer has in any table
     DELETE ugi FROM UserGenreInterest ugi
     WHERE ugi.userUuid = p_user_uuid
         AND ugi.isStyle = FALSE
@@ -398,20 +433,25 @@ BEGIN
             SELECT 1
             FROM Record r
             INNER JOIN MasterGenre mg ON r.masterId = mg.masterId
+            LEFT JOIN RecTable rt ON r.tableId = rt.id AND rt.userUuid = p_user_uuid
             WHERE r.userUuid = p_user_uuid
                 AND mg.genre = ugi.genre
                 AND mg.isStyle = FALSE
                 AND (r.isCustom IS NULL OR r.isCustom = FALSE)
+                AND (ugi.tableName = 'All' OR rt.name = ugi.tableName)
         );
     
-    -- Update each genre the user has
+    -- Update each genre for all tables (All, My Collection, Wishlist, Listened)
     OPEN genre_cursor;
     read_loop: LOOP
         FETCH genre_cursor INTO v_genre;
         IF done THEN
             LEAVE read_loop;
         END IF;
-        CALL update_user_genre_interest(p_user_uuid, v_genre);
+        CALL update_user_genre_interest(p_user_uuid, v_genre, 'All');
+        CALL update_user_genre_interest(p_user_uuid, v_genre, 'My Collection');
+        CALL update_user_genre_interest(p_user_uuid, v_genre, 'Wishlist');
+        CALL update_user_genre_interest(p_user_uuid, v_genre, 'Listened');
     END LOOP;
     CLOSE genre_cursor;
 END $$

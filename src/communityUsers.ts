@@ -855,6 +855,7 @@ export async function loadPublicUserCollection(
 export async function loadPublicUserCollectionByGenre(
   username: string,
   genre: string,
+  tableName?: string,
   forceRefresh = false
 ): Promise<MrcRecord[]> {
   const normalizedUser = username.trim().toLowerCase();
@@ -871,7 +872,7 @@ export async function loadPublicUserCollectionByGenre(
     throw error;
   }
 
-  const cacheKey = `${normalizedUser}::genre::${normalizedGenre.toLowerCase()}`;
+  const cacheKey = `${normalizedUser}::genre::${normalizedGenre.toLowerCase()}${tableName ? `::${tableName}` : ''}`;
   if (!forceRefresh) {
     if (collectionCache.has(cacheKey)) {
       return cloneRecords(collectionCache.get(cacheKey)!);
@@ -881,7 +882,12 @@ export async function loadPublicUserCollectionByGenre(
     }
   }
 
-  const endpoint = `/api/community/users/${username}/genre/${encodeURIComponent(normalizedGenre)}`;
+  const params = new URLSearchParams();
+  if (tableName) {
+    params.set('t', tableName);
+  }
+  const queryString = params.toString();
+  const endpoint = `/api/community/users/${username}/genre/${encodeURIComponent(normalizedGenre)}${queryString ? `?${queryString}` : ''}`;
 
   const fetchPromise = (async () => {
     try {

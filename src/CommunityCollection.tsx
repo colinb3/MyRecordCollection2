@@ -49,6 +49,7 @@ export default function CommunityCollection({
   const params = useParams<{ username: string }>();
   const [searchParams] = useSearchParams();
   const genreFilter = searchParams.get("g") || null;
+  const tableFilter = searchParams.get("t") || null;
   const cachedUser = getCachedUserInfo();
   const [username, setUsername] = useState<string>(cachedUser?.username ?? "");
   const [displayName, setDisplayName] = useState<string>(
@@ -125,7 +126,11 @@ export default function CommunityCollection({
 
     // If genre filter is present, use the genre-specific endpoint
     const collectionPromise = genreFilter
-      ? loadPublicUserCollectionByGenre(targetUsername, genreFilter)
+      ? loadPublicUserCollectionByGenre(
+          targetUsername,
+          genreFilter,
+          tableFilter || undefined
+        )
       : loadPublicUserCollection(targetUsername, activeTableName);
 
     Promise.all([loadPublicUserProfile(targetUsername), collectionPromise])
@@ -340,7 +345,9 @@ export default function CommunityCollection({
                 <Box>
                   <Typography variant="h5" sx={{ lineHeight: 1.2 }}>
                     {genreFilter
-                      ? `${targetDisplayName}'s ${genreFilter} Records`
+                      ? `${targetDisplayName}'s ${genreFilter} Records${
+                          tableFilter ? ` (${tableFilter})` : ""
+                        }`
                       : isWishlistView
                       ? `${targetDisplayName}'s Wishlist`
                       : isListenedView

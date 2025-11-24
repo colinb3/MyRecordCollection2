@@ -1645,20 +1645,20 @@ app.get("/api/compare/:username/genres", async (req, res) => {
       return res.status(400).json({ error: "Cannot compare with yourself" });
     }
     
-    // Fetch authenticated user's genre interests (only genres, not styles)
+    // Fetch authenticated user's genre interests (only genres, not styles, from 'All' table)
     const [myGenres] = await pool.query(
       `SELECT genre, rating, collectionPercent 
        FROM UserGenreInterest 
-       WHERE userUuid = ? AND isStyle = FALSE
+       WHERE userUuid = ? AND isStyle = FALSE AND tableName = 'All'
        ORDER BY genre`,
       [authenticatedUserUuid]
     );
     
-    // Fetch target user's genre interests (only genres, not styles)
+    // Fetch target user's genre interests (only genres, not styles, from 'All' table)
     const [theirGenres] = await pool.query(
       `SELECT genre, rating, collectionPercent 
        FROM UserGenreInterest 
-       WHERE userUuid = ? AND isStyle = FALSE
+       WHERE userUuid = ? AND isStyle = FALSE AND tableName = 'All'
        ORDER BY genre`,
       [targetUserUuid]
     );
@@ -2536,7 +2536,8 @@ app.get(
   async (req, res) => {
     const targetUsername = req.params.username;
     const genreName = req.params.genreName;
-    console.log(`Fetching ${targetUsername}'s collection by genre '${genreName}'...`);
+    const tableName = typeof req.query.t === "string" ? req.query.t : null;
+    console.log(`Fetching ${targetUsername}'s collection by genre '${genreName}'${tableName ? ` in table '${tableName}'` : ''}...`);
     
     if (!targetUsername) {
       return res.status(400).json({ error: "Username is required" });
@@ -2544,6 +2545,11 @@ app.get(
     
     if (!genreName) {
       return res.status(400).json({ error: "Genre is required" });
+    }
+    
+    // Validate table name if provided
+    if (tableName && !["My Collection", "Wishlist", "Listened"].includes(tableName)) {
+      return res.status(400).json({ error: "Invalid table name" });
     }
     
     // Optional auth - extract userUuid from token if present
@@ -2574,16 +2580,22 @@ app.get(
 
       const isOwner = authenticatedUserUuid && userRow.uuid === authenticatedUserUuid;
       
-      // Build a list of accessible table IDs
+      // Build a list of accessible table IDs, optionally filtered by tableName
       const tableIds = [];
-      if (collectionTable && (!collectionTable.isPrivate || isOwner)) {
-        tableIds.push(collectionTable.id);
+      if (!tableName || tableName === "My Collection") {
+        if (collectionTable && (!collectionTable.isPrivate || isOwner)) {
+          tableIds.push(collectionTable.id);
+        }
       }
-      if (wishlistTable && (!wishlistTable.isPrivate || isOwner)) {
-        tableIds.push(wishlistTable.id);
+      if (!tableName || tableName === "Wishlist") {
+        if (wishlistTable && (!wishlistTable.isPrivate || isOwner)) {
+          tableIds.push(wishlistTable.id);
+        }
       }
-      if (listenedTable && (!listenedTable.isPrivate || isOwner)) {
-        tableIds.push(listenedTable.id);
+      if (!tableName || tableName === "Listened") {
+        if (listenedTable && (!listenedTable.isPrivate || isOwner)) {
+          tableIds.push(listenedTable.id);
+        }
       }
 
       if (tableIds.length === 0) {
@@ -2651,8 +2663,16 @@ app.get(
 app.get(
   "/api/community/users/:username/genre-interests",
   async (req, res) => {
-    console.log("Fetching user genre interests...");
     const targetUsername = req.params.username;
+    const tableName = typeof req.query.table === "string" ? req.query.table : "All";
+    console.log(`Fetching ${targetUsername}'s genre interests for table '${tableName}'...`);
+    
+    // Validate table name
+    const validTables = ["All", "My Collection", "Wishlist", "Listened"];
+    if (!validTables.includes(tableName)) {
+      return res.status(400).json({ error: "Invalid table name" });
+    }
+    
     if (!targetUsername) {
       return res.status(400).json({ error: "Username is required" });
     }
@@ -2668,9 +2688,9 @@ app.get(
       const [rows] = await pool.query(
         `SELECT genre, rating, collectionPercent, recordCount
          FROM UserGenreInterest
-         WHERE userUuid = ?
+         WHERE userUuid = ? AND tableName = ?
          ORDER BY collectionPercent DESC`,
-        [userRow.uuid]
+        [userRow.uuid, tableName]
       );
 
       const genres = rows.map((row) => ({
