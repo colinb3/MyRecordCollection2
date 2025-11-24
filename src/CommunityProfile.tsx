@@ -421,12 +421,66 @@ export default function CommunityProfile() {
                     <Box
                       sx={{
                         position: "absolute",
-                        top: 45,
+                        top: -2.5,
                         right: -2.5,
-                        display: "flex",
-                        gap: 0.25,
+                        justifyItems: "flex-end",
                       }}
                     >
+                      <Box
+                        sx={{
+                          display: "flex",
+                          gap: 0.25,
+                          mb: 0.75,
+                        }}
+                      >
+                        {!isViewingOwnProfile ? (
+                          <Tooltip title="Compare collections">
+                            <IconButton
+                              color="inherit"
+                              size="medium"
+                              aria-label="Compare collections"
+                              onClick={() =>
+                                navigate(
+                                  `/community/${profileUsername}/compare`
+                                )
+                              }
+                            >
+                              <CompareArrowsIcon />
+                            </IconButton>
+                          </Tooltip>
+                        ) : (
+                          <Tooltip title="Profile settings">
+                            <IconButton
+                              color="inherit"
+                              aria-label="Open profile settings"
+                              onClick={handleOpenProfileSettings}
+                            >
+                              <SettingsIcon />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        <Tooltip title="View stats">
+                          <IconButton
+                            color="inherit"
+                            size="medium"
+                            aria-label="View stats"
+                            onClick={() =>
+                              navigate(`/community/${profileUsername}/stats`)
+                            }
+                          >
+                            <BarChartIcon />
+                          </IconButton>
+                        </Tooltip>
+                        <ShareButton
+                          title={`${
+                            profile.displayName || profile.username
+                          }'s Profile`}
+                          text={`Check out ${
+                            profile.displayName || profile.username
+                          }'s profile!`}
+                        />
+                      </Box>
+
                       {profile.listeningTo && profile.listeningTo.masterId && (
                         <Box>
                           <ButtonBase
@@ -450,7 +504,7 @@ export default function CommunityProfile() {
                             <Box
                               sx={{
                                 textAlign: "right",
-                                maxWidth: { xs: 125, sm: 250 },
+                                maxWidth: { xs: 120, sm: 250 },
                               }}
                             >
                               <Typography
@@ -486,60 +540,6 @@ export default function CommunityProfile() {
                         </Box>
                       )}
                     </Box>
-                    <Box
-                      sx={{
-                        position: "absolute",
-                        top: -2.5,
-                        right: -2.5,
-                        display: "flex",
-                        gap: 0.25,
-                      }}
-                    >
-                      {!isViewingOwnProfile ? (
-                        <Tooltip title="Compare collections">
-                          <IconButton
-                            color="inherit"
-                            size="medium"
-                            aria-label="Compare collections"
-                            onClick={() =>
-                              navigate(`/community/${profileUsername}/compare`)
-                            }
-                          >
-                            <CompareArrowsIcon />
-                          </IconButton>
-                        </Tooltip>
-                      ) : (
-                        <Tooltip title="Profile settings">
-                          <IconButton
-                            color="inherit"
-                            aria-label="Open profile settings"
-                            onClick={handleOpenProfileSettings}
-                          >
-                            <SettingsIcon />
-                          </IconButton>
-                        </Tooltip>
-                      )}
-                      <Tooltip title="View stats">
-                        <IconButton
-                          color="inherit"
-                          size="medium"
-                          aria-label="View stats"
-                          onClick={() =>
-                            navigate(`/community/${profileUsername}/stats`)
-                          }
-                        >
-                          <BarChartIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <ShareButton
-                        title={`${
-                          profile.displayName || profile.username
-                        }'s Profile`}
-                        text={`Check out ${
-                          profile.displayName || profile.username
-                        }'s profile!`}
-                      />
-                    </Box>
                     <Avatar
                       variant="rounded"
                       sx={{
@@ -554,7 +554,7 @@ export default function CommunityProfile() {
                     <Box>
                       <Typography
                         variant="h4"
-                        mt={{ xs: -2, sm: 0 }}
+                        mt={{ xs: -1, md: 0 }}
                         flexWrap={"wrap"}
                       >
                         {targetDisplayName}
@@ -580,7 +580,7 @@ export default function CommunityProfile() {
                           display: "flex",
                           gap: 0.5,
                           flexWrap: "wrap",
-                          mb: profile?.bio ? 1 : 0,
+                          mb: profile?.bio ? 1.5 : 0,
                         }}
                       >
                         {typeof profile?.isFollowing === "boolean" && (

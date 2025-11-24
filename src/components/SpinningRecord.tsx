@@ -14,8 +14,8 @@ export default function SpinningRecord({
     <Box
       sx={{
         position: "relative",
-        width: { xs: size * 0.8, sm: size },
-        height: { xs: size * 0.8, sm: size },
+        width: { xs: size * 0.85, sm: size },
+        height: { xs: size * 0.85, sm: size },
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -29,8 +29,8 @@ export default function SpinningRecord({
           alt="Album cover"
           sx={{
             position: "absolute",
-            width: { xs: size * 0.4, sm: size / 2 },
-            height: { xs: size * 0.4, sm: size / 2 },
+            width: { xs: size * 0.425, sm: size / 2 },
+            height: { xs: size * 0.425, sm: size / 2 },
             borderRadius: "50%",
             objectFit: "cover",
             zIndex: 1,
@@ -54,8 +54,8 @@ export default function SpinningRecord({
         alt="Vinyl record"
         sx={{
           position: "absolute",
-          width: { xs: size * 0.8, sm: size },
-          height: { xs: size * 0.8, sm: size },
+          width: { xs: size * 0.85, sm: size },
+          height: { xs: size * 0.85, sm: size },
           zIndex: 2,
           animation: "spin 3s linear infinite",
           "@keyframes spin": {
