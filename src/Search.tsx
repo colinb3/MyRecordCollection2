@@ -553,7 +553,8 @@ export default function Search() {
       <CssBaseline />
       <Box
         sx={{
-          p: { md: 1.5, xs: 1 },
+          px: { md: 1.5, xs: 1 },
+          pt: { md: 1.5, xs: 1 },
           height: "100vh",
           display: "flex",
           flexDirection: "column",
@@ -582,16 +583,9 @@ export default function Search() {
           onSearchChange={handleTopBarSearchChange}
           onSearchSubmit={handleTopBarSearchSubmit}
         />
-        <Box
-          sx={{
-            flex: 1,
-            overflowY: { xs: "auto", md: "hidden" },
-            pb: 3,
-            px: 1,
-            mt: 1,
-          }}
-        >
-          <Box maxWidth={860} mx="auto" sx={{ height: { xs: "100%" } }}>
+
+        <Box sx={{ flex: 1, overflowY: "hidden", pb: 3, px: 1 }}>
+          <Box maxWidth={860} mx="auto" sx={{ mt: 1, height: { xs: "100%" } }}>
             <Paper
               variant="outlined"
               sx={{

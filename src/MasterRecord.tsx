@@ -1289,7 +1289,8 @@ export default function MasterRecord() {
       <CssBaseline />
       <Box
         sx={{
-          p: { md: 1.5, xs: 1 },
+          px: { md: 1.5, xs: 1 },
+          pt: { md: 1.5, xs: 1 },
           height: "100vh",
           display: "flex",
           flexDirection: "column",
@@ -1306,8 +1307,9 @@ export default function MasterRecord() {
           sx={{
             flex: 1,
             overflowY: { xs: "auto", md: "auto" },
-            mt: 1,
+            pt: 1,
             px: 1,
+            pb: 3,
           }}
         >
           <Box

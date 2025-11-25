@@ -51,7 +51,7 @@ function SectionCard({ title, children }: SectionCardProps) {
     <Paper
       sx={{
         p: { xs: 2, md: 3 },
-        borderRadius: 2,
+        borderRadius: 1,
         display: "flex",
         flexDirection: "column",
         gap: 2,
@@ -359,7 +359,8 @@ export default function CommunityProfile() {
           height: "100vh",
           display: "flex",
           flexDirection: "column",
-          p: { md: 1.5, xs: 1 },
+          px: { md: 1.5, xs: 1 },
+          pt: { md: 1.5, xs: 1 },
           boxSizing: "border-box",
         }}
       >
@@ -370,7 +371,7 @@ export default function CommunityProfile() {
           profilePicUrl={profilePicUrl ?? undefined}
           onLogout={handleLogout}
         />
-        <Box sx={{ flex: 1, overflowY: "auto", pb: 3, px: 1 }}>
+        <Box sx={{ flex: 1, overflowY: "auto", pb: 4, px: 1 }}>
           <Box maxWidth={860} mx="auto" sx={{ mt: 1 }}>
             <Paper
               variant="outlined"

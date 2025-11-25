@@ -919,7 +919,6 @@ export default function CollectionSettings() {
         </Typography>
       </Box>
       <Paper
-        variant="outlined"
         sx={{
           p: 3,
           mb: 2,

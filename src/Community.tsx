@@ -477,7 +477,8 @@ export default function Community() {
           height: "100vh",
           display: "flex",
           flexDirection: "column",
-          p: { md: 1.5, xs: 1 },
+          px: { md: 1.5, xs: 1 },
+          pt: { md: 1.5, xs: 1 },
           boxSizing: "border-box",
         }}
       >
@@ -491,10 +492,6 @@ export default function Community() {
         <Box
           sx={{
             flex: 1,
-            /* Keep outer container non-scrolling so the inner Paper/List
-               always owns scrolling. Previously xs allowed the page-level
-               scrollbar which moved the scrollbar outside the activity
-               Paper on small screens. Force hidden at all sizes. */
             overflowY: "hidden",
             pb: 3,
             px: 1,

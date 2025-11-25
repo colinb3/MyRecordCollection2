@@ -1187,7 +1187,7 @@ export default function ProfileSettings({
               You haven&apos;t selected any highlights yet.
             </Typography>
           ) : (
-            <Stack spacing={1}>
+            <Stack spacing={1.5}>
               {highlightRecords.map((record, index) => {
                 const coverUrl =
                   typeof record.cover === "string" && record.cover.trim()
@@ -1196,9 +1196,9 @@ export default function ProfileSettings({
                 return (
                   <Paper
                     key={record.id}
-                    variant="outlined"
                     sx={{
-                      p: 2,
+                      px: 2,
+                      py: 1.5,
                       borderRadius: 2,
                     }}
                   >
@@ -1313,14 +1313,14 @@ export default function ProfileSettings({
         {listeningTo && (
           <Paper
             sx={{
-              p: 2,
+              px: 2,
+              py: 1.5,
               mb: 2,
               display: "flex",
               alignItems: "center",
               gap: 2,
               borderRadius: 2,
             }}
-            variant="outlined"
           >
             {listeningTo.cover && (
               <Avatar

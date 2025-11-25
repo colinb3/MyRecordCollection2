@@ -975,7 +975,8 @@ export default function ListDetail() {
       <CssBaseline />
       <Box
         sx={{
-          p: { md: 1.5, xs: 1 },
+          px: { md: 1.5, xs: 1 },
+          pt: { md: 1.5, xs: 1 },
           height: "100vh",
           display: "flex",
           flexDirection: "column",
@@ -989,7 +990,7 @@ export default function ListDetail() {
           profilePicUrl={profilePicUrl ?? undefined}
           searchPlaceholder="Search..."
         />
-        <Box sx={{ flex: 1, overflowY: "auto", pb: 3, px: 1 }}>
+        <Box sx={{ flex: 1, overflowY: "auto", pb: 4, px: 1 }}>
           <Box maxWidth={860} mx="auto" sx={{ mt: 1 }}>
             <Paper
               variant="outlined"

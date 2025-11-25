@@ -21,6 +21,7 @@ import editViewImg from "./assets/editview.png";
 import activityViewImg from "./assets/activityview.png";
 import profileViewImg from "./assets/profileview.png";
 import listViewImg from "./assets/listview.png";
+import statsViewImg from "./assets/statsview.png";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import LibraryMusicIcon from "@mui/icons-material/LibraryMusic";
 import FilterAltIcon from "@mui/icons-material/FilterAlt";
@@ -73,19 +74,6 @@ export default function LandingPage() {
           "Preview of the edit dialog showcasing quick tagging workflows",
       },
       {
-        title: "Create lists to share your favourites",
-        caption:
-          "Curate custom lists of records for any occasion—whether it's your top 10 jazz albums or the ultimate road trip vibes.",
-        bullets: [
-          "Shareable public lists or keep them private for your own enjoyment",
-          "Reorder records in a list with drag-and-drop ease",
-          "Easily find popular lists made by others",
-        ],
-        image: listViewImg,
-        imageAlt:
-          "Preview of the Discogs import dialog with progress and summaries",
-      },
-      {
         title: "Create your profile and connect with friends",
         caption:
           "Show off your music taste and see what your friends are listening to.",
@@ -99,6 +87,19 @@ export default function LandingPage() {
           "Preview of the profile page showing user info and featured records",
       },
       {
+        title: "Create lists to share your favourites",
+        caption:
+          "Curate custom lists of records for any occasion—whether it's your top 10 jazz albums or the ultimate road trip vibes.",
+        bullets: [
+          "Shareable public lists or keep them private for your own enjoyment",
+          "Reorder records in a list with drag-and-drop ease",
+          "Easily find popular lists made by others",
+        ],
+        image: listViewImg,
+        imageAlt:
+          "Preview of the Discogs import dialog with progress and summaries",
+      },
+      {
         title: "Keep up with your friends' activity",
         caption: "See what your friends are adding, reviewing, and liking.",
         bullets: [
@@ -108,6 +109,17 @@ export default function LandingPage() {
         ],
         image: activityViewImg,
         imageAlt: "Preview of the activity feed showing recent user actions",
+      },
+      {
+        title: "Detailed stats about your collection",
+        caption: "Easily see what your favourite genres are.",
+        bullets: [
+          "View a graphical breakdown of your collection by genre",
+          "See what genres you rate the highest",
+          "Compare your collection stats with others to see how your tastes differ",
+        ],
+        image: statsViewImg,
+        imageAlt: "Preview of the stats view showing user stats",
       },
     ],
     []
@@ -280,6 +292,7 @@ export default function LandingPage() {
                 <Stack spacing={3}>
                   <Typography
                     variant="h2"
+                    fontSize={{ xs: "3rem", md: "3.5rem" }}
                     fontWeight={700}
                     textAlign={{ xs: "center", md: "left" }}
                   >
@@ -287,6 +300,7 @@ export default function LandingPage() {
                   </Typography>
                   <Typography
                     variant="h6"
+                    fontSize={{ xs: "1.2rem", md: "1.3rem" }}
                     color="grey.300"
                     maxWidth={600}
                     textAlign={{ xs: "center", md: "left" }}

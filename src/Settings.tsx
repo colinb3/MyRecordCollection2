@@ -163,7 +163,8 @@ export default function Settings() {
       <CssBaseline />
       <Box
         sx={{
-          p: { md: 1.5, xs: 1 },
+          px: { md: 1.5, xs: 1 },
+          pt: { md: 1.5, xs: 1 },
           height: "100vh",
           boxSizing: "border-box",
           display: "flex",
@@ -179,8 +180,8 @@ export default function Settings() {
           profilePicUrl={profilePicUrl ?? undefined}
         />
 
-        <Box sx={{ flex: 1, overflowY: "auto", pb: 3, px: 1 }}>
-          <Box maxWidth={860} mx="auto" sx={{ mt: 1 }}>
+        <Box sx={{ flex: 1, overflowY: "auto", pb: 4, px: 1 }}>
+          <Box maxWidth={860} mx="auto" sx={{ mt: { xs: 0, md: 1 } }}>
             {!isLargeScreen && (
               <Box
                 sx={{
@@ -192,7 +193,7 @@ export default function Settings() {
                   top: 0,
                   bgcolor: "background.default",
                   zIndex: 10,
-                  py: 1,
+                  py: 0,
                   mx: -1,
                   px: 1,
                 }}
@@ -212,6 +213,7 @@ export default function Settings() {
               {isLargeScreen && (
                 <Grid size={{ md: 3 }}>
                   <Paper
+                    variant="outlined"
                     sx={{
                       p: 1,
                       borderRadius: 2,
@@ -229,6 +231,7 @@ export default function Settings() {
               )}
               <Grid size={{ md: 9, xs: 12 }}>
                 <Paper
+                  variant="outlined"
                   sx={{
                     p: 3,
                     borderRadius: 2,

@@ -566,7 +566,8 @@ export default function RecordDetails() {
       <CssBaseline />
       <Box
         sx={{
-          p: { md: 1.5, xs: 1 },
+          px: { md: 1.5, xs: 1 },
+          pt: { md: 1.5, xs: 1 },
           height: "100vh",
           display: "flex",
           flexDirection: "column",
@@ -580,22 +581,9 @@ export default function RecordDetails() {
           profilePicUrl={profilePicUrl ?? undefined}
           onLogout={handleLogout}
         />
-        <Box
-          component="main"
-          sx={{
-            flex: 1,
-            minHeight: 0,
-            overflowY: { xs: "auto", md: "auto" },
-            mt: 1,
-            pb: 2,
-            px: 1,
-          }}
-        >
-          <Box
-            maxWidth={860}
-            mx="auto"
-            sx={{ height: { md: "100%" }, pb: { xs: 4, sm: 0 } }}
-          >
+
+        <Box sx={{ flex: 1, overflowY: "auto", pb: 4, px: 1 }}>
+          <Box maxWidth={860} mx="auto" sx={{ mt: 1 }}>
             <Stack spacing={3}>
               {loadingRecord ? (
                 <Box

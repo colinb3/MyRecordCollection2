@@ -163,7 +163,8 @@ export default function CommunityFollows() {
           height: "100vh",
           display: "flex",
           flexDirection: "column",
-          p: { md: 1.5, xs: 1 },
+          px: { md: 1.5, xs: 1 },
+          pt: { md: 1.5, xs: 1 },
           boxSizing: "border-box",
         }}
       >
@@ -174,7 +175,7 @@ export default function CommunityFollows() {
           profilePicUrl={profilePicUrl ?? undefined}
           onLogout={handleLogout}
         />
-        <Box sx={{ flex: 1, overflowY: "auto", pb: 3, px: 1 }}>
+        <Box sx={{ flex: 1, overflowY: "auto", pb: 4, px: 1 }}>
           <Box maxWidth={720} mx="auto" sx={{ mt: 1 }}>
             <Box display={"flex"} alignItems="center" gap={1.5} mb={1} ml={1}>
               <Avatar

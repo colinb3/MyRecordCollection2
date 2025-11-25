@@ -482,7 +482,8 @@ export default function MasterReviews() {
       <CssBaseline />
       <Box
         sx={{
-          p: { md: 1.5, xs: 1 },
+          px: { md: 1.5, xs: 1 },
+          pt: { md: 1.5, xs: 1 },
           height: "100vh",
           display: "flex",
           flexDirection: "column",
@@ -496,19 +497,9 @@ export default function MasterReviews() {
           displayName={displayName}
           profilePicUrl={profilePicUrl ?? undefined}
         />
-        <Box
-          sx={{
-            flex: 1,
-            overflowY: { xs: "auto", md: "auto" },
-            mt: 1,
-            px: 1,
-          }}
-        >
-          <Box
-            maxWidth={860}
-            mx="auto"
-            sx={{ height: { md: "100%" }, pb: { xs: 4, sm: 0 } }}
-          >
+
+        <Box sx={{ flex: 1, overflowY: "auto", pb: 4, px: 1 }}>
+          <Box maxWidth={860} mx="auto" sx={{ mt: 1 }}>
             <Paper
               variant="outlined"
               sx={{
