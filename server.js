@@ -37,6 +37,12 @@ app.use(cors({
 app.use(cookieParser());
 app.use("/uploads", express.static(uploadsRoot));
 
+// Serve robots.txt for API subdomain
+app.get("/robots.txt", (_req, res) => {
+  res.type("text/plain");
+  res.send("User-agent: *\nDisallow: /\n");
+});
+
 const PORT = Number(process.env.PORT || 4000);
 // bind to 0.0.0.0 so the server is reachable from other machines (GCE VM)
 const HOST = process.env.HOST || '0.0.0.0';
