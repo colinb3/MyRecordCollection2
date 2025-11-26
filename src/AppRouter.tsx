@@ -1,6 +1,5 @@
 import {
   BrowserRouter,
-  HashRouter,
   Routes,
   Route,
   Navigate,
@@ -52,12 +51,9 @@ function RedirectIfAuthed({ children }: { children: React.ReactNode }) {
 }
 
 export default function AppRouter() {
-  // Use HashRouter for production (GitHub Pages) to avoid 404s on page reloads.
-  // Keep BrowserRouter for development for nicer URLs.
-  const Router = import.meta.env.PROD ? HashRouter : BrowserRouter;
-  // Only apply basename for BrowserRouter
-  const routerProps =
-    Router === BrowserRouter ? { basename: import.meta.env.BASE_URL } : {};
+  // Use BrowserRouter for clean URLs now that we have 404.html redirect
+  const Router = BrowserRouter;
+  const routerProps = { basename: import.meta.env.BASE_URL };
   return (
     <Router {...routerProps}>
       <Routes>

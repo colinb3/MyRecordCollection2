@@ -43,6 +43,17 @@
       }
     </style>
     <title>My Record Collection</title>
+    <script>
+      // GitHub Pages SPA redirect handler
+      // Restore the path that was stored in 404.html
+      (function() {
+        var redirect = sessionStorage.redirect;
+        delete sessionStorage.redirect;
+        if (redirect && redirect !== location.href) {
+          history.replaceState(null, null, redirect);
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
