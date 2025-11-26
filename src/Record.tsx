@@ -91,7 +91,7 @@ export default function RecordDetails() {
     if (!username) {
       return baseUrl;
     }
-    return `${baseUrl}/#/community/${username}/record/${recordIdNumber}`;
+    return `${baseUrl}/community/${username}/record/${recordIdNumber}`;
   }, [username, recordIdNumber]);
 
   const recordCoverUrl =
