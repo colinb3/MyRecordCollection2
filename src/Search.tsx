@@ -585,7 +585,7 @@ export default function Search() {
         />
 
         <Box sx={{ flex: 1, overflowY: "hidden", pb: 3, px: 1 }}>
-          <Box maxWidth={860} mx="auto" sx={{ mt: 1, height: { xs: "100%" } }}>
+          <Box maxWidth={860} mx="auto" sx={{ mt: 1, height: "100%" }}>
             <Paper
               variant="outlined"
               sx={{

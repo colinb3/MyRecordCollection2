@@ -46,7 +46,7 @@
     <script>
       // GitHub Pages SPA redirect handler
       // Restore the path that was stored in 404.html
-      (function() {
+      (function () {
         var redirect = sessionStorage.redirect;
         delete sessionStorage.redirect;
         if (redirect && redirect !== location.href) {

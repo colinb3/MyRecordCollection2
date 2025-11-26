@@ -260,3 +260,12 @@ export interface UserFollowLists {
   followers: CommunityUserSummary[];
   following: CommunityUserSummary[];
 }
+
+export interface PaginatedUserFollowLists {
+  followers: CommunityUserSummary[];
+  following: CommunityUserSummary[];
+  followersTotal: number;
+  followingTotal: number;
+  followersHasMore: boolean;
+  followingHasMore: boolean;
+}

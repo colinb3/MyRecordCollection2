@@ -108,16 +108,16 @@ export default function Collection({ tableName, title }: CollectionProps) {
     }
     // Use clean routes without query parameters
     if (tableName === "My Collection") {
-      return `${baseUrl}/#/community/${username}/collection`;
+      return `${baseUrl}/community/${username}/collection`;
     }
     if (tableName === "Wishlist") {
-      return `${baseUrl}/#/community/${username}/wishlist`;
+      return `${baseUrl}/community/${username}/wishlist`;
     }
     if (tableName === "Listened") {
-      return `${baseUrl}/#/community/${username}/listened`;
+      return `${baseUrl}/community/${username}/listened`;
     }
     // Fallback for any custom table names (though unlikely in practice)
-    return `${baseUrl}/#/community/${username}/collection`;
+    return `${baseUrl}/community/${username}/collection`;
   }, [username, tableName]);
 
   const [selectedRecord, setSelectedRecord] = useState<Record | null>(null);

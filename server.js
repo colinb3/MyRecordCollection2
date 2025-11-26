@@ -372,31 +372,41 @@ async function getUserByUsername(pool, username) {
   return rows[0];
 }
 
-async function getFollowersForUser(pool, userUuid) {
-  const [rows] = await pool.query(
-    `SELECT follower.username, follower.displayName, follower.profilePic,
+async function getFollowersForUser(pool, userUuid, limit = null, offset = 0) {
+  let query = `SELECT follower.username, follower.displayName, follower.profilePic,
             (SELECT COUNT(*) FROM Follows WHERE followsUuid = follower.uuid) AS followersCount,
             (SELECT COUNT(*) FROM Follows WHERE userUuid = follower.uuid) AS followingCount
      FROM Follows f
      JOIN User follower ON f.userUuid = follower.uuid
      WHERE f.followsUuid = ?
-     ORDER BY follower.username`,
-    [userUuid]
-  );
+     ORDER BY follower.username`;
+  
+  const params = [userUuid];
+  if (limit !== null) {
+    query += ` LIMIT ? OFFSET ?`;
+    params.push(limit, offset);
+  }
+  
+  const [rows] = await pool.query(query, params);
   return rows.map(mapCommunityUserSummary);
 }
 
-async function getFollowingForUser(pool, userUuid) {
-  const [rows] = await pool.query(
-    `SELECT following.username, following.displayName, following.profilePic,
+async function getFollowingForUser(pool, userUuid, limit = null, offset = 0) {
+  let query = `SELECT following.username, following.displayName, following.profilePic,
             (SELECT COUNT(*) FROM Follows WHERE followsUuid = following.uuid) AS followersCount,
             (SELECT COUNT(*) FROM Follows WHERE userUuid = following.uuid) AS followingCount
      FROM Follows f
      JOIN User following ON f.followsUuid = following.uuid
      WHERE f.userUuid = ?
-     ORDER BY following.username`,
-    [userUuid]
-  );
+     ORDER BY following.username`;
+  
+  const params = [userUuid];
+  if (limit !== null) {
+    query += ` LIMIT ? OFFSET ?`;
+    params.push(limit, offset);
+  }
+  
+  const [rows] = await pool.query(query, params);
   return rows.map(mapCommunityUserSummary);
 }
 
@@ -2659,6 +2669,10 @@ app.get(
       return res.status(400).json({ error: "Username is required" });
     }
 
+    const limit = req.query.limit ? Number.parseInt(req.query.limit, 10) : null;
+    const followersOffset = req.query.followersOffset ? Number.parseInt(req.query.followersOffset, 10) : 0;
+    const followingOffset = req.query.followingOffset ? Number.parseInt(req.query.followingOffset, 10) : 0;
+
     try {
       const pool = await getPool();
       const userRow = await getUserByUsername(pool, targetUsername);
@@ -2666,12 +2680,29 @@ app.get(
         return res.status(404).json({ error: "User not found" });
       }
 
+      // Get total counts
+      const [[{ followersTotal }]] = await pool.query(
+        `SELECT COUNT(*) as followersTotal FROM Follows WHERE followsUuid = ?`,
+        [userRow.uuid]
+      );
+      const [[{ followingTotal }]] = await pool.query(
+        `SELECT COUNT(*) as followingTotal FROM Follows WHERE userUuid = ?`,
+        [userRow.uuid]
+      );
+
       const [followers, following] = await Promise.all([
-        getFollowersForUser(pool, userRow.uuid),
-        getFollowingForUser(pool, userRow.uuid),
+        getFollowersForUser(pool, userRow.uuid, limit, followersOffset),
+        getFollowingForUser(pool, userRow.uuid, limit, followingOffset),
       ]);
 
-      res.json({ followers, following });
+      res.json({ 
+        followers, 
+        following,
+        followersTotal: Number(followersTotal),
+        followingTotal: Number(followingTotal),
+        followersHasMore: limit !== null && followersOffset + followers.length < followersTotal,
+        followingHasMore: limit !== null && followingOffset + following.length < followingTotal
+      });
     } catch (error) {
       console.error("Failed to load follows", error);
       res.status(500).json({ error: "Failed to load follows" });

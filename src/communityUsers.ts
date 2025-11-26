@@ -6,6 +6,7 @@ import type {
   PublicUserProfile,
   Record as MrcRecord,
   UserFollowLists,
+  PaginatedUserFollowLists,
 } from "./types";
 
 type AnyObject = { [key: string]: unknown };
@@ -977,6 +978,61 @@ export async function loadUserFollows(username: string): Promise<UserFollowLists
 
   followsInFlight.set(normalizedUser, fetchPromise);
   return fetchPromise;
+}
+
+export async function loadUserFollowsPaginated(
+  username: string,
+  limit: number,
+  followersOffset: number,
+  followingOffset: number
+): Promise<PaginatedUserFollowLists> {
+  const normalizedUser = username.trim().toLowerCase();
+  if (!normalizedUser) {
+    const error: ApiError = new Error("Username is required");
+    error.status = 400;
+    throw error;
+  }
+
+  const params = new URLSearchParams();
+  params.set("limit", limit.toString());
+  params.set("followersOffset", followersOffset.toString());
+  params.set("followingOffset", followingOffset.toString());
+
+  const res = await fetch(
+    apiUrl(`/api/community/users/${username}/follows?${params.toString()}`),
+    {
+      credentials: "include",
+    }
+  );
+
+  if (!res.ok) {
+    const message = await res
+      .json()
+      .catch(() => ({}))
+      .then((data: AnyObject) =>
+        typeof data?.error === "string" ? data.error : "Failed to load follows"
+      );
+    const error: ApiError = new Error(message);
+    error.status = res.status;
+    throw error;
+  }
+
+  const data = (await res.json().catch(() => ({}))) as AnyObject;
+  const followersRaw = Array.isArray(data.followers) ? data.followers : [];
+  const followingRaw = Array.isArray(data.following) ? data.following : [];
+
+  return {
+    followers: followersRaw
+      .filter((item): item is AnyObject => isObject(item))
+      .map((item) => normalizeUserSummary(item)),
+    following: followingRaw
+      .filter((item): item is AnyObject => isObject(item))
+      .map((item) => normalizeUserSummary(item)),
+    followersTotal: normalizeCount(data.followersTotal),
+    followingTotal: normalizeCount(data.followingTotal),
+    followersHasMore: Boolean(data.followersHasMore),
+    followingHasMore: Boolean(data.followingHasMore),
+  };
 }
 
 export function clearCommunityCaches(): void {
