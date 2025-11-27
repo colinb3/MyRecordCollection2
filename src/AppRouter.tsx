@@ -315,6 +315,7 @@ function RouteTracker() {
         const q = (params.get("q") || "").trim();
         return q ? `${q} | ` : "Search | ";
       }
+      if (pathname === "/wishlist") return "My Collection | ";
       if (pathname === "/wishlist") return "Wishlist | ";
       if (pathname === "/listened") return "Listened | ";
       if (pathname === "/settings") return "Settings | ";
