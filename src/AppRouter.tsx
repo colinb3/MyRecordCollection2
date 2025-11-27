@@ -316,8 +316,8 @@ function RouteTracker() {
         return q ? `${q} | ` : "Search | ";
       }
       if (pathname === "/wishlist") return "My Collection | ";
-      if (pathname === "/wishlist") return "Wishlist | ";
-      if (pathname === "/listened") return "Listened | ";
+      if (pathname === "/wishlist") return "My Wishlist | ";
+      if (pathname === "/listened") return "My Listened | ";
       if (pathname === "/settings") return "Settings | ";
       if (pathname === "/admin") return "Admin | ";
       if (pathname === "/lists") return "Lists | ";
