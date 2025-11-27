@@ -18,6 +18,7 @@ import {
   Stack,
   CircularProgress,
   Divider,
+  Tooltip,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import AddBoxIcon from "@mui/icons-material/AddBox";
@@ -92,12 +93,21 @@ const LISTENED_COLLECTION_NAME = "Listened";
 
 function RatingsHistogram({ counts }: { counts: number[] }) {
   const [width, setWidth] = useState(window.innerWidth);
+  const [selectedBar, setSelectedBar] = useState<number | null>(null);
 
   useEffect(() => {
     const handleResize = () => setWidth(window.innerWidth);
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  useEffect(() => {
+    const handleClickOutside = () => setSelectedBar(null);
+    if (selectedBar !== null) {
+      document.addEventListener("click", handleClickOutside);
+      return () => document.removeEventListener("click", handleClickOutside);
+    }
+  }, [selectedBar]);
 
   if (!Array.isArray(counts) || counts.length === 0) {
     return null;
@@ -126,7 +136,8 @@ function RatingsHistogram({ counts }: { counts: number[] }) {
         {counts.map((count, index) => {
           const safeCount = Number.isFinite(count) && count > 0 ? count : 0;
           const ratio = safeCount / safeMax;
-          const barHeight = Math.max(Math.round(ratio * 80), 4);
+          const barHeight = Math.max(Math.round(ratio * 90), 5);
+          const isSelected = selectedBar === index;
           return (
             <Box
               key={index}
@@ -134,28 +145,42 @@ function RatingsHistogram({ counts }: { counts: number[] }) {
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
-                width: { xs: (width - 130) / 10, md: 28 },
+                width: { xs: (width - 130) / 10, md: 32 },
                 minWidth: 0,
+                position: "relative",
               }}
             >
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{ whiteSpace: "nowrap" }}
+              <Tooltip
+                title={
+                  <Typography
+                    variant="body1"
+                    sx={{ textAlign: "center" }}
+                    fontSize={"1.1em"}
+                  >
+                    {index + 1}/10
+                    <br />
+                    {safeCount} Rating{safeCount === 1 ? "" : "s"}
+                  </Typography>
+                }
+                open={isSelected}
               >
-                {safeCount}
-              </Typography>
-              <Box
-                sx={{
-                  width: "100%",
-                  height: `${barHeight}px`,
-                  bgcolor: "primary.main",
-                  borderRadius: 1,
-                  transition: "0.2s ease",
-                  mt: 0.5,
-                  ":hover": { bgcolor: "primary.dark" },
-                }}
-              />
+                <Box
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedBar(isSelected ? null : index);
+                  }}
+                  sx={{
+                    width: "100%",
+                    height: `${barHeight}px`,
+                    bgcolor: isSelected ? "primary.dark" : "primary.main",
+                    borderRadius: 1,
+                    transition: "0.2s ease",
+                    mt: 0.5,
+                    cursor: "pointer",
+                    ":hover": { bgcolor: "primary.dark" },
+                  }}
+                />
+              </Tooltip>
               <Typography
                 variant="caption"
                 color="text.secondary"
@@ -1329,9 +1354,10 @@ export default function MasterRecord() {
             >
               <Box
                 sx={{
-                  flexBasis: { md: "45%" },
+                  flexBasis: { md: "48%" },
                   flexGrow: 1,
                   p: { xs: 2, md: 3 },
+                  pr: { md: 1.5 },
                   display: "flex",
                   flexDirection: "column",
                 }}
@@ -1416,9 +1442,10 @@ export default function MasterRecord() {
               </Box>
               <Box
                 sx={{
-                  flexBasis: { md: "55%" },
+                  flexBasis: { md: "52%" },
                   flexGrow: 1,
                   p: { xs: 2, md: 3 },
+                  pl: { md: 2 },
                   mt: { xs: -1, md: 0 },
                   mb: { xs: 2, md: 0 },
                   maxHeight: { xs: 720, md: "none" },

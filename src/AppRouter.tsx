@@ -293,7 +293,9 @@ export default function AppRouter() {
 
 function RouteTracker() {
   const location = useLocation();
+
   useEffect(() => {
+    // Track page views (analytics) and set the document title
     (async () => {
       try {
         const mod = await import("./analytics");
@@ -304,6 +306,72 @@ function RouteTracker() {
         /* ignore analytics errors */
       }
     })();
+
+    const getTitleFromLocation = (pathname: string, search: string) => {
+      // Clean up and handle common routes
+      if (pathname === "/") return "";
+      if (pathname === "/search") {
+        const params = new URLSearchParams(search);
+        const q = (params.get("q") || "").trim();
+        return q ? `${q} | ` : "Search | ";
+      }
+      if (pathname === "/wishlist") return "Wishlist | ";
+      if (pathname === "/listened") return "Listened | ";
+      if (pathname === "/settings") return "Settings | ";
+      if (pathname === "/admin") return "Admin | ";
+      if (pathname === "/lists") return "Lists | ";
+
+      // Lists detail
+      let m = pathname.match(/^\/lists\/(.+)$/);
+      if (m) return `List ${decodeURIComponent(m[1])} | `;
+
+      // Master record pages
+      m = pathname.match(/^\/master\/(\d+)(?:\/reviews)?$/);
+      if (m) return `Master ${m[1]} | `;
+      // Record pages
+      m = pathname.match(/^\/record\/(\d+)$/);
+      if (m) return `Record ${m[1]} | `;
+      m = pathname.match(/^\/community\/([^\/]+)\/record\/(\d+)$/);
+      if (m) return `Record ${m[2]} | `;
+
+      // Community routes
+      m = pathname.match(
+        /^\/community(?:\/([^\/]+))(?:\/(collection|wishlist|listened|genre|follows|stats|compare))?$/
+      );
+      if (m) {
+        const username = m[1] ? decodeURIComponent(m[1]) : null;
+        const section = m[2] || null;
+        if (!username) return "Community | ";
+        switch (section) {
+          case "collection":
+            return `${username}'s Collection | `;
+          case "wishlist":
+            return `${username}'s Wishlist | `;
+          case "listened":
+            return `${username}'s Listened | `;
+          case "genre":
+            return `${username}'s Genre | `;
+          case "follows":
+            return `${username}'s Follows | `;
+          case "stats":
+            return `${username}'s Stats | `;
+          case "compare":
+            return `Compare with ${username} | `;
+          default:
+            return `${username}'s Profile | `;
+        }
+      }
+
+      // Fallback: use the pathname (trimmed)
+      const nice = pathname.replace(/^\//, "").replace(/\//g, " | ");
+      return nice
+        ? nice.charAt(0).toUpperCase() + nice.slice(1) + " | "
+        : "Page | ";
+    };
+
+    const pageTitle = getTitleFromLocation(location.pathname, location.search);
+    document.title = `${pageTitle}My Record Collection`;
   }, [location]);
+
   return null;
 }
