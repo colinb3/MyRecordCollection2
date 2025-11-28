@@ -5,7 +5,6 @@ import {
   DialogActions,
   Box,
   Typography,
-  Button,
   IconButton,
   MobileStepper,
 } from "@mui/material";
