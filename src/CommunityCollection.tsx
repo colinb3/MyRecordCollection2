@@ -457,6 +457,8 @@ export default function CommunityCollection({
                   onResetFilters={resetFilters}
                   tagsLoading={loading}
                   displayedRecords={filteredRecords}
+                  isLargeScreen={isLargeScreen}
+                  setSidebarOpen={setSidebarOpen}
                 />
               </Grid>
             )}
@@ -500,14 +502,9 @@ export default function CommunityCollection({
                   onResetFilters={resetFilters}
                   tagsLoading={loading}
                   displayedRecords={filteredRecords}
+                  isLargeScreen={isLargeScreen}
+                  setSidebarOpen={setSidebarOpen}
                 />
-                <Box sx={{ textAlign: "right" }}>
-                  <IconButton onClick={() => setSidebarOpen(false)}>
-                    <span style={{ fontSize: 24, fontWeight: "bold" }}>
-                      &times;
-                    </span>
-                  </IconButton>
-                </Box>
               </Drawer>
             </>
           )}
