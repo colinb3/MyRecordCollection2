@@ -12,10 +12,12 @@ import {
   Button,
   CircularProgress,
   Slider,
+  IconButton,
 } from "@mui/material";
 import { type Filters } from "../types";
 import ReplayOutlinedIcon from "@mui/icons-material/ReplayOutlined";
 import SettingsIcon from "@mui/icons-material/Settings";
+import CloseIcon from "@mui/icons-material/Close";
 
 const MIN_RELEASE_YEAR = 1901;
 const MAX_RELEASE_YEAR = 2100;
@@ -31,6 +33,8 @@ interface FilterSidebarProps {
   tagsLoading?: boolean;
   // The records currently displayed in the table - used to compute tag counts
   displayedRecords?: Array<{ tags: string[] }>;
+  isLargeScreen?: boolean;
+  setSidebarOpen: (open: boolean) => void;
 }
 
 export default function FilterSidebar({
@@ -41,6 +45,8 @@ export default function FilterSidebar({
   onOpenManageTags,
   tagsLoading = false,
   displayedRecords = [],
+  isLargeScreen,
+  setSidebarOpen,
 }: FilterSidebarProps) {
   // --- All internal state has been removed ---
 
@@ -64,8 +70,9 @@ export default function FilterSidebar({
         flexDirection: "column",
         height: "100%",
         minWidth: 280,
-        borderRadius: 2,
+        borderRadius: { xs: 0, lg: 2 },
         overflow: "hidden",
+        backgroundColor: "background.default",
       }}
     >
       <Box
@@ -215,12 +222,19 @@ export default function FilterSidebar({
       </Box>
       <Button
         variant="contained"
-        sx={{ m: 2, fontWeight: 700 }}
+        sx={{ mx: 2, mt: 1.5, mb: { xs: 1, lg: 2 }, fontWeight: 700 }}
         onClick={onResetFilters}
         endIcon={<ReplayOutlinedIcon />}
       >
         Reset Filters
       </Button>
+      {!isLargeScreen && (
+        <Box sx={{ textAlign: "right", pr: 2, pb: 1 }}>
+          <IconButton onClick={() => setSidebarOpen(false)}>
+            <CloseIcon />
+          </IconButton>
+        </Box>
+      )}
     </Paper>
   );
 }

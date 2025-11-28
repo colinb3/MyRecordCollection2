@@ -39,7 +39,7 @@ import { performLogout } from "./logout";
 // Import Components
 import TopBar from "./components/TopBar";
 import RecordTable from "./components/RecordTable";
-const FilterSidebar = lazy(() => import("./components/FilterSidebar"));
+import FilterSidebar from "./components/FilterSidebar";
 import ManageTagsDialog from "./components/ManageTagsDialog";
 import TutorialDialog from "./components/TutorialDialog";
 
@@ -504,17 +504,17 @@ export default function Collection({ tableName, title }: CollectionProps) {
           </Grid>
           {isLargeScreen && (
             <Grid size={{ xs: 3 }} sx={{ height: "100%", minHeight: 0 }}>
-              <Suspense fallback={<Box sx={{ p: 2 }}>Loading filters…</Box>}>
-                <FilterSidebar
-                  tags={allTags}
-                  currentFilters={filters}
-                  onFiltersChange={handleFilterChange}
-                  onResetFilters={resetFilters}
-                  onOpenManageTags={() => setManageTagsOpen(true)}
-                  tagsLoading={loading}
-                  displayedRecords={filteredRecords}
-                />
-              </Suspense>
+              <FilterSidebar
+                tags={allTags}
+                currentFilters={filters}
+                onFiltersChange={handleFilterChange}
+                onResetFilters={resetFilters}
+                onOpenManageTags={() => setManageTagsOpen(true)}
+                tagsLoading={loading}
+                displayedRecords={filteredRecords}
+                isLargeScreen={isLargeScreen}
+                setSidebarOpen={setSidebarOpen}
+              />
             </Grid>
           )}
         </Grid>
@@ -567,24 +567,17 @@ export default function Collection({ tableName, title }: CollectionProps) {
               },
             }}
           >
-            <Suspense fallback={<Box sx={{ p: 2 }}>Loading filters…</Box>}>
-              <FilterSidebar
-                tags={allTags}
-                currentFilters={filters}
-                onFiltersChange={handleFilterChange}
-                onResetFilters={resetFilters}
-                onOpenManageTags={() => setManageTagsOpen(true)}
-                tagsLoading={loading}
-                displayedRecords={filteredRecords}
-              />
-            </Suspense>
-            <Box sx={{ textAlign: "right", p: 1 }}>
-              <IconButton onClick={() => setSidebarOpen(false)}>
-                <span style={{ fontSize: 24, fontWeight: "bold" }}>
-                  &times;
-                </span>
-              </IconButton>
-            </Box>
+            <FilterSidebar
+              tags={allTags}
+              currentFilters={filters}
+              onFiltersChange={handleFilterChange}
+              onResetFilters={resetFilters}
+              onOpenManageTags={() => setManageTagsOpen(true)}
+              tagsLoading={loading}
+              displayedRecords={filteredRecords}
+              isLargeScreen={isLargeScreen}
+              setSidebarOpen={setSidebarOpen}
+            />
           </Drawer>
         )}
         <ManageTagsDialog

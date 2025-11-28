@@ -18,6 +18,10 @@ import {
   IconButton,
   Tooltip,
   Stack,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
 } from "@mui/material";
 import { useNavigate, useParams } from "react-router-dom";
 import TopBar from "./components/TopBar";
@@ -37,7 +41,11 @@ import CompareArrowsIcon from "@mui/icons-material/CompareArrows";
 import BarChartIcon from "@mui/icons-material/BarChart";
 import ShareButton from "./components/ShareButton";
 import VisibilityIcon from "@mui/icons-material/Visibility";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
+import ShareIcon from "@mui/icons-material/Share";
+import FlagIcon from "@mui/icons-material/Flag";
 import { performLogout } from "./logout";
+import ReportDialog from "./components/ReportDialog";
 
 const OWN_PREVIEW_LIMIT = 3;
 
@@ -90,6 +98,8 @@ export default function CommunityProfile() {
   const [error, setError] = useState<string | null>(null);
   const [followPending, setFollowPending] = useState<boolean>(false);
   const [followError, setFollowError] = useState<string | null>(null);
+  const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
+  const [reportDialogOpen, setReportDialogOpen] = useState<boolean>(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -449,17 +459,7 @@ export default function CommunityProfile() {
                               <CompareArrowsIcon />
                             </IconButton>
                           </Tooltip>
-                        ) : (
-                          <Tooltip title="Profile settings">
-                            <IconButton
-                              color="inherit"
-                              aria-label="Open profile settings"
-                              onClick={handleOpenProfileSettings}
-                            >
-                              <SettingsIcon />
-                            </IconButton>
-                          </Tooltip>
-                        )}
+                        ) : null}
                         <Tooltip title="View stats">
                           <IconButton
                             color="inherit"
@@ -472,14 +472,85 @@ export default function CommunityProfile() {
                             <BarChartIcon />
                           </IconButton>
                         </Tooltip>
-                        <ShareButton
-                          title={`${
-                            profile.displayName || profile.username
-                          }'s Profile`}
-                          text={`Check out ${
-                            profile.displayName || profile.username
-                          }'s profile!`}
-                        />
+
+                        <IconButton
+                          color="inherit"
+                          size="medium"
+                          aria-label="More options"
+                          onClick={(e) => setMenuAnchor(e.currentTarget)}
+                        >
+                          <MoreVertIcon />
+                        </IconButton>
+                        <Menu
+                          anchorEl={menuAnchor}
+                          open={Boolean(menuAnchor)}
+                          onClose={() => setMenuAnchor(null)}
+                          anchorOrigin={{
+                            vertical: "bottom",
+                            horizontal: "right",
+                          }}
+                          transformOrigin={{
+                            vertical: "top",
+                            horizontal: "right",
+                          }}
+                        >
+                          <MenuItem
+                            onClick={() => {
+                              setMenuAnchor(null);
+                              if (navigator.share) {
+                                navigator
+                                  .share({
+                                    title: `${
+                                      profile.displayName || profile.username
+                                    }'s Profile`,
+                                    text: `Check out ${
+                                      profile.displayName || profile.username
+                                    }'s profile!`,
+                                    url: window.location.href,
+                                  })
+                                  .catch(() => {});
+                              } else {
+                                navigator.clipboard.writeText(
+                                  window.location.href
+                                );
+                              }
+                            }}
+                          >
+                            <ListItemIcon>
+                              <ShareIcon fontSize="small" />
+                            </ListItemIcon>
+                            <ListItemText>Share</ListItemText>
+                          </MenuItem>
+                          {isViewingOwnProfile ? (
+                            <Tooltip title="Profile settings">
+                              <MenuItem
+                                onClick={() => {
+                                  setMenuAnchor(null);
+                                  handleOpenProfileSettings();
+                                }}
+                              >
+                                <ListItemIcon>
+                                  <SettingsIcon fontSize="small" />
+                                </ListItemIcon>
+                                <ListItemText>Profile Settings</ListItemText>
+                              </MenuItem>
+                            </Tooltip>
+                          ) : (
+                            username && (
+                              <MenuItem
+                                onClick={() => {
+                                  setMenuAnchor(null);
+                                  setReportDialogOpen(true);
+                                }}
+                              >
+                                <ListItemIcon>
+                                  <FlagIcon fontSize="small" />
+                                </ListItemIcon>
+                                <ListItemText>Report</ListItemText>
+                              </MenuItem>
+                            )
+                          )}
+                        </Menu>
                       </Box>
 
                       {profile.listeningTo && profile.listeningTo.masterId && (
@@ -835,6 +906,14 @@ export default function CommunityProfile() {
           </Box>
         </Box>
       </Box>
+
+      <ReportDialog
+        open={reportDialogOpen}
+        onClose={() => setReportDialogOpen(false)}
+        type="user"
+        targetId={profileUsername}
+        targetName={profile?.displayName || profileUsername}
+      />
     </ThemeProvider>
   );
 }

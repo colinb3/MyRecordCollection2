@@ -120,6 +120,7 @@ export interface UserInfo {
   joinedDate: string | null;
   isAdmin: boolean;
   adminPermissions: AdminPermissions;
+  hasPendingReports: boolean;
 }
 
 export interface ProfileHighlights {

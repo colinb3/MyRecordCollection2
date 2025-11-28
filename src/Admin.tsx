@@ -29,15 +29,21 @@ import {
   TableContainer,
   Chip,
   Tooltip,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Pagination,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import SecurityIcon from "@mui/icons-material/Security";
+import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 
 import TopBar from "./components/TopBar";
 import { darkTheme } from "./theme";
 import apiUrl from "./api";
-import { getCachedUserInfo, loadUserInfo } from "./userInfo";
+import { getCachedUserInfo, setCachedUserInfo, loadUserInfo } from "./userInfo";
 import { setUserId } from "./analytics";
 import type { AdminPermissions } from "./types";
 import { performLogout } from "./logout";
@@ -54,6 +60,7 @@ type AdminTabKey =
   | "masters"
   | "tags"
   | "lists"
+  | "reports"
   | "fixcovers";
 
 const TAB_OPTIONS: { label: string; value: AdminTabKey }[] = [
@@ -62,6 +69,7 @@ const TAB_OPTIONS: { label: string; value: AdminTabKey }[] = [
   { label: "Masters", value: "masters" },
   { label: "Tags", value: "tags" },
   { label: "Lists", value: "lists" },
+  { label: "Reports", value: "reports" },
   { label: "Fix Covers", value: "fixcovers" },
 ];
 
@@ -151,6 +159,20 @@ type AdminListRecord = {
   isCustom: boolean;
   masterId: number | null;
   sortOrder: number | null;
+};
+
+type AdminReport = {
+  id: number;
+  type: "general" | "user" | "record" | "master" | "list";
+  reportedByUsername: string | null;
+  reason: string;
+  userNotes: string | null;
+  created: string | null;
+  status: string;
+  adminNotes: string | null;
+  targetId: number | null;
+  targetName: string | null;
+  targetUsername: string | null;
 };
 
 function toDateTimeLocal(value: string | null): string {
@@ -2523,6 +2545,503 @@ function ListsTab() {
   );
 }
 
+const REPORT_STATUS_OPTIONS = ["Pending", "Reviewed", "Resolved", "Dismissed"];
+const REPORT_TYPE_OPTIONS = [
+  { label: "All Types", value: "" },
+  { label: "General", value: "general" },
+  { label: "User", value: "user" },
+  { label: "Record", value: "record" },
+  { label: "Master", value: "master" },
+  { label: "List", value: "list" },
+];
+
+function ReportsTab() {
+  const navigate = useNavigate();
+  const [reports, setReports] = useState<AdminReport[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Filters - input is for the text field, filter is the committed value
+  const [typeFilter, setTypeFilter] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [reportedByInput, setReportedByInput] = useState<string>("");
+  const [reportedByFilter, setReportedByFilter] = useState<string>("");
+
+  // Edit dialog
+  const [editing, setEditing] = useState<AdminReport | null>(null);
+  const [editStatus, setEditStatus] = useState<string>("");
+  const [editAdminNotes, setEditAdminNotes] = useState<string>("");
+  const [saving, setSaving] = useState(false);
+
+  const fetchReports = useCallback(
+    async (pageNum: number) => {
+      setError(null);
+      setLoading(true);
+
+      try {
+        const params = new URLSearchParams();
+        params.set("page", String(pageNum));
+        if (typeFilter) params.set("type", typeFilter);
+        if (statusFilter) params.set("status", statusFilter);
+        if (reportedByFilter) params.set("reportedBy", reportedByFilter);
+
+        const response = await fetch(
+          apiUrl(`/api/admin/reports?${params.toString()}`),
+          { credentials: "include" }
+        );
+
+        let payload: unknown = null;
+        try {
+          payload = await response.json();
+        } catch {
+          payload = null;
+        }
+
+        if (!response.ok) {
+          const message = getErrorMessage(
+            payload,
+            `Failed to load reports (${response.status})`
+          );
+          throw new Error(message);
+        }
+
+        const body = (payload ?? {}) as {
+          reports?: AdminReport[];
+          total?: number;
+          page?: number;
+          totalPages?: number;
+        };
+        setReports(Array.isArray(body.reports) ? body.reports : []);
+        setTotal(typeof body.total === "number" ? body.total : 0);
+        setPage(typeof body.page === "number" ? body.page : 1);
+        setTotalPages(
+          typeof body.totalPages === "number" ? body.totalPages : 1
+        );
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load reports");
+        setReports([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [typeFilter, statusFilter, reportedByFilter]
+  );
+
+  useEffect(() => {
+    fetchReports(1);
+  }, [fetchReports]);
+
+  const applyReportedByFilter = useCallback(() => {
+    setReportedByFilter(reportedByInput.trim());
+  }, [reportedByInput]);
+
+  const handlePageChange = (
+    _event: React.ChangeEvent<unknown>,
+    value: number
+  ) => {
+    fetchReports(value);
+  };
+
+  useEffect(() => {
+    if (!editing) {
+      setEditStatus("");
+      setEditAdminNotes("");
+      return;
+    }
+    setEditStatus(editing.status);
+    setEditAdminNotes(editing.adminNotes ?? "");
+  }, [editing]);
+
+  const handleSave = async () => {
+    if (!editing) return;
+    setSaving(true);
+    setError(null);
+
+    try {
+      const response = await fetch(
+        apiUrl(`/api/admin/reports/${editing.type}/${editing.id}`),
+        {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            status: editStatus,
+            adminNotes: editAdminNotes.trim() || null,
+          }),
+        }
+      );
+
+      let payload: unknown = null;
+      try {
+        payload = await response.json();
+      } catch {
+        payload = null;
+      }
+
+      if (!response.ok) {
+        const message = getErrorMessage(
+          payload,
+          `Failed to update report (${response.status})`
+        );
+        throw new Error(message);
+      }
+
+      // Update hasPendingReports in cached user info
+      const responseBody = payload as { hasPendingReports?: boolean } | null;
+      if (responseBody && typeof responseBody.hasPendingReports === "boolean") {
+        const cachedInfo = getCachedUserInfo();
+        if (cachedInfo) {
+          setCachedUserInfo({
+            ...cachedInfo,
+            hasPendingReports: responseBody.hasPendingReports,
+          });
+        }
+      }
+
+      // Update the report in the list
+      setReports((prev) =>
+        prev.map((r) =>
+          r.id === editing.id && r.type === editing.type
+            ? {
+                ...r,
+                status: editStatus,
+                adminNotes: editAdminNotes.trim() || null,
+              }
+            : r
+        )
+      );
+      setEditing(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update report");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const getTargetLink = (report: AdminReport): string | null => {
+    if (report.type === "user" && report.targetUsername) {
+      return `/community/${encodeURIComponent(report.targetUsername)}`;
+    }
+    if (report.type === "record" && report.targetId && report.targetUsername) {
+      return `/community/${encodeURIComponent(report.targetUsername)}/record/${
+        report.targetId
+      }`;
+    }
+    if (report.type === "master" && report.targetId) {
+      return `/master/${report.targetId}`;
+    }
+    if (report.type === "list" && report.targetId) {
+      return `/list/${report.targetId}`;
+    }
+    return null;
+  };
+
+  const getStatusColor = (
+    status: string
+  ): "default" | "warning" | "success" | "error" => {
+    switch (status) {
+      case "Pending":
+        return "warning";
+      case "Resolved":
+        return "success";
+      case "Dismissed":
+        return "error";
+      default:
+        return "default";
+    }
+  };
+
+  const getTypeLabel = (type: string): string => {
+    return type.charAt(0).toUpperCase() + type.slice(1);
+  };
+
+  return (
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      <Stack
+        direction={{ xs: "column", md: "row" }}
+        spacing={2}
+        alignItems="center"
+      >
+        <FormControl size="small" sx={{ minWidth: 140 }}>
+          <InputLabel>Type</InputLabel>
+          <Select
+            value={typeFilter}
+            label="Type"
+            onChange={(e) => setTypeFilter(e.target.value)}
+          >
+            {REPORT_TYPE_OPTIONS.map((opt) => (
+              <MenuItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+
+        <FormControl size="small" sx={{ minWidth: 140 }}>
+          <InputLabel>Status</InputLabel>
+          <Select
+            value={statusFilter}
+            label="Status"
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <MenuItem value="">All Statuses</MenuItem>
+            {REPORT_STATUS_OPTIONS.map((status) => (
+              <MenuItem key={status} value={status}>
+                {status}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+
+        <TextField
+          label="Reported By"
+          value={reportedByInput}
+          onChange={(e) => setReportedByInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              applyReportedByFilter();
+            }
+          }}
+          size="small"
+          sx={{ width: { xs: "100%", md: 200 } }}
+        />
+
+        <Button
+          variant="outlined"
+          onClick={() => {
+            setReportedByFilter(reportedByInput.trim());
+          }}
+          disabled={loading}
+        >
+          Refresh
+        </Button>
+
+        <Box sx={{ flexGrow: 1 }} />
+        <Typography variant="body2" sx={{ opacity: 0.8 }}>
+          {total} report{total !== 1 ? "s" : ""}
+        </Typography>
+      </Stack>
+
+      {error && <Alert severity="error">{error}</Alert>}
+
+      <TableContainer component={Paper} sx={{ maxHeight: 500 }}>
+        <Table stickyHeader size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell>ID</TableCell>
+              <TableCell>Type</TableCell>
+              <TableCell>Reported By</TableCell>
+              <TableCell>Target</TableCell>
+              <TableCell>Reason</TableCell>
+              <TableCell>Notes</TableCell>
+              <TableCell>Created</TableCell>
+              <TableCell>Status</TableCell>
+              <TableCell align="right">Actions</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {reports.map((report) => {
+              const targetLink = getTargetLink(report);
+              return (
+                <TableRow hover key={`${report.type}-${report.id}`}>
+                  <TableCell>{report.id}</TableCell>
+                  <TableCell>
+                    <Chip
+                      label={getTypeLabel(report.type)}
+                      size="small"
+                      variant="outlined"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    {report.reportedByUsername ? (
+                      <Button
+                        size="small"
+                        onClick={() =>
+                          navigate(
+                            `/community/${encodeURIComponent(
+                              report.reportedByUsername!
+                            )}`
+                          )
+                        }
+                        sx={{ textTransform: "none", p: 0, minWidth: 0 }}
+                      >
+                        @{report.reportedByUsername}
+                      </Button>
+                    ) : (
+                      "—"
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {report.type === "general" ? (
+                      "—"
+                    ) : targetLink ? (
+                      <Stack direction="row" spacing={0.5} alignItems="center">
+                        <Button
+                          size="small"
+                          onClick={() => navigate(targetLink)}
+                          sx={{ textTransform: "none", p: 0, minWidth: 0 }}
+                          endIcon={<OpenInNewIcon fontSize="inherit" />}
+                        >
+                          {report.targetName ||
+                            report.targetUsername ||
+                            `ID: ${report.targetId}`}
+                        </Button>
+                      </Stack>
+                    ) : (
+                      report.targetName ||
+                      report.targetUsername ||
+                      `ID: ${report.targetId}` ||
+                      "—"
+                    )}
+                  </TableCell>
+                  <TableCell>{report.reason}</TableCell>
+                  <TableCell>
+                    {report.userNotes ? (
+                      <Tooltip title={report.userNotes}>
+                        <span style={{ cursor: "help" }}>
+                          {report.userNotes.length > 30
+                            ? report.userNotes.slice(0, 30) + "…"
+                            : report.userNotes}
+                        </span>
+                      </Tooltip>
+                    ) : (
+                      "—"
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {report.created
+                      ? new Date(report.created).toLocaleDateString()
+                      : "—"}
+                  </TableCell>
+                  <TableCell>
+                    <Chip
+                      label={report.status}
+                      size="small"
+                      color={getStatusColor(report.status)}
+                    />
+                  </TableCell>
+                  <TableCell align="right">
+                    <IconButton size="small" onClick={() => setEditing(report)}>
+                      <EditIcon fontSize="small" />
+                    </IconButton>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+            {!loading && reports.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={9} align="center">
+                  No reports found.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      {loading ? (
+        <Box sx={{ display: "flex", justifyContent: "center", py: 2 }}>
+          <CircularProgress size={28} />
+        </Box>
+      ) : (
+        totalPages > 1 && (
+          <Box sx={{ display: "flex", justifyContent: "center", py: 1 }}>
+            <Pagination
+              count={totalPages}
+              page={page}
+              onChange={handlePageChange}
+              color="primary"
+            />
+          </Box>
+        )
+      )}
+
+      <Dialog
+        open={Boolean(editing)}
+        onClose={() => (saving ? undefined : setEditing(null))}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Update Report</DialogTitle>
+        <DialogContent
+          sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}
+        >
+          {editing && (
+            <>
+              <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+                <Typography variant="body2">
+                  <strong>Type:</strong> {getTypeLabel(editing.type)}
+                </Typography>
+                <Typography variant="body2">
+                  <strong>Reported by:</strong> @
+                  {editing.reportedByUsername || "Unknown"}
+                </Typography>
+              </Box>
+              <Typography variant="body2">
+                <strong>Reason:</strong> {editing.reason}
+              </Typography>
+              {editing.userNotes && (
+                <Typography variant="body2">
+                  <strong>User notes:</strong> {editing.userNotes}
+                </Typography>
+              )}
+              {editing.targetName && (
+                <Typography variant="body2">
+                  <strong>Target:</strong> {editing.targetName}
+                </Typography>
+              )}
+              <FormControl size="small" fullWidth>
+                <InputLabel>Status</InputLabel>
+                <Select
+                  value={editStatus}
+                  label="Status"
+                  onChange={(e) => setEditStatus(e.target.value)}
+                >
+                  {REPORT_STATUS_OPTIONS.map((status) => (
+                    <MenuItem key={status} value={status}>
+                      {status}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <TextField
+                label="Admin Notes"
+                value={editAdminNotes}
+                onChange={(e) => setEditAdminNotes(e.target.value)}
+                multiline
+                minRows={2}
+                maxRows={4}
+                size="small"
+                sx={{
+                  "& .MuiInputBase-root": {
+                    height: "auto",
+                  },
+                }}
+              />
+            </>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setEditing(null)}
+            disabled={saving}
+            variant="outlined"
+          >
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={saving} variant="contained">
+            {saving ? "Saving…" : "Save"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+}
+
 function TagsTab() {
   const [searchInput, setSearchInput] = useState("");
   const [ownerInput, setOwnerInput] = useState("");
@@ -2915,6 +3434,8 @@ export default function Admin() {
         return <MastersTab />;
       case "lists":
         return <ListsTab />;
+      case "reports":
+        return <ReportsTab />;
       case "fixcovers":
         return <FixCoversTab />;
       case "tags":

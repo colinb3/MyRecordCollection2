@@ -19,6 +19,7 @@ import {
   CircularProgress,
   Divider,
   Tooltip,
+  IconButton,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import AddBoxIcon from "@mui/icons-material/AddBox";
@@ -27,6 +28,7 @@ import FavoriteIcon from "@mui/icons-material/Favorite";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import HeadphonesIcon from "@mui/icons-material/Headphones";
 import HeadphonesOutlinedIcon from "@mui/icons-material/HeadphonesOutlined";
+import FlagIcon from "@mui/icons-material/Flag";
 import apiUrl from "./api";
 import TopBar from "./components/TopBar";
 import { darkTheme } from "./theme";
@@ -40,6 +42,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { getCachedUserLists, setCachedUserLists } from "./userLists";
 import { performLogout } from "./logout";
 import ShareButton from "./components/ShareButton";
+import ReportDialog from "./components/ReportDialog";
 
 interface RecordListItem {
   id: string;
@@ -257,6 +260,7 @@ export default function MasterRecord() {
   const [masterLoading, setMasterLoading] = useState(false);
   const [masterError, setMasterError] = useState<string | null>(null);
   const [releaseYearTouched, setReleaseYearTouched] = useState(false);
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
 
   const albumCoverUrl =
     typeof album?.cover === "string" && album.cover.trim()
@@ -1371,16 +1375,30 @@ export default function MasterRecord() {
                   >
                     Back
                   </Button>
-                  <Box>
+                  <Box sx={{ gap: 0.5 }}>
                     {masterInfo?.inDb ? (
-                      <ShareButton
-                        title={`${album?.record || "Record"} by ${
-                          album?.artist || "Unknown Artist"
-                        }`}
-                        text={`Check out this record: ${
-                          album?.record || "Record"
-                        } by ${album?.artist || "Unknown Artist"}`}
-                      />
+                      <>
+                        {username && (
+                          <Tooltip title="Report">
+                            <IconButton
+                              color="inherit"
+                              size="medium"
+                              aria-label="Report this record"
+                              onClick={() => setReportDialogOpen(true)}
+                            >
+                              <FlagIcon />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        <ShareButton
+                          title={`${album?.record || "Record"} by ${
+                            album?.artist || "Unknown Artist"
+                          }`}
+                          text={`Check out this record: ${
+                            album?.record || "Record"
+                          } by ${album?.artist || "Unknown Artist"}`}
+                        />
+                      </>
                     ) : null}
                   </Box>
                 </Stack>
@@ -1498,6 +1516,17 @@ export default function MasterRecord() {
             {snackbar.message}
           </Alert>
         </Snackbar>
+
+        <ReportDialog
+          open={reportDialogOpen}
+          onClose={() => setReportDialogOpen(false)}
+          type="master"
+          targetId={
+            masterIdOverride ??
+            (masterIdParam ? Number(masterIdParam) : undefined)
+          }
+          targetName={album?.record || "Unknown"}
+        />
       </Box>
     </ThemeProvider>
   );

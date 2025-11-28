@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import {
   Avatar,
+  Badge,
   Box,
   Typography,
   TextField,
@@ -44,6 +45,8 @@ interface TopBarProps {
   onSearchSubmit?: (value: string) => void;
   /** Explicit admin flag; falls back to cached user info when omitted */
   isAdmin?: boolean;
+  /** Whether there are pending reports (for admin notification badge) */
+  hasPendingReports?: boolean;
 }
 
 export default function TopBar({
@@ -57,6 +60,7 @@ export default function TopBar({
   onSearchChange,
   onSearchSubmit,
   isAdmin,
+  hasPendingReports,
 }: TopBarProps) {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
@@ -114,6 +118,9 @@ export default function TopBar({
 
   const cachedInfo = getCachedUserInfo();
   const canAdmin = Boolean(isAdmin ?? cachedInfo?.isAdmin);
+  const showPendingBadge = Boolean(
+    hasPendingReports ?? cachedInfo?.hasPendingReports
+  );
 
   return (
     <Grid>
@@ -176,15 +183,32 @@ export default function TopBar({
             color="inherit"
           >
             {username ? (
-              <Avatar
-                src={profilePicUrl ?? undefined}
-                alt={displayName || username || "Profile"}
-                sx={{ width: 40, height: 40, bgcolor: "grey.700" }}
+              <Badge
+                overlap="circular"
+                anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+                variant="dot"
+                invisible={!canAdmin || !showPendingBadge}
+                sx={{
+                  "& .MuiBadge-badge": {
+                    backgroundColor: "warning.main",
+                    width: 12,
+                    height: 12,
+                    borderRadius: "50%",
+                    border: "2px solid",
+                    borderColor: "background.default",
+                  },
+                }}
               >
-                {!profilePicUrl
-                  ? (displayName || username || "").charAt(0).toUpperCase()
-                  : undefined}
-              </Avatar>
+                <Avatar
+                  src={profilePicUrl ?? undefined}
+                  alt={displayName || username || "Profile"}
+                  sx={{ width: 40, height: 40, bgcolor: "grey.700" }}
+                >
+                  {!profilePicUrl
+                    ? (displayName || username || "").charAt(0).toUpperCase()
+                    : undefined}
+                </Avatar>
+              </Badge>
             ) : (
               <AccountCircle sx={{ width: 40, height: 40 }} />
             )}
@@ -302,7 +326,13 @@ export default function TopBar({
                       }}
                     >
                       <ListItemIcon>
-                        <AdminPanelSettingsIcon />
+                        <AdminPanelSettingsIcon
+                          sx={
+                            showPendingBadge
+                              ? { color: "warning.main" }
+                              : undefined
+                          }
+                        />
                       </ListItemIcon>
                       <ListItemText>Admin Panel</ListItemText>
                     </MenuItem>

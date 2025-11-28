@@ -98,6 +98,7 @@ export async function loadUserInfo(
       if (!username || !userUuid) {
         throw new Error("Invalid user info payload");
       }
+      const hasPendingReports = Boolean((data as Record<string, unknown>).hasPendingReports);
       const normalized: UserInfo = {
         username,
         email,
@@ -110,6 +111,7 @@ export async function loadUserInfo(
         joinedDate,
         isAdmin,
         adminPermissions,
+        hasPendingReports,
       };
       cachedUserInfo = normalized;
       return { ...normalized };

@@ -3467,6 +3467,19 @@ app.get('/api/me', requireAuth, async (req, res) => {
     req.isAdmin = isAdmin ? true : undefined;
     req.adminPermissions = isAdmin ? adminPermissions : undefined;
 
+    // For admins, check if there are any pending reports (efficient EXISTS query)
+    let hasPendingReports = false;
+    if (isAdmin) {
+      const [pendingCheck] = await pool.execute(
+        `SELECT EXISTS(SELECT 1 FROM GeneralReport WHERE status = 'Pending')
+          OR EXISTS(SELECT 1 FROM ReportedUser WHERE status = 'Pending')
+          OR EXISTS(SELECT 1 FROM ReportedRecord WHERE status = 'Pending')
+          OR EXISTS(SELECT 1 FROM ReportedMaster WHERE status = 'Pending')
+          OR EXISTS(SELECT 1 FROM ReportedList WHERE status = 'Pending') AS hasPending`
+      );
+      hasPendingReports = Boolean(pendingCheck[0]?.hasPending);
+    }
+
     res.json({
       username: userRow.username,
       email: userRow.email ?? null,
@@ -3479,6 +3492,7 @@ app.get('/api/me', requireAuth, async (req, res) => {
       joinedDate: normalizeDateOnly(userRow.created),
       isAdmin,
       adminPermissions,
+      hasPendingReports,
     });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch user info' });
@@ -7048,6 +7062,272 @@ app.delete('/api/admin/lists/:listId/records/:recordId', requireAuth, requireAdm
   } catch (error) {
     console.error('Failed to delete record from list as admin', error);
     res.status(500).json({ error: 'Failed to delete record from list' });
+  }
+});
+
+// ===================== REPORTS =====================
+
+// Submit a report (any type)
+app.post('/api/reports', requireAuth, async (req, res) => {
+  console.log('Submitting report...');
+  const userUuid = req.userUuid;
+  const { type, reason, notes, targetId, targetUsername } = req.body;
+
+  if (!['general', 'user', 'record', 'master', 'list'].includes(type)) {
+    return res.status(400).json({ error: 'Invalid report type' });
+  }
+  if (typeof reason !== 'string' || !reason.trim()) {
+    return res.status(400).json({ error: 'reason is required' });
+  }
+
+  const trimmedReason = reason.trim();
+  const trimmedNotes = typeof notes === 'string' && notes.trim() ? notes.trim() : null;
+
+  try {
+    const pool = await getPool();
+
+    if (type === 'general') {
+      await pool.execute(
+        `INSERT INTO GeneralReport (reportedBy, reason, userNotes) VALUES (?, ?, ?)`,
+        [userUuid, trimmedReason, trimmedNotes]
+      );
+    } else if (type === 'user') {
+      if (!targetUsername || typeof targetUsername !== 'string') {
+        return res.status(400).json({ error: 'targetUsername is required for user reports' });
+      }
+      // Get the user's uuid from username
+      const [userRows] = await pool.query(
+        'SELECT uuid FROM User WHERE username = ?',
+        [targetUsername.trim()]
+      );
+      if (!Array.isArray(userRows) || userRows.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      const reportedUserUuid = userRows[0].uuid;
+      await pool.execute(
+        `INSERT INTO ReportedUser (reportedBy, reportedUser, reason, userNotes) VALUES (?, ?, ?, ?)`,
+        [userUuid, reportedUserUuid, trimmedReason, trimmedNotes]
+      );
+    } else if (type === 'record') {
+      const recordId = Number(targetId);
+      if (!Number.isInteger(recordId) || recordId <= 0) {
+        return res.status(400).json({ error: 'targetId (recordId) is required for record reports' });
+      }
+      await pool.execute(
+        `INSERT INTO ReportedRecord (reportedBy, recordId, reason, userNotes) VALUES (?, ?, ?, ?)`,
+        [userUuid, recordId, trimmedReason, trimmedNotes]
+      );
+    } else if (type === 'master') {
+      const masterId = Number(targetId);
+      if (!Number.isInteger(masterId) || masterId <= 0) {
+        return res.status(400).json({ error: 'targetId (masterId) is required for master reports' });
+      }
+      await pool.execute(
+        `INSERT INTO ReportedMaster (reportedBy, masterId, reason, userNotes) VALUES (?, ?, ?, ?)`,
+        [userUuid, masterId, trimmedReason, trimmedNotes]
+      );
+    } else if (type === 'list') {
+      const listId = Number(targetId);
+      if (!Number.isInteger(listId) || listId <= 0) {
+        return res.status(400).json({ error: 'targetId (listId) is required for list reports' });
+      }
+      await pool.execute(
+        `INSERT INTO ReportedList (reportedBy, listId, reason, userNotes) VALUES (?, ?, ?, ?)`,
+        [userUuid, listId, trimmedReason, trimmedNotes]
+      );
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Failed to submit report', error);
+    res.status(500).json({ error: 'Failed to submit report' });
+  }
+});
+
+// Get reports (admin only) - paginated with filters
+app.get('/api/admin/reports', requireAuth, requireAdmin, async (req, res) => {
+  console.log('Admin fetching reports...');
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const limit = 10;
+  const offset = (page - 1) * limit;
+  
+  const typeFilter = typeof req.query.type === 'string' && req.query.type.trim() ? req.query.type.trim().toLowerCase() : null;
+  const statusFilter = typeof req.query.status === 'string' && req.query.status.trim() ? req.query.status.trim() : null;
+  const reportedByFilter = typeof req.query.reportedBy === 'string' && req.query.reportedBy.trim() ? req.query.reportedBy.trim() : null;
+
+  try {
+    const pool = await getPool();
+    
+    // Build queries for each report type, filtering as needed
+    const reportTypes = typeFilter ? [typeFilter] : ['general', 'user', 'record', 'master', 'list'];
+    const allReports = [];
+    let totalCount = 0;
+
+    for (const rType of reportTypes) {
+      let tableName, selectFields, joins = '';
+      
+      if (rType === 'general') {
+        tableName = 'GeneralReport';
+        selectFields = `g.id, 'general' AS type, g.reportedBy, g.reason, g.userNotes, g.created, g.status, g.adminNotes,
+                        NULL AS targetId, NULL AS targetName, NULL AS targetUsername,
+                        u.username AS reportedByUsername`;
+        joins = 'LEFT JOIN User u ON g.reportedBy = u.uuid';
+      } else if (rType === 'user') {
+        tableName = 'ReportedUser';
+        selectFields = `g.id, 'user' AS type, g.reportedBy, g.reason, g.userNotes, g.created, g.status, g.adminNotes,
+                        NULL AS targetId, ru.displayName AS targetName, ru.username AS targetUsername,
+                        u.username AS reportedByUsername`;
+        joins = 'LEFT JOIN User u ON g.reportedBy = u.uuid LEFT JOIN User ru ON g.reportedUser = ru.uuid';
+      } else if (rType === 'record') {
+        tableName = 'ReportedRecord';
+        selectFields = `g.id, 'record' AS type, g.reportedBy, g.reason, g.userNotes, g.created, g.status, g.adminNotes,
+                        g.recordId AS targetId, r.name AS targetName, ru.username AS targetUsername,
+                        u.username AS reportedByUsername`;
+        joins = `LEFT JOIN User u ON g.reportedBy = u.uuid 
+                 LEFT JOIN Record r ON g.recordId = r.id 
+                 LEFT JOIN User ru ON r.userUuid = ru.uuid`;
+      } else if (rType === 'master') {
+        tableName = 'ReportedMaster';
+        selectFields = `g.id, 'master' AS type, g.reportedBy, g.reason, g.userNotes, g.created, g.status, g.adminNotes,
+                        g.masterId AS targetId, m.name AS targetName, NULL AS targetUsername,
+                        u.username AS reportedByUsername`;
+        joins = 'LEFT JOIN User u ON g.reportedBy = u.uuid LEFT JOIN Master m ON g.masterId = m.id';
+      } else if (rType === 'list') {
+        tableName = 'ReportedList';
+        selectFields = `g.id, 'list' AS type, g.reportedBy, g.reason, g.userNotes, g.created, g.status, g.adminNotes,
+                        g.listId AS targetId, l.name AS targetName, lu.username AS targetUsername,
+                        u.username AS reportedByUsername`;
+        joins = `LEFT JOIN User u ON g.reportedBy = u.uuid 
+                 LEFT JOIN List l ON g.listId = l.id 
+                 LEFT JOIN User lu ON l.userUuid = lu.uuid`;
+      } else {
+        continue;
+      }
+
+      let whereConditions = [];
+      let whereParams = [];
+
+      if (statusFilter) {
+        whereConditions.push('g.status = ?');
+        whereParams.push(statusFilter);
+      }
+      if (reportedByFilter) {
+        whereConditions.push('u.username LIKE ?');
+        whereParams.push(`%${escapeForLike(reportedByFilter)}%`);
+      }
+
+      const whereClause = whereConditions.length > 0 ? 'WHERE ' + whereConditions.join(' AND ') : '';
+
+      // Get count
+      const [countRows] = await pool.query(
+        `SELECT COUNT(*) AS cnt FROM ${tableName} g ${joins} ${whereClause}`,
+        whereParams
+      );
+      totalCount += Number(countRows[0]?.cnt || 0);
+
+      // Get reports
+      const [rows] = await pool.query(
+        `SELECT ${selectFields} FROM ${tableName} g ${joins} ${whereClause} ORDER BY g.created DESC`,
+        whereParams
+      );
+      
+      if (Array.isArray(rows)) {
+        allReports.push(...rows);
+      }
+    }
+
+    // Sort all reports by created date descending
+    allReports.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
+
+    // Apply pagination
+    const paginatedReports = allReports.slice(offset, offset + limit);
+
+    const reports = paginatedReports.map(row => ({
+      id: Number(row.id),
+      type: String(row.type),
+      reportedByUsername: row.reportedByUsername ? String(row.reportedByUsername) : null,
+      reason: String(row.reason),
+      userNotes: row.userNotes ? String(row.userNotes) : null,
+      created: row.created ? String(row.created) : null,
+      status: String(row.status),
+      adminNotes: row.adminNotes ? String(row.adminNotes) : null,
+      targetId: row.targetId ? Number(row.targetId) : null,
+      targetName: row.targetName ? String(row.targetName) : null,
+      targetUsername: row.targetUsername ? String(row.targetUsername) : null,
+    }));
+
+    res.json({
+      reports,
+      total: totalCount,
+      page,
+      totalPages: Math.ceil(totalCount / limit),
+    });
+  } catch (error) {
+    console.error('Failed to fetch reports as admin', error);
+    res.status(500).json({ error: 'Failed to fetch reports' });
+  }
+});
+
+// Update report status (admin only)
+app.patch('/api/admin/reports/:type/:id', requireAuth, requireAdmin, async (req, res) => {
+  console.log('Admin updating report...');
+  const { type, id } = req.params;
+  const reportId = Number(id);
+
+  if (!['general', 'user', 'record', 'master', 'list'].includes(type)) {
+    return res.status(400).json({ error: 'Invalid report type' });
+  }
+  if (!Number.isInteger(reportId) || reportId <= 0) {
+    return res.status(400).json({ error: 'Invalid report ID' });
+  }
+
+  const { status, adminNotes } = req.body;
+  if (typeof status !== 'string' || !status.trim()) {
+    return res.status(400).json({ error: 'status is required' });
+  }
+
+  const trimmedStatus = status.trim();
+  const trimmedAdminNotes = typeof adminNotes === 'string' && adminNotes.trim() ? adminNotes.trim() : null;
+
+  const tableMap = {
+    general: 'GeneralReport',
+    user: 'ReportedUser',
+    record: 'ReportedRecord',
+    master: 'ReportedMaster',
+    list: 'ReportedList',
+  };
+  const tableName = tableMap[type];
+
+  try {
+    const pool = await getPool();
+    const [result] = await pool.execute(
+      `UPDATE ${tableName} SET status = ?, adminNotes = ? WHERE id = ?`,
+      [trimmedStatus, trimmedAdminNotes, reportId]
+    );
+
+    if (!result || result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Report not found' });
+    }
+
+    // Check if there are still pending reports
+    let hasPendingReports = false;
+    try {
+      const [pendingCheck] = await pool.execute(
+        `SELECT EXISTS(SELECT 1 FROM GeneralReport WHERE status = 'Pending')
+              OR EXISTS(SELECT 1 FROM ReportedUser WHERE status = 'Pending')
+              OR EXISTS(SELECT 1 FROM ReportedRecord WHERE status = 'Pending')
+              OR EXISTS(SELECT 1 FROM ReportedMaster WHERE status = 'Pending')
+              OR EXISTS(SELECT 1 FROM ReportedList WHERE status = 'Pending') AS hasPending`
+      );
+      hasPendingReports = Boolean(pendingCheck[0]?.hasPending);
+    } catch (pendingErr) {
+      console.warn('Could not check pending reports:', pendingErr.message);
+    }
+
+    res.json({ success: true, hasPendingReports });
+  } catch (error) {
+    console.error('Failed to update report as admin', error);
+    res.status(500).json({ error: 'Failed to update report' });
   }
 });
 

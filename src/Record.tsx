@@ -20,6 +20,7 @@ import {
   DialogContentText,
   ButtonBase,
   IconButton,
+  Tooltip,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import LaunchIcon from "@mui/icons-material/Launch";
@@ -43,8 +44,10 @@ import type { Record as MrcRecord, RecordOwnerInfo } from "./types";
 import EditRecordDialog from "./components/EditRecordDialog";
 import MoveRecordDialog from "./components/MoveRecordDialog";
 import ShareButton from "./components/ShareButton";
+import ReportDialog from "./components/ReportDialog";
 import { formatLocalDate } from "./dateUtils";
 import { performLogout } from "./logout";
+import FlagIcon from "@mui/icons-material/Flag";
 
 const DEFAULT_COLLECTION_NAME = "My Collection";
 
@@ -85,6 +88,7 @@ export default function RecordDetails() {
   const [viewerHasLikedReview, setViewerHasLikedReview] =
     useState<boolean>(false);
   const [likeLoading, setLikeLoading] = useState(false);
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
 
   const getRecordUrl = useCallback(() => {
     const baseUrl = window.location.origin;
@@ -949,6 +953,17 @@ export default function RecordDetails() {
                                   } by ${record?.artist || "Unknown Artist"}`}
                                 />
                               )}
+                              {!isOwnerView && username && (
+                                <Tooltip title="Report record">
+                                  <IconButton
+                                    size="small"
+                                    color="inherit"
+                                    onClick={() => setReportDialogOpen(true)}
+                                  >
+                                    <FlagIcon />
+                                  </IconButton>
+                                </Tooltip>
+                              )}
                             </Stack>
                           )}
                         </Stack>
@@ -975,8 +990,28 @@ export default function RecordDetails() {
         onClose={() => !deleteLoading && setDeleteDialogOpen(false)}
         maxWidth="xs"
         fullWidth
+        slotProps={{
+          backdrop: {
+            sx: {
+              backgroundColor: "rgba(0, 0, 0, 0.4)",
+              backdropFilter: "blur(3.5px)",
+            },
+          },
+          paper: {
+            sx: {
+              backgroundColor: "background.default",
+              boxShadow: 15,
+              maxHeight: "85vh",
+              m: 2,
+              overflow: "visible",
+              borderRadius: 3,
+            },
+          },
+        }}
       >
-        <DialogTitle sx={{ bgcolor: "background.paper" }}>
+        <DialogTitle
+          sx={{ bgcolor: "background.paper", borderRadius: "8px 8px 0 0" }}
+        >
           Delete Record
         </DialogTitle>
         <DialogContent sx={{ bgcolor: "background.paper" }}>
@@ -986,7 +1021,9 @@ export default function RecordDetails() {
             }"? This action cannot be undone.`}
           </DialogContentText>
         </DialogContent>
-        <DialogActions sx={{ bgcolor: "background.paper" }}>
+        <DialogActions
+          sx={{ bgcolor: "background.paper", borderRadius: "0 0 8px 8px" }}
+        >
           <Button
             onClick={() => setDeleteDialogOpen(false)}
             disabled={deleteLoading}
@@ -1026,6 +1063,14 @@ export default function RecordDetails() {
           {snackbar.message}
         </Alert>
       </Snackbar>
+
+      <ReportDialog
+        open={reportDialogOpen}
+        onClose={() => setReportDialogOpen(false)}
+        type="record"
+        targetId={recordIdNumber}
+        targetName={record?.record || "Unknown Record"}
+      />
     </ThemeProvider>
   );
 }

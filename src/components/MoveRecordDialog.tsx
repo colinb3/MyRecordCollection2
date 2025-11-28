@@ -88,11 +88,31 @@ export default function MoveRecordDialog({
       onClose={() => !submitting && onClose()}
       fullWidth
       maxWidth="xs"
+      slotProps={{
+        backdrop: {
+          sx: {
+            backgroundColor: "rgba(0, 0, 0, 0.4)",
+            backdropFilter: "blur(3.5px)",
+          },
+        },
+        paper: {
+          sx: {
+            backgroundColor: "background.default",
+            boxShadow: 15,
+            maxHeight: "85vh",
+            m: 2,
+            overflow: "visible",
+            borderRadius: 3,
+          },
+        },
+      }}
     >
-      <DialogTitle sx={{ bgcolor: "background.paper" }}>
+      <DialogTitle
+        sx={{ bgcolor: "background.paper", borderRadius: "8px 8px 0 0" }}
+      >
         Move Record
       </DialogTitle>
-      <DialogContent dividers sx={{ bgcolor: "background.paper" }}>
+      <DialogContent sx={{ bgcolor: "background.paper" }}>
         {loadingCollections ? (
           <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
             <CircularProgress size={28} />
@@ -125,7 +145,9 @@ export default function MoveRecordDialog({
           </Typography>
         )}
       </DialogContent>
-      <DialogActions sx={{ bgcolor: "background.paper" }}>
+      <DialogActions
+        sx={{ bgcolor: "background.paper", borderRadius: "0 0 8px 8px" }}
+      >
         <Button
           onClick={onClose}
           disabled={submitting}

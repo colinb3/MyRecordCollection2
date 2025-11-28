@@ -120,15 +120,15 @@ export default function TutorialDialog({
             backdropFilter: "blur(3.5px)",
           },
         },
-      }}
-      PaperProps={{
-        sx: {
-          backgroundColor: "background.default",
-          boxShadow: 15,
-          borderRadius: 3,
-          maxHeight: "85vh",
-          m: 2,
-          overflow: "visible",
+        paper: {
+          sx: {
+            backgroundColor: "background.default",
+            boxShadow: 15,
+            maxHeight: "85vh",
+            m: 2,
+            overflow: "visible",
+            borderRadius: 3,
+          },
         },
       }}
     >

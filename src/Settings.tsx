@@ -16,6 +16,7 @@ import { darkTheme } from "./theme";
 import { useMediaQuery } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
 import { performLogout } from "./logout";
+import ReportDialog from "./components/ReportDialog";
 
 // Import Components
 import TopBar from "./components/TopBar";
@@ -28,6 +29,7 @@ import ProfileSettings from "./components/settings/ProfileSettings.tsx";
 const MENU_OPTIONS: SettingsMenuOption[] = [
   { id: "profile", label: "Profile" },
   { id: "collection", label: "Collection" },
+  { id: "feedback", label: "Feedback" },
   { id: "tutorial", label: "Start Tutorial" },
 ];
 
@@ -49,6 +51,7 @@ export default function Settings() {
     MENU_OPTIONS[0].id
   );
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
   const isLargeScreen = useMediaQuery("(min-width:900px)");
 
   useEffect(() => {
@@ -125,6 +128,7 @@ export default function Settings() {
                     canManageAdmins: false,
                     canDeleteUsers: false,
                   },
+                  hasPendingReports: cachedUser?.hasPendingReports ?? false,
                 });
                 setUserUuid(uuid);
               }
@@ -153,6 +157,10 @@ export default function Settings() {
       onSelect={(id: string) => {
         if (id === "tutorial") {
           navigate("/mycollection", { state: { showTutorial: true } });
+          return;
+        }
+        if (id === "feedback") {
+          setFeedbackDialogOpen(true);
           return;
         }
         setSelectedSection(id);
@@ -258,6 +266,13 @@ export default function Settings() {
             <Box sx={{ width: 260, p: 2 }}>{menu}</Box>
           </Drawer>
         )}
+
+        <ReportDialog
+          open={feedbackDialogOpen}
+          onClose={() => setFeedbackDialogOpen(false)}
+          type="general"
+          targetName="General Feedback"
+        />
       </Box>
     </ThemeProvider>
   );

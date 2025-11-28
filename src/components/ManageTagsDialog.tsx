@@ -227,11 +227,31 @@ export default function ManageTagsDialog({
         onClose={() => !loading && handleClose()}
         fullWidth
         maxWidth="xs"
+        slotProps={{
+          backdrop: {
+            sx: {
+              backgroundColor: "rgba(0, 0, 0, 0.4)",
+              backdropFilter: "blur(3.5px)",
+            },
+          },
+          paper: {
+            sx: {
+              backgroundColor: "background.default",
+              boxShadow: 15,
+              maxHeight: "85vh",
+              m: 2,
+              overflow: "visible",
+              borderRadius: 3,
+            },
+          },
+        }}
       >
-        <DialogTitle sx={{ bgcolor: "background.paper" }}>
+        <DialogTitle
+          sx={{ bgcolor: "background.paper", borderRadius: "8px 8px 0 0" }}
+        >
           Manage Tags
         </DialogTitle>
-        <DialogContent sx={{ bgcolor: "background.paper" }} dividers>
+        <DialogContent sx={{ bgcolor: "background.paper" }}>
           <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
             <TextField
               label="New Tag"
@@ -342,7 +362,9 @@ export default function ManageTagsDialog({
             )}
           </List>
         </DialogContent>
-        <DialogActions sx={{ bgcolor: "background.paper" }}>
+        <DialogActions
+          sx={{ bgcolor: "background.paper", borderRadius: "0 0 8px 8px" }}
+        >
           <Button
             onClick={handleClose}
             disabled={loading}

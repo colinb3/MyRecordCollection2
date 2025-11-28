@@ -32,6 +32,8 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
 import ShareButton from "./components/ShareButton";
+import ReportDialog from "./components/ReportDialog";
+import FlagIcon from "@mui/icons-material/Flag";
 import CoverImage from "./components/CoverImage";
 import {
   DndContext,
@@ -59,6 +61,7 @@ import { optimizeProfileImageFile } from "./profileImageOptimizer";
 import { formatLocalDate } from "./dateUtils";
 import LockIcon from "@mui/icons-material/Lock";
 import PublicIcon from "@mui/icons-material/Public";
+import AddIcon from "@mui/icons-material/Add";
 import { performLogout } from "./logout";
 
 interface OwnerInfo {
@@ -309,6 +312,7 @@ export default function ListDetail() {
     releaseYear: number | null;
     cover: string;
   }>({ open: false, record: null, rating: 0, releaseYear: null, cover: "" });
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -1213,22 +1217,60 @@ export default function ListDetail() {
                                   text={`Check out this list: ${list.name}`}
                                 />
                               )}
+                              {!list.isOwner && username && (
+                                <Tooltip title="Report list">
+                                  <IconButton
+                                    size="small"
+                                    color="inherit"
+                                    onClick={() => setReportDialogOpen(true)}
+                                  >
+                                    <FlagIcon />
+                                  </IconButton>
+                                </Tooltip>
+                              )}
                             </Stack>
                           </Box>
                         </Stack>
                       </Box>
 
-                      <Paper sx={{ p: { xs: 2, md: 3 } }}>
+                      <Paper
+                        sx={{
+                          px: { xs: 2, md: 3 },
+                          pb: { xs: 2, md: 3 },
+                          pt: 1.5,
+                        }}
+                      >
                         <Stack
                           direction="row"
                           spacing={1}
                           alignItems="center"
-                          mb={2}
+                          mb={1.5}
+                          px={1}
+                          justifyContent={"space-between"}
                         >
-                          <Typography variant="h6" fontWeight={700}>
-                            Records
-                          </Typography>
-                          <Chip size="small" label={safeRecords.length} />
+                          <Stack
+                            direction="row"
+                            spacing={1}
+                            alignItems="center"
+                          >
+                            <Typography variant="h6" fontWeight={700}>
+                              Records
+                            </Typography>
+                            <Chip size="small" label={safeRecords.length} />
+                          </Stack>
+                          <Box>
+                            {list.isOwner && (
+                              <Tooltip title="Add to List">
+                                <IconButton
+                                  aria-label="add record"
+                                  onClick={() => navigate("/search")}
+                                  size="small"
+                                >
+                                  <AddIcon />
+                                </IconButton>
+                              </Tooltip>
+                            )}
+                          </Box>
                         </Stack>
                         {safeRecords.length === 0 ? (
                           <Typography color="text.secondary">
@@ -1545,6 +1587,14 @@ export default function ListDetail() {
             </Button>
           </DialogActions>
         </Dialog>
+
+        <ReportDialog
+          open={reportDialogOpen}
+          onClose={() => setReportDialogOpen(false)}
+          type="list"
+          targetId={listId ?? undefined}
+          targetName={list?.name || "Unknown List"}
+        />
       </Box>
     </ThemeProvider>
   );

@@ -1354,11 +1354,31 @@ export default function Lists() {
           onClose={handleCloseEdit}
           maxWidth="sm"
           fullWidth
+          slotProps={{
+            backdrop: {
+              sx: {
+                backgroundColor: "rgba(0, 0, 0, 0.4)",
+                backdropFilter: "blur(3.5px)",
+              },
+            },
+            paper: {
+              sx: {
+                backgroundColor: "background.default",
+                boxShadow: 15,
+                maxHeight: "85vh",
+                m: 2,
+                overflow: "visible",
+                borderRadius: 3,
+              },
+            },
+          }}
         >
-          <DialogTitle sx={{ bgcolor: "background.paper" }}>
+          <DialogTitle
+            sx={{ bgcolor: "background.paper", borderRadius: "8px 8px 0 0" }}
+          >
             Edit list
           </DialogTitle>
-          <DialogContent dividers sx={{ bgcolor: "background.paper" }}>
+          <DialogContent sx={{ bgcolor: "background.paper" }}>
             <Stack direction={"row"} spacing={2} alignItems="center" mb={1}>
               {editPicturePreview ? (
                 <Avatar
@@ -1469,7 +1489,12 @@ export default function Lists() {
               />
             </Stack>
           </DialogContent>
-          <DialogActions sx={{ bgcolor: "background.paper" }}>
+          <DialogActions
+            sx={{
+              bgcolor: "background.paper",
+              borderRadius: "0 0 8px 8px",
+            }}
+          >
             <Button onClick={handleCloseEdit}>Cancel</Button>
             <Button
               variant="contained"
@@ -1487,9 +1512,31 @@ export default function Lists() {
           onClose={handleCloseDeleteConfirmation}
           maxWidth="sm"
           fullWidth
+          slotProps={{
+            backdrop: {
+              sx: {
+                backgroundColor: "rgba(0, 0, 0, 0.4)",
+                backdropFilter: "blur(3.5px)",
+              },
+            },
+            paper: {
+              sx: {
+                backgroundColor: "background.default",
+                boxShadow: 15,
+                maxHeight: "85vh",
+                m: 2,
+                overflow: "visible",
+                borderRadius: 3,
+              },
+            },
+          }}
         >
-          <DialogTitle>Delete List?</DialogTitle>
-          <DialogContent>
+          <DialogTitle
+            sx={{ bgcolor: "background.paper", borderRadius: "8px 8px 0 0" }}
+          >
+            Delete List?
+          </DialogTitle>
+          <DialogContent sx={{ bgcolor: "background.paper" }}>
             <Typography>
               Are you sure you want to delete the list "
               {deleteConfirmation.list?.name}"?
@@ -1509,7 +1556,9 @@ export default function Lists() {
               This action cannot be undone.
             </Typography>
           </DialogContent>
-          <DialogActions>
+          <DialogActions
+            sx={{ bgcolor: "background.paper", borderRadius: "0 0 8px 8px" }}
+          >
             <Button onClick={handleCloseDeleteConfirmation}>Cancel</Button>
             <Button
               variant="contained"
