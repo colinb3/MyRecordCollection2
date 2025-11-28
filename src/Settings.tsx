@@ -28,6 +28,7 @@ import ProfileSettings from "./components/settings/ProfileSettings.tsx";
 const MENU_OPTIONS: SettingsMenuOption[] = [
   { id: "profile", label: "Profile" },
   { id: "collection", label: "Collection" },
+  { id: "tutorial", label: "Start Tutorial" },
 ];
 
 export default function Settings() {
@@ -150,6 +151,10 @@ export default function Settings() {
       options={MENU_OPTIONS}
       selectedOption={selectedSection}
       onSelect={(id: string) => {
+        if (id === "tutorial") {
+          navigate("/mycollection", { state: { showTutorial: true } });
+          return;
+        }
         setSelectedSection(id);
         if (!isLargeScreen) {
           setDrawerOpen(false);

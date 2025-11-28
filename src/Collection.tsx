@@ -41,6 +41,7 @@ import TopBar from "./components/TopBar";
 import RecordTable from "./components/RecordTable";
 const FilterSidebar = lazy(() => import("./components/FilterSidebar"));
 import ManageTagsDialog from "./components/ManageTagsDialog";
+import TutorialDialog from "./components/TutorialDialog";
 
 interface CollectionProps {
   tableName: string;
@@ -49,6 +50,7 @@ interface CollectionProps {
 
 interface CollectionLocationState {
   message?: string;
+  showTutorial?: boolean;
 }
 
 interface CollectionPrivacy {
@@ -128,6 +130,7 @@ export default function Collection({ tableName, title }: CollectionProps) {
     severity: "success" | "error";
   }>({ open: false, message: "", severity: "success" });
   const [manageTagsOpen, setManageTagsOpen] = useState(false);
+  const [tutorialOpen, setTutorialOpen] = useState(false);
   const [columnVisibility, setColumnVisibility] = useState<ColumnVisibilityMap>(
     () =>
       cachedRecordTablePreferences
@@ -319,6 +322,24 @@ export default function Collection({ tableName, title }: CollectionProps) {
       }
     }
   }, [location]);
+
+  // Show tutorial for new users navigating from registration
+  useEffect(() => {
+    const state = location?.state as CollectionLocationState | undefined;
+    if (state?.showTutorial && tableName === "My Collection") {
+      setTutorialOpen(true);
+      // Clear the state so refreshing doesn't re-show tutorial
+      try {
+        window.history.replaceState({}, document.title);
+      } catch {
+        // ignore if replaceState is not available
+      }
+    }
+  }, [location, tableName]);
+
+  const handleCloseTutorial = () => {
+    setTutorialOpen(false);
+  };
 
   const handleLogout = async () => {
     await performLogout(navigate);
@@ -644,6 +665,9 @@ export default function Collection({ tableName, title }: CollectionProps) {
             }));
           }}
         />
+
+        {/* First-time user tutorial */}
+        <TutorialDialog open={tutorialOpen} onClose={handleCloseTutorial} />
       </Box>
     </ThemeProvider>
   );

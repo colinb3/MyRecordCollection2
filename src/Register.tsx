@@ -108,7 +108,7 @@ export default function Register() {
         } catch {
           // ignore analytics failures
         }
-        navigate("/mycollection");
+        navigate("/mycollection", { state: { showTutorial: true } });
       } else {
         setError(data.error || "Registration failed");
       }
