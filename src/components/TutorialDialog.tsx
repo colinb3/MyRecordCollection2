@@ -108,8 +108,6 @@ export default function TutorialDialog({
     onClose();
   };
 
-  const currentPage = pages[activeStep];
-
   return (
     <Dialog
       open={open}
@@ -206,31 +204,49 @@ export default function TutorialDialog({
           px: 3,
         }}
       >
-        <Typography variant="h5" component="h2" fontWeight={600} sx={{ mb: 2 }}>
-          {currentPage.title}
-        </Typography>
-
-        <Typography
-          variant="body1"
-          color="text.secondary"
-          sx={{ mb: 2, maxWidth: 400 }}
-        >
-          {currentPage.description}
-        </Typography>
-        {currentPage.image && (
+        {/* Render all pages, but only show the active one */}
+        {pages.map((page, index) => (
           <Box
-            component="img"
-            src={currentPage.image}
-            alt={currentPage.title}
+            key={index}
             sx={{
-              maxWidth: "100%",
-              maxHeight: currentPage.imageMaxHeight ?? 200,
-              objectFit: "contain",
-              borderRadius: 2,
-              mb: 0,
+              display: activeStep === index ? "flex" : "none",
+              flexDirection: "column",
+              alignItems: "center",
             }}
-          />
-        )}
+          >
+            <Typography
+              variant="h5"
+              component="h2"
+              fontWeight={600}
+              sx={{ mb: 2 }}
+            >
+              {page.title}
+            </Typography>
+
+            <Typography
+              variant="body1"
+              color="text.secondary"
+              sx={{ mb: 2, maxWidth: 400 }}
+            >
+              {page.description}
+            </Typography>
+
+            {page.image && (
+              <Box
+                component="img"
+                src={page.image}
+                alt={page.title}
+                sx={{
+                  maxWidth: "100%",
+                  maxHeight: page.imageMaxHeight ?? 200,
+                  objectFit: "contain",
+                  borderRadius: 2,
+                  mb: 0,
+                }}
+              />
+            )}
+          </Box>
+        ))}
       </DialogContent>
 
       <DialogActions
@@ -258,17 +274,6 @@ export default function TutorialDialog({
           nextButton={<Box sx={{ width: 0 }} />}
           backButton={<Box sx={{ width: 0 }} />}
         />
-
-        {activeStep === 0 && (
-          <Button
-            variant="text"
-            size="small"
-            onClick={handleClose}
-            sx={{ color: "text.secondary", mt: 1 }}
-          >
-            Skip Tutorial
-          </Button>
-        )}
       </DialogActions>
     </Dialog>
   );
