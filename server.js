@@ -3470,14 +3470,15 @@ app.get('/api/me', requireAuth, async (req, res) => {
     // For admins, check if there are any pending reports (efficient EXISTS query)
     let hasPendingReports = false;
     if (isAdmin) {
-      const [pendingCheck] = await pool.execute(
-        `SELECT EXISTS(SELECT 1 FROM GeneralReport WHERE status = 'Pending')
-          OR EXISTS(SELECT 1 FROM ReportedUser WHERE status = 'Pending')
-          OR EXISTS(SELECT 1 FROM ReportedRecord WHERE status = 'Pending')
-          OR EXISTS(SELECT 1 FROM ReportedMaster WHERE status = 'Pending')
-          OR EXISTS(SELECT 1 FROM ReportedList WHERE status = 'Pending') AS hasPending`
-      );
-      hasPendingReports = Boolean(pendingCheck[0]?.hasPending);
+      try {
+        const [pendingCheck] = await pool.execute(
+          `SELECT EXISTS(SELECT 1 FROM Report WHERE status = 'Pending') AS hasPending`
+        );
+        hasPendingReports = Boolean(pendingCheck[0]?.hasPending);
+      } catch (pendingErr) {
+        // Table may not exist yet, ignore the error
+        console.warn('Could not check pending reports:', pendingErr.message);
+      }
     }
 
     res.json({
@@ -7086,12 +7087,12 @@ app.post('/api/reports', requireAuth, async (req, res) => {
   try {
     const pool = await getPool();
 
-    if (type === 'general') {
-      await pool.execute(
-        `INSERT INTO GeneralReport (reportedBy, reason, userNotes) VALUES (?, ?, ?)`,
-        [userUuid, trimmedReason, trimmedNotes]
-      );
-    } else if (type === 'user') {
+    let targetUserUuid = null;
+    let targetRecordId = null;
+    let targetMasterId = null;
+    let targetListId = null;
+
+    if (type === 'user') {
       if (!targetUsername || typeof targetUsername !== 'string') {
         return res.status(400).json({ error: 'targetUsername is required for user reports' });
       }
@@ -7103,39 +7104,29 @@ app.post('/api/reports', requireAuth, async (req, res) => {
       if (!Array.isArray(userRows) || userRows.length === 0) {
         return res.status(404).json({ error: 'User not found' });
       }
-      const reportedUserUuid = userRows[0].uuid;
-      await pool.execute(
-        `INSERT INTO ReportedUser (reportedBy, reportedUser, reason, userNotes) VALUES (?, ?, ?, ?)`,
-        [userUuid, reportedUserUuid, trimmedReason, trimmedNotes]
-      );
+      targetUserUuid = userRows[0].uuid;
     } else if (type === 'record') {
-      const recordId = Number(targetId);
-      if (!Number.isInteger(recordId) || recordId <= 0) {
+      targetRecordId = Number(targetId);
+      if (!Number.isInteger(targetRecordId) || targetRecordId <= 0) {
         return res.status(400).json({ error: 'targetId (recordId) is required for record reports' });
       }
-      await pool.execute(
-        `INSERT INTO ReportedRecord (reportedBy, recordId, reason, userNotes) VALUES (?, ?, ?, ?)`,
-        [userUuid, recordId, trimmedReason, trimmedNotes]
-      );
     } else if (type === 'master') {
-      const masterId = Number(targetId);
-      if (!Number.isInteger(masterId) || masterId <= 0) {
+      targetMasterId = Number(targetId);
+      if (!Number.isInteger(targetMasterId) || targetMasterId <= 0) {
         return res.status(400).json({ error: 'targetId (masterId) is required for master reports' });
       }
-      await pool.execute(
-        `INSERT INTO ReportedMaster (reportedBy, masterId, reason, userNotes) VALUES (?, ?, ?, ?)`,
-        [userUuid, masterId, trimmedReason, trimmedNotes]
-      );
     } else if (type === 'list') {
-      const listId = Number(targetId);
-      if (!Number.isInteger(listId) || listId <= 0) {
+      targetListId = Number(targetId);
+      if (!Number.isInteger(targetListId) || targetListId <= 0) {
         return res.status(400).json({ error: 'targetId (listId) is required for list reports' });
       }
-      await pool.execute(
-        `INSERT INTO ReportedList (reportedBy, listId, reason, userNotes) VALUES (?, ?, ?, ?)`,
-        [userUuid, listId, trimmedReason, trimmedNotes]
-      );
     }
+
+    await pool.execute(
+      `INSERT INTO Report (type, reportedBy, targetUserUuid, targetRecordId, targetMasterId, targetListId, reason, userNotes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [type, userUuid, targetUserUuid, targetRecordId, targetMasterId, targetListId, trimmedReason, trimmedNotes]
+    );
 
     res.json({ success: true });
   } catch (error) {
@@ -7158,103 +7149,106 @@ app.get('/api/admin/reports', requireAuth, requireAdmin, async (req, res) => {
   try {
     const pool = await getPool();
     
-    // Build queries for each report type, filtering as needed
-    const reportTypes = typeFilter ? [typeFilter] : ['general', 'user', 'record', 'master', 'list'];
-    const allReports = [];
-    let totalCount = 0;
+    // Build WHERE conditions
+    const whereConditions = [];
+    const whereParams = [];
 
-    for (const rType of reportTypes) {
-      let tableName, selectFields, joins = '';
-      
-      if (rType === 'general') {
-        tableName = 'GeneralReport';
-        selectFields = `g.id, 'general' AS type, g.reportedBy, g.reason, g.userNotes, g.created, g.status, g.adminNotes,
-                        NULL AS targetId, NULL AS targetName, NULL AS targetUsername,
-                        u.username AS reportedByUsername`;
-        joins = 'LEFT JOIN User u ON g.reportedBy = u.uuid';
-      } else if (rType === 'user') {
-        tableName = 'ReportedUser';
-        selectFields = `g.id, 'user' AS type, g.reportedBy, g.reason, g.userNotes, g.created, g.status, g.adminNotes,
-                        NULL AS targetId, ru.displayName AS targetName, ru.username AS targetUsername,
-                        u.username AS reportedByUsername`;
-        joins = 'LEFT JOIN User u ON g.reportedBy = u.uuid LEFT JOIN User ru ON g.reportedUser = ru.uuid';
-      } else if (rType === 'record') {
-        tableName = 'ReportedRecord';
-        selectFields = `g.id, 'record' AS type, g.reportedBy, g.reason, g.userNotes, g.created, g.status, g.adminNotes,
-                        g.recordId AS targetId, r.name AS targetName, ru.username AS targetUsername,
-                        u.username AS reportedByUsername`;
-        joins = `LEFT JOIN User u ON g.reportedBy = u.uuid 
-                 LEFT JOIN Record r ON g.recordId = r.id 
-                 LEFT JOIN User ru ON r.userUuid = ru.uuid`;
-      } else if (rType === 'master') {
-        tableName = 'ReportedMaster';
-        selectFields = `g.id, 'master' AS type, g.reportedBy, g.reason, g.userNotes, g.created, g.status, g.adminNotes,
-                        g.masterId AS targetId, m.name AS targetName, NULL AS targetUsername,
-                        u.username AS reportedByUsername`;
-        joins = 'LEFT JOIN User u ON g.reportedBy = u.uuid LEFT JOIN Master m ON g.masterId = m.id';
-      } else if (rType === 'list') {
-        tableName = 'ReportedList';
-        selectFields = `g.id, 'list' AS type, g.reportedBy, g.reason, g.userNotes, g.created, g.status, g.adminNotes,
-                        g.listId AS targetId, l.name AS targetName, lu.username AS targetUsername,
-                        u.username AS reportedByUsername`;
-        joins = `LEFT JOIN User u ON g.reportedBy = u.uuid 
-                 LEFT JOIN List l ON g.listId = l.id 
-                 LEFT JOIN User lu ON l.userUuid = lu.uuid`;
-      } else {
-        continue;
-      }
-
-      let whereConditions = [];
-      let whereParams = [];
-
-      if (statusFilter) {
-        whereConditions.push('g.status = ?');
-        whereParams.push(statusFilter);
-      }
-      if (reportedByFilter) {
-        whereConditions.push('u.username LIKE ?');
-        whereParams.push(`%${escapeForLike(reportedByFilter)}%`);
-      }
-
-      const whereClause = whereConditions.length > 0 ? 'WHERE ' + whereConditions.join(' AND ') : '';
-
-      // Get count
-      const [countRows] = await pool.query(
-        `SELECT COUNT(*) AS cnt FROM ${tableName} g ${joins} ${whereClause}`,
-        whereParams
-      );
-      totalCount += Number(countRows[0]?.cnt || 0);
-
-      // Get reports
-      const [rows] = await pool.query(
-        `SELECT ${selectFields} FROM ${tableName} g ${joins} ${whereClause} ORDER BY g.created DESC`,
-        whereParams
-      );
-      
-      if (Array.isArray(rows)) {
-        allReports.push(...rows);
-      }
+    if (typeFilter) {
+      whereConditions.push('r.type = ?');
+      whereParams.push(typeFilter);
+    }
+    if (statusFilter) {
+      whereConditions.push('r.status = ?');
+      whereParams.push(statusFilter);
+    }
+    if (reportedByFilter) {
+      whereConditions.push('u.username LIKE ?');
+      whereParams.push(`%${escapeForLike(reportedByFilter)}%`);
     }
 
-    // Sort all reports by created date descending
-    allReports.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
+    const whereClause = whereConditions.length > 0 ? 'WHERE ' + whereConditions.join(' AND ') : '';
 
-    // Apply pagination
-    const paginatedReports = allReports.slice(offset, offset + limit);
+    // Get total count
+    const [countRows] = await pool.query(
+      `SELECT COUNT(*) AS cnt 
+       FROM Report r
+       LEFT JOIN User u ON r.reportedBy = u.uuid
+       ${whereClause}`,
+      whereParams
+    );
+    const totalCount = Number(countRows[0]?.cnt || 0);
 
-    const reports = paginatedReports.map(row => ({
-      id: Number(row.id),
-      type: String(row.type),
-      reportedByUsername: row.reportedByUsername ? String(row.reportedByUsername) : null,
-      reason: String(row.reason),
-      userNotes: row.userNotes ? String(row.userNotes) : null,
-      created: row.created ? String(row.created) : null,
-      status: String(row.status),
-      adminNotes: row.adminNotes ? String(row.adminNotes) : null,
-      targetId: row.targetId ? Number(row.targetId) : null,
-      targetName: row.targetName ? String(row.targetName) : null,
-      targetUsername: row.targetUsername ? String(row.targetUsername) : null,
-    }));
+    // Get paginated reports with JOINs to get target names
+    const [rows] = await pool.query(
+      `SELECT 
+         r.id,
+         r.type,
+         r.reason,
+         r.userNotes,
+         r.created,
+         r.status,
+         r.adminNotes,
+         r.targetUserUuid,
+         r.targetRecordId,
+         r.targetMasterId,
+         r.targetListId,
+         u.username AS reportedByUsername,
+         tu.username AS targetUsername,
+         tu.displayName AS targetUserDisplayName,
+         rec.name AS targetRecordName,
+         recOwner.username AS targetRecordOwnerUsername,
+         m.name AS targetMasterName,
+         l.name AS targetListName,
+         listOwner.username AS targetListOwnerUsername
+       FROM Report r
+       LEFT JOIN User u ON r.reportedBy = u.uuid
+       LEFT JOIN User tu ON r.targetUserUuid = tu.uuid
+       LEFT JOIN Record rec ON r.targetRecordId = rec.id
+       LEFT JOIN User recOwner ON rec.userUuid = recOwner.uuid
+       LEFT JOIN Master m ON r.targetMasterId = m.id
+       LEFT JOIN List l ON r.targetListId = l.id
+       LEFT JOIN User listOwner ON l.userUuid = listOwner.uuid
+       ${whereClause}
+       ORDER BY r.created DESC
+       LIMIT ? OFFSET ?`,
+      [...whereParams, limit, offset]
+    );
+
+    const reports = (rows || []).map(row => {
+      let targetId = null;
+      let targetName = null;
+      let targetUsername = null;
+
+      if (row.type === 'user') {
+        targetName = row.targetUserDisplayName || row.targetUsername;
+        targetUsername = row.targetUsername;
+      } else if (row.type === 'record') {
+        targetId = row.targetRecordId;
+        targetName = row.targetRecordName;
+        targetUsername = row.targetRecordOwnerUsername;
+      } else if (row.type === 'master') {
+        targetId = row.targetMasterId;
+        targetName = row.targetMasterName;
+      } else if (row.type === 'list') {
+        targetId = row.targetListId;
+        targetName = row.targetListName;
+        targetUsername = row.targetListOwnerUsername;
+      }
+
+      return {
+        id: Number(row.id),
+        type: String(row.type),
+        reportedByUsername: row.reportedByUsername ? String(row.reportedByUsername) : null,
+        reason: String(row.reason),
+        userNotes: row.userNotes ? String(row.userNotes) : null,
+        created: row.created ? String(row.created) : null,
+        status: String(row.status),
+        adminNotes: row.adminNotes ? String(row.adminNotes) : null,
+        targetId: targetId ? Number(targetId) : null,
+        targetName: targetName ? String(targetName) : null,
+        targetUsername: targetUsername ? String(targetUsername) : null,
+      };
+    });
 
     res.json({
       reports,
@@ -7271,12 +7265,9 @@ app.get('/api/admin/reports', requireAuth, requireAdmin, async (req, res) => {
 // Update report status (admin only)
 app.patch('/api/admin/reports/:type/:id', requireAuth, requireAdmin, async (req, res) => {
   console.log('Admin updating report...');
-  const { type, id } = req.params;
+  const { id } = req.params;
   const reportId = Number(id);
 
-  if (!['general', 'user', 'record', 'master', 'list'].includes(type)) {
-    return res.status(400).json({ error: 'Invalid report type' });
-  }
   if (!Number.isInteger(reportId) || reportId <= 0) {
     return res.status(400).json({ error: 'Invalid report ID' });
   }
@@ -7289,19 +7280,10 @@ app.patch('/api/admin/reports/:type/:id', requireAuth, requireAdmin, async (req,
   const trimmedStatus = status.trim();
   const trimmedAdminNotes = typeof adminNotes === 'string' && adminNotes.trim() ? adminNotes.trim() : null;
 
-  const tableMap = {
-    general: 'GeneralReport',
-    user: 'ReportedUser',
-    record: 'ReportedRecord',
-    master: 'ReportedMaster',
-    list: 'ReportedList',
-  };
-  const tableName = tableMap[type];
-
   try {
     const pool = await getPool();
     const [result] = await pool.execute(
-      `UPDATE ${tableName} SET status = ?, adminNotes = ? WHERE id = ?`,
+      `UPDATE Report SET status = ?, adminNotes = ? WHERE id = ?`,
       [trimmedStatus, trimmedAdminNotes, reportId]
     );
 
@@ -7313,11 +7295,7 @@ app.patch('/api/admin/reports/:type/:id', requireAuth, requireAdmin, async (req,
     let hasPendingReports = false;
     try {
       const [pendingCheck] = await pool.execute(
-        `SELECT EXISTS(SELECT 1 FROM GeneralReport WHERE status = 'Pending')
-              OR EXISTS(SELECT 1 FROM ReportedUser WHERE status = 'Pending')
-              OR EXISTS(SELECT 1 FROM ReportedRecord WHERE status = 'Pending')
-              OR EXISTS(SELECT 1 FROM ReportedMaster WHERE status = 'Pending')
-              OR EXISTS(SELECT 1 FROM ReportedList WHERE status = 'Pending') AS hasPending`
+        `SELECT EXISTS(SELECT 1 FROM Report WHERE status = 'Pending') AS hasPending`
       );
       hasPendingReports = Boolean(pendingCheck[0]?.hasPending);
     } catch (pendingErr) {

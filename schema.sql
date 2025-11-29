@@ -179,67 +179,27 @@ CREATE TABLE UserGenreInterest (
     FOREIGN KEY (userUuid) REFERENCES User(uuid) ON DELETE CASCADE
 );
 
-CREATE TABLE GeneralReport (
+CREATE TABLE Report (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    type ENUM('general', 'user', 'record', 'master', 'list') NOT NULL,
     reportedBy CHAR(36),
-    reason VARCHAR(50) NOT NULL,
-    userNotes TEXT,
-    created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    status VARCHAR(20) NOT NULL DEFAULT 'Pending',
-    adminNotes TEXT DEFAULT NULL,
-    FOREIGN KEY (reportedBy) REFERENCES User(uuid) ON DELETE SET NULL
-);
-
-CREATE TABLE ReportedUser (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    reportedBy CHAR(36),
-    reportedUser CHAR(36),
+    targetUserUuid CHAR(36) DEFAULT NULL,
+    targetRecordId INT DEFAULT NULL,
+    targetMasterId INT DEFAULT NULL,
+    targetListId INT DEFAULT NULL,
     reason VARCHAR(50) NOT NULL,
     userNotes TEXT,
     created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     status VARCHAR(20) NOT NULL DEFAULT 'Pending',
     adminNotes TEXT DEFAULT NULL,
     FOREIGN KEY (reportedBy) REFERENCES User(uuid) ON DELETE SET NULL,
-    FOREIGN KEY (reportedUser) REFERENCES User(uuid) ON DELETE SET NULL
-);
-
-CREATE TABLE ReportedRecord (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    reportedBy CHAR(36),
-    recordId INT,
-    reason VARCHAR(50) NOT NULL,
-    userNotes TEXT,
-    created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    status VARCHAR(20) NOT NULL DEFAULT 'Pending',
-    adminNotes TEXT DEFAULT NULL,
-    FOREIGN KEY (reportedBy) REFERENCES User(uuid) ON DELETE CASCADE,
-    FOREIGN KEY (recordId) REFERENCES Record(id) ON DELETE SET NULL
-);
-
-CREATE TABLE ReportedMaster (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    reportedBy CHAR(36),
-    masterId INT,
-    reason VARCHAR(50) NOT NULL,
-    userNotes TEXT,
-    created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    status VARCHAR(20) NOT NULL DEFAULT 'Pending',
-    adminNotes TEXT DEFAULT NULL,
-    FOREIGN KEY (reportedBy) REFERENCES User(uuid) ON DELETE CASCADE,
-    FOREIGN KEY (masterId) REFERENCES Master(id) ON DELETE SET NULL
-);
-
-CREATE TABLE ReportedList (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    reportedBy CHAR(36),
-    listId INT,
-    reason VARCHAR(50) NOT NULL,
-    userNotes TEXT,
-    created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    status VARCHAR(20) NOT NULL DEFAULT 'Pending',
-    adminNotes TEXT DEFAULT NULL,
-    FOREIGN KEY (reportedBy) REFERENCES User(uuid) ON DELETE CASCADE,
-    FOREIGN KEY (listId) REFERENCES List(id) ON DELETE SET NULL
+    FOREIGN KEY (targetUserUuid) REFERENCES User(uuid) ON DELETE SET NULL,
+    FOREIGN KEY (targetRecordId) REFERENCES Record(id) ON DELETE SET NULL,
+    FOREIGN KEY (targetMasterId) REFERENCES Master(id) ON DELETE SET NULL,
+    FOREIGN KEY (targetListId) REFERENCES List(id) ON DELETE SET NULL,
+    INDEX idx_report_status_created (status, created),
+    INDEX idx_report_type_status (type, status),
+    INDEX idx_report_reportedBy (reportedBy)
 );
 
 -- Keep Master rating tallies (rating1..rating10) and ratingAve in sync with Record changes

@@ -43,7 +43,7 @@ const defaultPages: TutorialPage[] = [
   {
     title: "Add Records to Your Collection",
     description:
-      "Use the search bar at the top of any page to find albums and add them to your collection, wishlist, or listening history. You can also scan barcodes or add custom records to find records.",
+      "Use the search bar at the top of any page to find albums and add them to your collection, wishlist, or listening history. You can also scan record barcodes to find them or add custom records.",
     image: searchTutorialImg,
     imageMaxHeight: 200,
   },
