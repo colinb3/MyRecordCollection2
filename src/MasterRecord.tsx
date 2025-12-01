@@ -33,7 +33,7 @@ import apiUrl from "./api";
 import TopBar from "./components/TopBar";
 import { darkTheme } from "./theme";
 import { setUserId } from "./analytics";
-import FindRecordSidebar from "./components/FindRecordSidebar";
+import MasterSidebar from "./components/MasterSidebar";
 import CoverImage from "./components/CoverImage";
 import { getCachedUserInfo, loadUserInfo } from "./userInfo";
 import { loadUserTags } from "./userTags";
@@ -459,7 +459,14 @@ export default function MasterRecord() {
   }, []);
 
   const handleAddNewTag = useCallback((tag: string) => {
-    setAvailableTags((prev) => (prev.includes(tag) ? prev : [...prev, tag]));
+    // Insert the new tag in alphabetical order (case-insensitive)
+    setAvailableTags((prev) => {
+      if (prev.includes(tag)) return prev;
+      const newTags = [...prev, tag];
+      newTags.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+      return newTags;
+    });
+    // Also select the new tag
     setSelectedTags((prev) => (prev.includes(tag) ? prev : [...prev, tag]));
   }, []);
 
@@ -1475,7 +1482,7 @@ export default function MasterRecord() {
                   flexDirection: "column",
                 }}
               >
-                <FindRecordSidebar
+                <MasterSidebar
                   availableTags={availableTags}
                   selectedTags={selectedTags}
                   onToggleTag={handleToggleTag}

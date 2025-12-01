@@ -130,13 +130,15 @@ export default function EditRecordDialog({
   // Handler for the Autocomplete tags input
   const handleTagsChange = (_: unknown, newValue: string[]) => {
     if (editedRecord) {
-      setEditedRecord({ ...editedRecord, tags: newValue });
+      // Truncate each tag to 50 chars
+      const truncated = newValue.map((t) => t.slice(0, 50));
+      setEditedRecord({ ...editedRecord, tags: truncated });
     }
   };
 
   // Helper to add a tag if it's not already present (case-insensitive)
   const addTagIfMissing = (tag: string) => {
-    const normalized = tag.trim();
+    const normalized = tag.trim().slice(0, 50);
     if (!normalized) return;
     setEditedRecord((prev) => {
       if (!prev) return prev;
@@ -464,10 +466,13 @@ export default function EditRecordDialog({
                     variant="outlined"
                     label="Tags"
                     placeholder="Add tags"
-                    inputProps={{
-                      ...params.inputProps,
-                      enterKeyHint: "done",
-                      onKeyDown: handleKeyDown,
+                    slotProps={{
+                      htmlInput: {
+                        ...params.inputProps,
+                        enterKeyHint: "done",
+                        onKeyDown: handleKeyDown,
+                        maxLength: 50,
+                      },
                     }}
                     sx={{
                       "& .MuiOutlinedInput-root": {

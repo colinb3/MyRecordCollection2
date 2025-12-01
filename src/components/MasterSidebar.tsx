@@ -4,13 +4,6 @@ import {
   Paper,
   Typography,
   Box,
-  List,
-  ListSubheader,
-  ListItem,
-  ListItemButton,
-  ListItemIcon,
-  Checkbox,
-  ListItemText,
   TextField,
   Button,
   Slider,
@@ -21,6 +14,8 @@ import {
   FormControl,
   IconButton,
   Tooltip,
+  Chip,
+  Autocomplete,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import SettingsIcon from "@mui/icons-material/Settings";
@@ -39,7 +34,7 @@ export interface SidebarListOption {
   listRecordId: number | null;
 }
 
-interface FindRecordSidebarProps {
+interface MasterSidebarProps {
   availableTags: string[];
   selectedTags: string[];
   onToggleTag: (tag: string) => void;
@@ -72,7 +67,7 @@ interface SidebarActionConfig {
   icon?: ReactNode;
 }
 
-export default function FindRecordSidebar({
+export default function MasterSidebar({
   availableTags,
   selectedTags,
   onToggleTag,
@@ -93,27 +88,65 @@ export default function FindRecordSidebar({
   onAddToList,
   onManageLists,
   listActionDisabled,
-}: FindRecordSidebarProps) {
+}: MasterSidebarProps) {
   const [selectedListId, setSelectedListId] = useState<number | "">("");
+  const [tagInputValue, setTagInputValue] = useState("");
+
   const handleSlider = (_: Event, val: number | number[]) => {
     onRatingChange(val as number);
   };
 
-  const handleAddTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      const target = e.target as HTMLInputElement;
-      const val = target.value.trim();
-      if (val && !availableTags.includes(val)) {
-        onAddNewTag(val);
-      }
-      target.value = "";
-      try {
-        target.blur();
-      } catch {
-        // ignore if blur fails
-      }
+  // Combine wikiTags and availableTags into grouped options for Autocomplete
+  const getGroupedOptions = () => {
+    const suggestedTags = (wikiTags ?? []).filter(
+      (tag) => !selectedTags.includes(tag)
+    );
+    const existingTags = availableTags.filter(
+      (tag) => !selectedTags.includes(tag) && !(wikiTags ?? []).includes(tag)
+    );
+    return [
+      ...suggestedTags.map((tag) => ({ tag, group: "Suggested" })),
+      ...existingTags.map((tag) => ({ tag, group: "Existing" })),
+    ];
+  };
+
+  const addTag = (tagToAdd: string) => {
+    // Truncate to 50 chars
+    const truncated = tagToAdd.slice(0, 50);
+    if (!truncated) return;
+
+    // Case-insensitive check if already selected
+    const alreadySelected = selectedTags.some(
+      (t) => t.toLowerCase() === truncated.toLowerCase()
+    );
+    if (alreadySelected) return;
+
+    // Case-insensitive check if it exists in availableTags
+    const existingTag = availableTags.find(
+      (t) => t.toLowerCase() === truncated.toLowerCase()
+    );
+    if (existingTag) {
+      // Use the existing tag's casing
+      onToggleTag(existingTag);
+    } else {
+      // Brand new tag - add to list and select
+      onAddNewTag(truncated);
     }
+  };
+
+  const handleTagSelect = (
+    _: unknown,
+    value: { tag: string; group: string } | string | null
+  ) => {
+    if (!value) return;
+    const tagToAdd =
+      typeof value === "string" ? value.trim() : value.tag.trim();
+    addTag(tagToAdd);
+    setTagInputValue("");
+  };
+
+  const handleRemoveTag = (tagToRemove: string) => {
+    onToggleTag(tagToRemove);
   };
 
   return (
@@ -142,107 +175,101 @@ export default function FindRecordSidebar({
           variant="subtitle1"
           sx={{ display: "flex", alignItems: "center" }}
         >
-          Choose Tags
+          Tags
           {wikiLoading && <CircularProgress size={16} sx={{ ml: 1 }} />}
         </Typography>
-        <Box
-          sx={{
-            flexGrow: 0,
-            overflowY: "auto",
-            border: "1px solid grey",
-            borderRadius: 2,
-            minHeight: 200,
-            my: 1,
-          }}
-        >
-          <List dense sx={{ p: 0 }} subheader={<li />}>
-            {wikiTags && wikiTags.length > 0 && (
-              <li>
-                <ul style={{ padding: 0, margin: 0 }}>
-                  <ListSubheader
-                    component="div"
-                    sx={{
-                      position: "sticky",
-                      top: 0,
-                      bgcolor: "#2f2f2f",
-                      zIndex: 1,
-                    }}
-                  >
-                    Suggested
-                  </ListSubheader>
-                  {wikiTags.map((tag) => (
-                    <ListItem disablePadding key={`wiki-${tag}`}>
-                      <ListItemButton
-                        dense
-                        onClick={() => onToggleTag(tag)}
-                        sx={{ py: 0 }}
-                      >
-                        <ListItemIcon sx={{ minWidth: 35 }}>
-                          <Checkbox
-                            edge="start"
-                            checked={selectedTags.includes(tag)}
-                            tabIndex={-1}
-                            disableRipple
-                          />
-                        </ListItemIcon>
-                        <ListItemText primary={tag} />
-                      </ListItemButton>
-                    </ListItem>
-                  ))}
-                </ul>
-              </li>
-            )}
 
-            <li>
-              <ul style={{ padding: 0, margin: 0 }}>
-                <ListSubheader
-                  component="div"
-                  sx={{
-                    position: "sticky",
-                    bgcolor: "#2f2f2f",
-                    zIndex: 1,
-                  }}
-                >
-                  Existing
-                </ListSubheader>
-                {availableTags.map((tag) => (
-                  <ListItem disablePadding key={tag}>
-                    <ListItemButton
-                      dense
-                      onClick={() => onToggleTag(tag)}
-                      sx={{ py: 0 }}
-                    >
-                      <ListItemIcon sx={{ minWidth: 35 }}>
-                        <Checkbox
-                          edge="start"
-                          checked={selectedTags.includes(tag)}
-                          tabIndex={-1}
-                          disableRipple
-                        />
-                      </ListItemIcon>
-                      <ListItemText primary={tag} />
-                    </ListItemButton>
-                  </ListItem>
-                ))}
-                {availableTags.length === 0 && (
-                  <ListItem>
-                    <ListItemText primary="No tags yet" />
-                  </ListItem>
-                )}
-              </ul>
-            </li>
-          </List>
-        </Box>
+        {/* Selected tags as horizontal chips */}
+        {selectedTags.length > 0 && (
+          <Stack
+            direction="row"
+            spacing={0.5}
+            useFlexGap
+            flexWrap="wrap"
+            sx={{ mb: 1, mt: 0.5 }}
+          >
+            {selectedTags.map((tag) => (
+              <Chip
+                key={tag}
+                label={<Typography variant="body2">{tag}</Typography>}
+                onDelete={() => handleRemoveTag(tag)}
+                sx={{ mb: 0.25 }}
+              />
+            ))}
+          </Stack>
+        )}
 
-        <TextField
-          placeholder="Add New Tag"
+        {/* Autocomplete for adding tags */}
+        <Autocomplete
+          freeSolo
+          options={getGroupedOptions()}
+          groupBy={(option) =>
+            typeof option === "string" ? "New" : option.group
+          }
+          getOptionLabel={(option) =>
+            typeof option === "string" ? option : option.tag
+          }
+          inputValue={tagInputValue}
+          onInputChange={(_, newValue) => setTagInputValue(newValue)}
+          onChange={handleTagSelect}
+          value={null}
           size="small"
-          onKeyDown={handleAddTag}
-          sx={{ mb: 2 }}
-          inputProps={{ enterKeyHint: "done", autoComplete: "off" }}
+          sx={{ mb: 1.5 }}
+          slotProps={{
+            listbox: {
+              sx: {
+                bgcolor: "background.paper",
+                maxHeight: 275,
+                border: "2px solid",
+                borderColor: "divider",
+                borderRadius: 1.5,
+              },
+            },
+          }}
+          renderGroup={(params) => (
+            <li key={params.key}>
+              <Typography
+                variant="caption"
+                sx={{
+                  px: 2,
+                  py: 0.75,
+                  display: "block",
+                  color: "text.secondary",
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  letterSpacing: 0.5,
+                }}
+              >
+                {params.group}
+              </Typography>
+              <ul style={{ padding: 0, margin: 0 }}>{params.children}</ul>
+            </li>
+          )}
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              placeholder={
+                selectedTags.length === 0 ? "Add tags..." : "Add more tags..."
+              }
+              slotProps={{
+                htmlInput: {
+                  ...params.inputProps,
+                  enterKeyHint: "done",
+                  autoComplete: "off",
+                  maxLength: 50,
+                },
+              }}
+            />
+          )}
         />
         <Typography variant="subtitle1">Rating</Typography>
-        <Box sx={{ justifySelf: "center", width: { xs: "94%", md: "90%" } }}>
+        <Box
+          sx={{
+            justifySelf: "center",
+            width: { xs: "94%", md: "90%" },
+            mb: 0.5,
+          }}
+        >
           <Slider
             value={rating}
             onChange={handleSlider}
@@ -263,7 +290,7 @@ export default function FindRecordSidebar({
         </Box>
         <Typography
           variant="subtitle1"
-          sx={{ display: "flex", alignItems: "center", mt: 1 }}
+          sx={{ display: "flex", alignItems: "center" }}
         >
           Release
           {masterLoading && <CircularProgress size={16} sx={{ ml: 1 }} />}
@@ -273,7 +300,7 @@ export default function FindRecordSidebar({
           type="number"
           size="small"
           onChange={(e) => onReleaseYearChange(Number(e.target.value))}
-          sx={{ mb: 1, width: "50%" }}
+          sx={{ mb: 1.5, width: "50%" }}
           slotProps={{
             input: {
               inputProps: { min: 1901, max: 2100 },

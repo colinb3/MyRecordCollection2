@@ -1267,7 +1267,7 @@ async function fetchDiscogsRelease(releaseId) {
 async function fetchLastFmCover(artist, record) {
   const apiKey = process.env.LASTFM_API_KEY;
   if (!apiKey) return null;
-  const query = `${record}`.trim(); // search by record title only per request
+  const query = `${record.trim()} ${artist.trim()}`; // search by record title only per request
   if (!query) return null;
   const url = `https://ws.audioscrobbler.com/2.0/?method=album.search&album=${encodeURIComponent(
     query
@@ -1281,8 +1281,9 @@ async function fetchLastFmCover(artist, record) {
     const albums = data?.results?.albummatches?.album;
     if (!Array.isArray(albums) || albums.length === 0) return null;
 
-    // normalize target artist for comparison
+    // normalize targets for comparison
     const targetArtist = (artist || "").toLowerCase().trim();
+    const targetRecord = (record || "").toLowerCase().trim();
 
     // helper to extract extralarge (or best fallback) from album image array
     const pickExtralarge = (album) => {
@@ -1303,7 +1304,8 @@ async function fetchLastFmCover(artist, record) {
     if (targetArtist) {
       for (const album of albums) {
         const aArtist = (album?.artist || "").toLowerCase().trim();
-        if (aArtist && aArtist === targetArtist) {
+        const aName = (album?.name || "").toLowerCase().trim();
+        if (aArtist && aArtist === targetArtist && aName === targetRecord) {
           const urlText = pickExtralarge(album);
           if (urlText) return urlText;
         }
@@ -4073,10 +4075,12 @@ app.post('/api/records/update', requireAuth, async (req, res) => {
     await pool.execute(`DELETE FROM Tagged WHERE recordId = ?`, [id]);
 
     for (const tagName of tags || []) {
-      let [tagRows] = await pool.execute(`SELECT id FROM Tag WHERE name = ? AND userUuid = ?`, [tagName, req.userUuid]);
+      const truncatedTag = String(tagName).trim().slice(0, 50);
+      if (!truncatedTag) continue;
+      let [tagRows] = await pool.execute(`SELECT id FROM Tag WHERE name = ? AND userUuid = ?`, [truncatedTag, req.userUuid]);
       let tagId;
       if (tagRows.length === 0) {
-        const [result] = await pool.execute(`INSERT INTO Tag (name, userUuid, created) VALUES (?, ?, UTC_TIMESTAMP())`, [tagName, req.userUuid]);
+        const [result] = await pool.execute(`INSERT INTO Tag (name, userUuid, created) VALUES (?, ?, UTC_TIMESTAMP())`, [truncatedTag, req.userUuid]);
         tagId = result.insertId;
       } else {
         tagId = tagRows[0].id;
@@ -4238,10 +4242,12 @@ app.post('/api/records/create', requireAuth, async (req, res) => {
     const newId = result.insertId;
     // Add tags (create if missing)
     for (const tagName of tags || []) {
-      let [tagRows] = await pool.execute(`SELECT id FROM Tag WHERE name = ? AND userUuid = ?`, [tagName, req.userUuid]);
+      const truncatedTag = String(tagName).trim().slice(0, 50);
+      if (!truncatedTag) continue;
+      let [tagRows] = await pool.execute(`SELECT id FROM Tag WHERE name = ? AND userUuid = ?`, [truncatedTag, req.userUuid]);
       let tagId;
       if (tagRows.length === 0) {
-        const [tagResult] = await pool.execute(`INSERT INTO Tag (name, userUuid, created) VALUES (?, ?, UTC_TIMESTAMP())`, [tagName, req.userUuid]);
+        const [tagResult] = await pool.execute(`INSERT INTO Tag (name, userUuid, created) VALUES (?, ?, UTC_TIMESTAMP())`, [truncatedTag, req.userUuid]);
         tagId = tagResult.insertId;
       } else {
         tagId = tagRows[0].id;
@@ -4275,7 +4281,8 @@ app.post('/api/tags/create', requireAuth, async (req, res) => {
   if (!name || !name.trim()) return res.status(400).json({ error: 'Tag name required' });
   try {
     const pool = await getPool();
-    const trimmed = name.trim();
+    const trimmed = name.trim().slice(0, 50);
+    if (trimmed.length === 0) return res.status(400).json({ error: 'Tag name required' });
     // Check duplicate
     const [existing] = await pool.execute(`SELECT id FROM Tag WHERE name = ? AND userUuid = ?`, [trimmed, req.userUuid]);
     if (existing.length > 0) return res.status(409).json({ error: 'Tag already exists' });
@@ -4293,7 +4300,7 @@ app.post('/api/tags/rename', requireAuth, async (req, res) => {
   if (!newName) return res.status(400).json({ error: 'newName required' });
   try {
     const pool = await getPool();
-    const trimmedNew = String(newName).trim();
+    const trimmedNew = String(newName).trim().slice(0, 50);
     if (!trimmedNew) return res.status(400).json({ error: 'New name cannot be empty' });
 
     let targetId = null;
@@ -4426,7 +4433,7 @@ app.post('/api/import/discogs', requireAuth, async (req, res) => {
         new Set(
           tagsArray
             .filter((tag) => typeof tag === 'string')
-            .map((tag) => tag.trim())
+            .map((tag) => tag.trim().slice(0, 50))
             .filter(Boolean)
         )
       );

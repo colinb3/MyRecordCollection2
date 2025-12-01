@@ -266,6 +266,7 @@ export default function ManageTagsDialog({
                 }
               }}
               disabled={loading}
+              inputProps={{ maxLength: 50 }}
             />
             <Button
               variant="contained"
@@ -341,6 +342,7 @@ export default function ManageTagsDialog({
                     }}
                     autoFocus
                     disabled={loading}
+                    inputProps={{ maxLength: 50 }}
                   />
                 ) : (
                   <ListItemButton

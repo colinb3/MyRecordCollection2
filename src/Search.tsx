@@ -726,11 +726,6 @@ export default function Search() {
                                 {recordLoadingMore ? "Loading..." : "Load More"}
                               </Button>
                             </Box>
-                            <Typography
-                              sx={{ mx: "auto", color: "text.secondary" }}
-                            >
-                              Tip: Search by the album name
-                            </Typography>
                           </Stack>
                         )}
                       </List>
