@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { DataGrid, type GridColDef } from "@mui/x-data-grid";
-import Box from "@mui/material/Box";
+import { Box, useMediaQuery } from "@mui/material";
 import Skeleton from "@mui/material/Skeleton";
 import CoverImage from "./CoverImage";
 import {
@@ -9,13 +9,14 @@ import {
   type RecordTableSortPreference,
 } from "../types";
 import { formatLocalDate } from "../dateUtils";
+import SubjectIcon from "@mui/icons-material/Subject";
 
 // Clean column definitions with wrapping via cellClassName
 const columns: GridColDef[] = [
   {
     field: "cover",
     headerName: "",
-    width: 116,
+    width: 112,
     sortable: false,
     renderCell: (params) => {
       // Show skeleton square when loading
@@ -24,16 +25,16 @@ const columns: GridColDef[] = [
           <Box
             sx={{
               ml: -0.5,
-              width: 100,
-              height: 100,
+              width: { xs: 86, sm: 100 },
+              height: { xs: 86, sm: 100 },
             }}
           >
             <Skeleton
               variant="rounded"
               animation="pulse"
               sx={{
-                width: 100,
-                height: 100,
+                width: { xs: 86, sm: 100 },
+                height: { xs: 86, sm: 100 },
                 borderRadius: 1,
                 bgcolor: "action.hover",
               }}
@@ -51,8 +52,8 @@ const columns: GridColDef[] = [
         <Box
           sx={{
             ml: -0.5,
-            width: 100,
-            height: 100,
+            width: { xs: 86, sm: 100 },
+            height: { xs: 86, sm: 100 },
           }}
         >
           <CoverImage
@@ -61,9 +62,9 @@ const columns: GridColDef[] = [
             variant="rounded"
             iconSize="small"
             sx={{
-              width: 100,
-              height: 100,
-              borderRadius: 1,
+              width: { xs: 86, sm: 100 },
+              height: { xs: 86, sm: 100 },
+              borderRadius: 1.5,
             }}
           />
         </Box>
@@ -118,7 +119,24 @@ const columns: GridColDef[] = [
       if (params.row.isLoading) {
         return <Skeleton animation="pulse" width="40%" height={24} />;
       }
-      return params.value;
+      const hasReview = Boolean(
+        params.row &&
+          params.row.review !== undefined &&
+          params.row.review !== null &&
+          params.row.review !== ""
+      );
+
+      return (
+        <>
+          {params.value}
+          {hasReview && (
+            <SubjectIcon
+              fontSize="small"
+              sx={{ ml: 0.5, pb: 0.25, verticalAlign: "middle" }}
+            />
+          )}
+        </>
+      );
     },
   },
   {
@@ -198,6 +216,12 @@ export default function RecordTable({
   defaultSort,
   loading = false,
 }: RecordTableProps) {
+  const isXSScreen = useMediaQuery("(min-width:600px)");
+  const columnsWithResponsive = useMemo(() => {
+    return columns.map((col) =>
+      col.field === "cover" ? { ...col, width: isXSScreen ? 112 : 96 } : col
+    );
+  }, [isXSScreen]);
   const handleRowClick = (params: { row: Record }) => {
     onSelect?.(params.row as Record);
   };
@@ -259,11 +283,11 @@ export default function RecordTable({
     <DataGrid
       key={gridKey}
       rows={displayRows}
-      columns={columns}
+      columns={columnsWithResponsive}
       loading={loading && records.length > 0}
       initialState={gridInitialState}
       density="comfortable"
-      rowHeight={89}
+      rowHeight={isXSScreen ? 89 : 75}
       getRowId={(row) => row.id}
       onRowClick={handleRowClick}
       getRowClassName={getRowClassName}
