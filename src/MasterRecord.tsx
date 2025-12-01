@@ -1360,10 +1360,13 @@ export default function MasterRecord() {
                 sx={{
                   flexBasis: { md: "48%" },
                   flexGrow: 1,
-                  p: { xs: 2, md: 3 },
-                  pr: { md: 1.5 },
+                  my: { xs: 2, md: 3 },
+                  pl: { xs: 2, md: 3 },
+                  mr: { xs: 2, md: 0 },
+                  pr: { xs: 0, md: 1.5 },
                   display: "flex",
                   flexDirection: "column",
+                  overflowY: { md: "auto" },
                 }}
               >
                 <Stack direction={"row"} justifyContent="space-between">
