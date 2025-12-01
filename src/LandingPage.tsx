@@ -213,7 +213,7 @@ export default function LandingPage() {
       Icon: PeopleAltIcon,
     },
     {
-      title: "See reviews and ratings",
+      title: "Reviews and ratings",
       description:
         "Review any record, see the average ratings and reviews for your favourite records, and like your favourite reviews.",
       Icon: FavoriteIcon,
@@ -227,11 +227,11 @@ export default function LandingPage() {
     {
       title: "Keep up with your friends",
       description:
-        "Follow other collectors to keep up with their latest activity — including their latest collection additions, reviews, lists, and likes.",
+        "Follow other collectors to compare your favourites and keep up with their latest activity — including collection additions, reviews, lists, and likes.",
       Icon: FeedIcon,
     },
     {
-      title: "Discogs import in seconds",
+      title: "Discogs import in a Blink",
       description:
         "Import your Discogs collection and we handle covers, ratings, and tags automatically.",
       Icon: CloudUploadIcon,

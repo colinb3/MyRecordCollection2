@@ -379,7 +379,6 @@ export default function Collection({ tableName, title }: CollectionProps) {
             mb: 1,
             display: "flex",
             justifyContent: "flex-start",
-            gap: 0.5,
           }}
         >
           <TextField
@@ -389,14 +388,14 @@ export default function Collection({ tableName, title }: CollectionProps) {
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
             sx={{
-              width: 300,
+              width: 275,
             }}
           />
           <Button
             variant="outlined"
             color="primary"
             startIcon={<AddIcon />}
-            sx={{ whiteSpace: "nowrap" }}
+            sx={{ whiteSpace: "nowrap", ml: 1 }}
             onClick={async () => {
               if (creating) return;
               setCreating(true);
@@ -465,11 +464,13 @@ export default function Collection({ tableName, title }: CollectionProps) {
             Custom
           </Button>
           {!(currentTableIsPrivate === true) && (
-            <ShareButton
-              url={getCollectionUrl()}
-              title={title ?? tableName}
-              text={`Check out my ${title ?? tableName}`}
-            />
+            <Box sx={{ ml: 0.75 }}>
+              <ShareButton
+                url={getCollectionUrl()}
+                title={title ?? tableName}
+                text={`Check out my ${title ?? tableName}`}
+              />
+            </Box>
           )}
         </Box>
         <Grid

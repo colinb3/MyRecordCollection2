@@ -1190,8 +1190,8 @@ export default function Community() {
                                   alt={`${entry.record.record} cover`}
                                   variant="rounded"
                                   sx={{
-                                    width: { xs: 100, sm: 150, md: 175 },
-                                    height: { xs: 100, sm: 150, md: 175 },
+                                    width: { xs: 100, sm: 125, md: 150 },
+                                    height: { xs: 100, sm: 125, md: 150 },
                                     borderRadius: 1,
                                     flexShrink: 0,
                                     boxShadow: 1,
@@ -1201,8 +1201,8 @@ export default function Community() {
                                 <Avatar
                                   variant="rounded"
                                   sx={{
-                                    width: { xs: 100, sm: 150, md: 175 },
-                                    height: { xs: 100, sm: 150, md: 175 },
+                                    width: { xs: 100, sm: 125, md: 150 },
+                                    height: { xs: 100, sm: 125, md: 150 },
                                     borderRadius: 1,
                                     bgcolor: "grey.800",
                                     flexShrink: 0,
@@ -1458,8 +1458,8 @@ export default function Community() {
                                   alt={`${entry.list.name} cover`}
                                   variant="rounded"
                                   sx={{
-                                    width: { xs: 100, sm: 150, md: 175 },
-                                    height: { xs: 100, sm: 150, md: 175 },
+                                    width: { xs: 100, sm: 125, md: 150 },
+                                    height: { xs: 100, sm: 125, md: 150 },
                                     borderRadius: 1,
                                     flexShrink: 0,
                                     boxShadow: 1,
