@@ -301,7 +301,7 @@ export default function CommunityCollection({
           <Box
             sx={{
               flex: "0 0 auto",
-              pb: 1,
+              pb: 0.5,
               display: "flex",
               flexDirection: "column",
               gap: 1,
@@ -340,13 +340,13 @@ export default function CommunityCollection({
                 }}
               >
                 <Avatar
-                  sx={{ width: 48, height: 48, bgcolor: "grey.700" }}
+                  sx={{ width: 36, height: 36, bgcolor: "grey.700" }}
                   src={profile?.profilePicUrl ?? undefined}
                 >
                   {!profile?.profilePicUrl && targetAvatarInitial}
                 </Avatar>
                 <Box>
-                  <Typography variant="h5" sx={{ lineHeight: 1.2 }}>
+                  <Typography variant="h6" sx={{ lineHeight: 1 }}>
                     {genreFilter
                       ? `${targetDisplayName}'s ${genreFilter} Records${
                           tableFilter ? ` (${tableFilter})` : ""
@@ -356,9 +356,6 @@ export default function CommunityCollection({
                       : isListenedView
                       ? `${targetDisplayName}'s Listened`
                       : `${targetDisplayName}'s Collection`}
-                  </Typography>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    @{profile?.username ?? targetUsername}
                   </Typography>
                 </Box>
               </ButtonBase>
