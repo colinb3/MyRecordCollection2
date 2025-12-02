@@ -28,7 +28,7 @@ type CollectionFilter = "all" | "collection" | "listened" | "wishlist";
 
 interface ComparedRecord {
   id: number;
-  masterId: number;
+  masterId: string;
   record: string;
   artist: string;
   cover: string | null;

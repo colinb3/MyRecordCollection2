@@ -14,7 +14,7 @@ CREATE TABLE User (
 
 CREATE TABLE ListeningTo (
     userUuid CHAR(36) PRIMARY KEY,
-    masterId INT NOT NULL,
+    masterId VARCHAR(10) NOT NULL,
     created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (masterId) REFERENCES Master(id) ON DELETE CASCADE,
     FOREIGN KEY (userUuid) REFERENCES User(uuid) ON DELETE CASCADE
@@ -47,7 +47,7 @@ CREATE TABLE Record (
     userUuid CHAR(36),
     tableId INT,
     review TEXT,
-    masterId INT,
+    masterId VARCHAR(10),
     reviewLikes INT DEFAULT 0,
     FOREIGN KEY (masterId) REFERENCES Master(id) ON DELETE SET NULL,
     FOREIGN KEY (userUuid) REFERENCES User(uuid) ON DELETE CASCADE,
@@ -119,7 +119,7 @@ CREATE TABLE ListRecord (
     sortOrder INT DEFAULT 0,
     userUuid CHAR(36),
     listId INT,
-    masterId INT,
+    masterId VARCHAR(10),
     FOREIGN KEY (masterId) REFERENCES Master(id) ON DELETE SET NULL,
     FOREIGN KEY (userUuid) REFERENCES User(uuid) ON DELETE CASCADE,
     FOREIGN KEY (listId) REFERENCES List(id) ON DELETE CASCADE
@@ -139,7 +139,7 @@ CREATE TABLE ListLike (
 CREATE INDEX idx_follows_followed ON Follows (followsUuid);
 
 CREATE TABLE Master (
-    id INT PRIMARY KEY,
+    id VARCHAR(10) PRIMARY KEY,
     artist VARCHAR(255),
     cover VARCHAR(255),
     created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -160,7 +160,7 @@ CREATE TABLE Master (
 );
 
 CREATE TABLE MasterGenre (
-    masterId INT,
+    masterId VARCHAR(10),
     genre VARCHAR(100),
     isStyle BOOLEAN,
     PRIMARY KEY (masterId, genre),
@@ -185,7 +185,7 @@ CREATE TABLE Report (
     reportedBy CHAR(36),
     targetUserUuid CHAR(36) DEFAULT NULL,
     targetRecordId INT DEFAULT NULL,
-    targetMasterId INT DEFAULT NULL,
+    targetMasterId VARCHAR(10) DEFAULT NULL,
     targetListId INT DEFAULT NULL,
     reason VARCHAR(50) NOT NULL,
     userNotes TEXT,
@@ -206,7 +206,7 @@ CREATE TABLE Report (
 DELIMITER $$
 
 DROP PROCEDURE IF EXISTS update_master_ratings $$
-CREATE PROCEDURE update_master_ratings(IN p_master_id INT)
+CREATE PROCEDURE update_master_ratings(IN p_master_id VARCHAR(10))
 BEGIN
     DECLARE c0 INT DEFAULT 0;
     DECLARE c1 INT DEFAULT 0;
@@ -481,7 +481,7 @@ END $$
 
 -- Update genre interests for all users who have records with a specific master
 DROP PROCEDURE IF EXISTS update_genre_interests_for_master $$
-CREATE PROCEDURE update_genre_interests_for_master(IN p_master_id INT)
+CREATE PROCEDURE update_genre_interests_for_master(IN p_master_id VARCHAR(10))
 BEGIN
     DECLARE done INT DEFAULT FALSE;
     DECLARE v_user_uuid CHAR(36);

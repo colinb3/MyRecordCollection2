@@ -320,14 +320,20 @@ function normalizeFeedEntry(raw: AnyObject): CommunityFeedEntry | null {
     }
 
     const recordObject = recordRaw as AnyObject;
-    const masterId = Number(recordObject.masterId);
+    // masterId can be numeric string or 'r' prefixed string
+    const masterId =
+      typeof recordObject.masterId === 'string' && recordObject.masterId.trim()
+        ? recordObject.masterId.trim()
+        : typeof recordObject.masterId === 'number' && recordObject.masterId > 0
+          ? String(recordObject.masterId)
+          : null;
     const recordName = typeof recordObject.name === 'string' ? recordObject.name : '';
     const artist = typeof recordObject.artist === 'string' ? recordObject.artist : '';
     const cover = typeof recordObject.cover === 'string' && recordObject.cover.trim()
       ? recordObject.cover.trim()
       : null;
 
-    if (!Number.isInteger(masterId) || masterId <= 0 || !recordName) {
+    if (!masterId || !recordName) {
       return null;
     }
 
@@ -677,10 +683,13 @@ export async function loadPublicUserProfile(
                     typeof lt.name === "string" && lt.name.trim()
                       ? lt.name.trim()
                       : "",
+                  // masterId can be numeric string or 'r' prefixed string
                   masterId:
-                    typeof lt.masterId === "number" && Number.isInteger(lt.masterId)
-                      ? lt.masterId
-                      : null,
+                    typeof lt.masterId === "string" && lt.masterId.trim()
+                      ? lt.masterId.trim()
+                      : typeof lt.masterId === "number" && lt.masterId > 0
+                        ? String(lt.masterId)
+                        : null,
                 };
               })()
             : null,

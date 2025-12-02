@@ -216,6 +216,44 @@ function formatUtcDateTime(value) {
   )}`;
 }
 
+/**
+ * Validates a masterId string.
+ * Valid formats: numeric string (e.g., "12345") or 'r' + numeric string (e.g., "r12345")
+ * Returns true if valid, false otherwise.
+ */
+function isValidMasterId(masterId) {
+  if (typeof masterId !== "string" || !masterId) {
+    return false;
+  }
+  // Check if it's a release ID (prefixed with 'r') or a master ID (numeric only)
+  const isRelease = masterId.startsWith("r");
+  const numericPart = isRelease ? masterId.slice(1) : masterId;
+  const num = Number(numericPart);
+  return Number.isInteger(num) && num > 0;
+}
+
+/**
+ * Parses a masterId value and returns it as a validated string, or null if invalid.
+ * Accepts string or number inputs.
+ */
+function parseMasterId(value) {
+  if (typeof value === "string" && isValidMasterId(value)) {
+    return value;
+  }
+  // Handle legacy numeric masterId values
+  if (typeof value === "number" && Number.isInteger(value) && value > 0) {
+    return String(value);
+  }
+  // Handle string that's just a number
+  if (typeof value === "string") {
+    const num = Number(value);
+    if (Number.isInteger(num) && num > 0) {
+      return String(num);
+    }
+  }
+  return null;
+}
+
 const RECORD_TABLE_COLUMN_KEYS = [
   "cover",
   "record",
@@ -490,7 +528,7 @@ function mapListRecordRow(row) {
   const id = Number(row?.id);
   const ratingValue = Number(row?.rating);
   const releaseYearValue = Number(row?.releaseYear);
-  const masterIdValue = Number(row?.masterId);
+  const masterIdRaw = row?.masterId;
   const sortOrderValue = Number(row?.sortOrder);
   return {
     id: Number.isInteger(id) && id > 0 ? id : 0,
@@ -508,7 +546,7 @@ function mapListRecordRow(row) {
         ? Math.trunc(ratingValue)
         : null,
     releaseYear: Number.isInteger(releaseYearValue) ? releaseYearValue : null,
-    masterId: Number.isInteger(masterIdValue) && masterIdValue > 0 ? masterIdValue : null,
+    masterId: parseMasterId(masterIdRaw),
     added: row?.added ? formatUtcDateTime(row.added) : null,
     sortOrder: Number.isInteger(sortOrderValue) && sortOrderValue > 0 ? sortOrderValue : undefined,
   };
@@ -721,7 +759,15 @@ async function lookupDiscogsByBarcode(barcode) {
 
     const { artist, record } = splitDiscogsTitle(prioritized?.title);
     const masterIdRaw = prioritized?.master_id;
-    const masterId = Number(masterIdRaw);
+    const masterIdNum = Number(masterIdRaw);
+    const releaseIdNum = Number(prioritized?.id);
+    // Use master_id as string if > 0, otherwise use 'r' + release id
+    let masterId = null;
+    if (Number.isInteger(masterIdNum) && masterIdNum > 0) {
+      masterId = String(masterIdNum);
+    } else if (Number.isInteger(releaseIdNum) && releaseIdNum > 0) {
+      masterId = `r${releaseIdNum}`;
+    }
     const releaseYear = normalizeDiscogsReleaseYear(prioritized?.year);
     const cover =
       typeof prioritized?.cover_image === "string" && prioritized.cover_image.trim()
@@ -740,7 +786,7 @@ async function lookupDiscogsByBarcode(barcode) {
       : null;
 
     return {
-      masterId: Number.isInteger(masterId) && masterId > 0 ? masterId : null,
+      masterId,
       artist: cleanedArtist || null,
       record: record || null,
       releaseYear,
@@ -786,14 +832,15 @@ async function lookupDiscogsMaster(artist, record) {
       return null;
     }
 
-    // Helper to extract masterId from a result (prefer master_id if > 0, else use id)
+    // Helper to extract masterId from a result (prefer master_id if > 0, else use 'r' + id)
+    // Returns a string: either the master_id as string, or 'r' + release id
     const extractMasterId = (result) => {
       const masterIdVal = Number(result?.master_id);
       if (Number.isInteger(masterIdVal) && masterIdVal > 0) {
-        return masterIdVal;
+        return String(masterIdVal);
       }
       const idVal = Number(result?.id);
-      return Number.isInteger(idVal) && idVal > 0 ? idVal : null;
+      return Number.isInteger(idVal) && idVal > 0 ? `r${idVal}` : null;
     };
 
     // Try to find a result that matches the artist and record name
@@ -837,14 +884,27 @@ async function lookupDiscogsMaster(artist, record) {
 }
 
 /**
- * Fetches full master details from Discogs API including genres and styles
+ * Fetches full master/release details from Discogs API including genres and styles.
+ * masterId is a string: either a numeric ID (for master releases) or 'r' + numeric ID (for releases).
  */
 async function fetchDiscogsMasterDetails(masterId) {
-  if (!Number.isInteger(masterId) || masterId <= 0) {
+  if (typeof masterId !== "string" || !masterId) {
     return null;
   }
 
-  const url = new URL(`https://api.discogs.com/masters/${masterId}`);
+  // Determine if this is a release ID (prefixed with 'r') or a master ID
+  const isRelease = masterId.startsWith("r");
+  const numericId = isRelease ? masterId.slice(1) : masterId;
+  
+  // Validate that the numeric part is a valid positive integer
+  const idNum = Number(numericId);
+  if (!Number.isInteger(idNum) || idNum <= 0) {
+    return null;
+  }
+
+  // Use the appropriate Discogs endpoint
+  const endpoint = isRelease ? "releases" : "masters";
+  const url = new URL(`https://api.discogs.com/${endpoint}/${numericId}`);
   if (DISCOGS_API_KEY && DISCOGS_API_SECRET) {
     url.searchParams.set("key", DISCOGS_API_KEY);
     url.searchParams.set("secret", DISCOGS_API_SECRET);
@@ -862,7 +922,7 @@ async function fetchDiscogsMasterDetails(masterId) {
       if (response.status === 404) {
         return null;
       }
-      console.warn(`Discogs master API returned ${response.status} for master ${masterId}`);
+      console.warn(`Discogs ${endpoint} API returned ${response.status} for ${masterId}`);
       return null;
     }
 
@@ -872,7 +932,7 @@ async function fetchDiscogsMasterDetails(masterId) {
 
     return { genres, styles };
   } catch (error) {
-    console.warn(`Failed to fetch Discogs master ${masterId}`, error);
+    console.warn(`Failed to fetch Discogs ${endpoint} ${masterId}`, error);
     return null;
   }
 }
@@ -881,7 +941,7 @@ async function fetchDiscogsMasterDetails(masterId) {
  * Inserts genres and styles into MasterGenre table
  */
 async function insertMasterGenres(pool, masterId, genres, styles) {
-  if (!Number.isInteger(masterId) || masterId <= 0) {
+  if (!isValidMasterId(masterId)) {
     return;
   }
 
@@ -917,7 +977,7 @@ async function insertMasterGenres(pool, masterId, genres, styles) {
  * Syncs genres and styles in MasterGenre table - adds new ones and removes ones not in the provided arrays
  */
 async function syncMasterGenres(pool, masterId, genres, styles) {
-  if (!Number.isInteger(masterId) || masterId <= 0) {
+  if (!isValidMasterId(masterId)) {
     return;
   }
 
@@ -1073,7 +1133,7 @@ async function getUserCollectionsForRecord(pool, userUuid, { masterId, artist, r
   const results = [];
   const seen = new Set();
 
-  if (Number.isInteger(masterId) && masterId > 0) {
+  if (isValidMasterId(masterId)) {
     const [rows] = await pool.query(
       `SELECT r.id AS recordId, rt.name AS tableName
          FROM Record r
@@ -1155,7 +1215,7 @@ async function getUserListMembershipForRecord(pool, userUuid, { masterId, artist
 
   const params = [userUuid];
   let whereClause = "";
-  if (Number.isInteger(masterId) && masterId > 0) {
+  if (isValidMasterId(masterId)) {
     whereClause = "lr.masterId = ?";
     params.push(masterId);
   } else if (normalizedArtist && normalizedRecord) {
@@ -1736,8 +1796,8 @@ app.get("/api/records/master-info", async (req, res) => {
     }
   }
 
-  const masterIdParam = Number(req.query.masterId);
-  const hasMasterId = Number.isInteger(masterIdParam) && masterIdParam > 0;
+  const masterIdParam = parseMasterId(req.query.masterId);
+  const hasMasterId = isValidMasterId(masterIdParam);
 
   if (hasMasterId) {
     try {
@@ -1766,9 +1826,13 @@ app.get("/api/records/master-info", async (req, res) => {
       });
 
       if (!row) {
-        // Master ID exists but not in our database yet - fetch details from Discogs (barcode search)
+        // Master ID exists but not in our database yet - fetch details from Discogs
+        // Determine if this is a release ID (prefixed with 'r') or a master ID
+        const isRelease = masterIdParam.startsWith("r");
+        const numericId = isRelease ? masterIdParam.slice(1) : masterIdParam;
+        const discogsEndpoint = isRelease ? "releases" : "masters";
         try {
-          const discogsUrl = `https://api.discogs.com/masters/${masterIdParam}`;
+          const discogsUrl = `https://api.discogs.com/${discogsEndpoint}/${numericId}`;
           const discogsResponse = await fetch(discogsUrl, {
             headers: {
               "User-Agent": DISCOGS_USER_AGENT,
@@ -2021,8 +2085,7 @@ app.post("/api/barcode_search", async (req, res) => {
 app.get("/api/records/master-reviews", async (req, res) => {
   console.log("Fetching master reviews...");
 
-  const masterIdParam = Number(req.query.masterId);
-  const masterId = Number.isInteger(masterIdParam) && masterIdParam > 0 ? masterIdParam : null;
+  const masterId = parseMasterId(req.query.masterId);
   if (!masterId) {
     return res.status(400).json({ error: "masterId is required" });
   }
@@ -2363,12 +2426,11 @@ app.get("/api/community/users/:username", async (req, res) => {
     );
     if (listeningToRows && listeningToRows.length > 0) {
       const row = listeningToRows[0];
-      const masterIdValue = Number(row.masterId);
       listeningTo = {
         artist: typeof row.artist === 'string' && row.artist.trim() ? row.artist.trim() : null,
         cover: typeof row.cover === 'string' && row.cover.trim() ? row.cover.trim() : null,
         name: typeof row.name === 'string' ? row.name : '',
-        masterId: Number.isInteger(masterIdValue) && masterIdValue > 0 ? masterIdValue : null,
+        masterId: parseMasterId(row.masterId),
       };
     }
 
@@ -3135,9 +3197,7 @@ app.get("/api/activity", requireAuth, async (req, res) => {
       const rating = Number.isFinite(ratingRaw) ? ratingRaw : 0;
       const releaseRaw = Number(row.release);
       const release = Number.isFinite(releaseRaw) ? releaseRaw : 0;
-      const masterIdRaw = Number(row.masterId);
-      const masterId =
-        Number.isInteger(masterIdRaw) && masterIdRaw > 0 ? masterIdRaw : null;
+      const masterId = parseMasterId(row.masterId);
   const added = row.timestamp;
       const cover =
         typeof row.cover === "string" && row.cover ? row.cover : undefined;
@@ -4164,9 +4224,8 @@ app.post('/api/records/create', requireAuth, async (req, res) => {
   const rawIsCustom = req.body ? req.body.isCustom : undefined;
   const isCustom = rawIsCustom === true || rawIsCustom === 1 || rawIsCustom === "1";
 
-  const masterIdRaw = req.body ? req.body.masterId : undefined;
-  const masterId = Number(masterIdRaw);
-  const hasMaster = Number.isInteger(masterId) && masterId > 0;
+  const masterId = parseMasterId(req.body?.masterId);
+  const hasMaster = isValidMasterId(masterId);
 
   let masterReleaseYear = null;
   if (hasMaster) {
@@ -5335,8 +5394,7 @@ app.post('/api/lists/:listId/records', requireAuth, async (req, res) => {
   if (!Number.isInteger(listId) || listId <= 0) {
     return res.status(400).json({ error: 'Invalid list id' });
   }
-  const masterIdRaw = Number(req.body?.masterId);
-  const masterId = Number.isInteger(masterIdRaw) && masterIdRaw > 0 ? masterIdRaw : null;
+  const masterId = parseMasterId(req.body?.masterId);
   const recordNameRaw = typeof req.body?.recordName === 'string' ? req.body.recordName.trim() : '';
   const artistRaw = typeof req.body?.artist === 'string' ? req.body.artist.trim() : '';
   let recordName = recordNameRaw;
@@ -6214,8 +6272,8 @@ app.get('/api/admin/records', requireAuth, requireAdmin, async (req, res) => {
   }
 
   if (rawMasterId) {
-    const masterId = Number(rawMasterId);
-    if (Number.isInteger(masterId) && masterId > 0) {
+    const masterId = parseMasterId(rawMasterId);
+    if (isValidMasterId(masterId)) {
       conditions.push('r.masterId = ?');
       params.push(masterId);
     }
@@ -6265,7 +6323,7 @@ app.get('/api/admin/records', requireAuth, requireAdmin, async (req, res) => {
       review: row.review ?? null,
       added: row.added ? formatUtcDateTime(row.added) : null,
       isCustom: Boolean(row.isCustom),
-      masterId: row.masterId !== null && row.masterId !== undefined ? Number(row.masterId) : null,
+      masterId: row.masterId ?? null,
       releaseYear: row.release_year !== null && row.release_year !== undefined ? Number(row.release_year) : null,
       owner: {
         username: row.username,
@@ -6370,9 +6428,9 @@ app.patch('/api/admin/records/:recordId', requireAuth, requireAdmin, async (req,
       updates.push('masterId = ?');
       params.push(null);
     } else {
-      const masterValue = Number(masterId);
-      if (!Number.isInteger(masterValue) || masterValue <= 0) {
-        return res.status(400).json({ error: 'masterId must be a positive integer or null' });
+      const masterValue = parseMasterId(masterId);
+      if (!masterValue) {
+        return res.status(400).json({ error: 'masterId must be a valid master ID (positive integer or r-prefixed release ID) or null' });
       }
       updates.push('masterId = ?');
       params.push(masterValue);
@@ -6469,7 +6527,7 @@ app.patch('/api/admin/records/:recordId', requireAuth, requireAdmin, async (req,
         review: row.review ?? null,
         added: row.added ? formatUtcDateTime(row.added) : null,
         isCustom: Boolean(row.isCustom),
-        masterId: row.masterId !== null && row.masterId !== undefined ? Number(row.masterId) : null,
+        masterId: row.masterId ?? null,
         releaseYear: row.release_year !== null && row.release_year !== undefined ? Number(row.release_year) : null,
         owner: {
           username: row.username,
@@ -6559,9 +6617,9 @@ app.get('/api/admin/masters', requireAuth, requireAdmin, async (req, res) => {
 
 app.patch('/api/admin/masters/:masterId', requireAuth, requireAdmin, async (req, res) => {
   console.log('Admin updating master...');
-  const masterId = Number(req.params.masterId);
-  if (!Number.isInteger(masterId) || masterId <= 0) {
-    return res.status(400).json({ error: 'masterId must be a positive integer' });
+  const masterId = parseMasterId(req.params.masterId);
+  if (!isValidMasterId(masterId)) {
+    return res.status(400).json({ error: 'masterId must be a valid master ID' });
   }
 
   const { name, artist, cover, releaseYear } = req.body || {};
@@ -6682,8 +6740,8 @@ app.patch('/api/admin/masters/:masterId', requireAuth, requireAdmin, async (req,
 
 // Get genres for a specific master (admin only)
 app.get('/api/admin/masters/:masterId/genres', requireAuth, requireAdmin, async (req, res) => {
-  const masterId = Number(req.params.masterId);
-  if (!Number.isInteger(masterId) || masterId <= 0) {
+  const masterId = parseMasterId(req.params.masterId);
+  if (!isValidMasterId(masterId)) {
     return res.status(400).json({ error: 'Invalid masterId' });
   }
 
@@ -6714,9 +6772,9 @@ app.get('/api/admin/masters/:masterId/genres', requireAuth, requireAdmin, async 
 
 app.delete('/api/admin/masters/:masterId', requireAuth, requireAdmin, async (req, res) => {
   console.log('Admin deleting master...');
-  const masterId = Number(req.params.masterId);
-  if (!Number.isInteger(masterId) || masterId <= 0) {
-    return res.status(400).json({ error: 'masterId must be a positive integer' });
+  const masterId = parseMasterId(req.params.masterId);
+  if (!isValidMasterId(masterId)) {
+    return res.status(400).json({ error: 'masterId must be a valid master ID' });
   }
 
   try {
@@ -7407,7 +7465,7 @@ app.get("/api/masters/search", requireAuth, async (req, res) => {
     );
 
     const results = rows.map((row) => ({
-      masterId: Number(row.id),
+      masterId: row.id,
       name: typeof row.name === 'string' ? row.name : '',
       artist: typeof row.artist === 'string' && row.artist.trim() ? row.artist.trim() : null,
       cover: typeof row.cover === 'string' && row.cover.trim() ? row.cover.trim() : null,
@@ -7426,10 +7484,11 @@ app.get("/api/user/listening-to", requireAuth, async (req, res) => {
   
   try {
     const pool = await getPool();
+    // Use LEFT JOIN so we can get the masterId even if it's not in Master table
     const [rows] = await pool.query(
       `SELECT m.artist, m.cover, m.name, lt.masterId 
        FROM ListeningTo lt
-       JOIN Master m ON m.id = lt.masterId
+       LEFT JOIN Master m ON m.id = lt.masterId
        WHERE lt.userUuid = ? LIMIT 1`,
       [req.userUuid]
     );
@@ -7439,12 +7498,40 @@ app.get("/api/user/listening-to", requireAuth, async (req, res) => {
     }
 
     const row = rows[0];
-    const listeningTo = {
-      artist: typeof row.artist === 'string' && row.artist.trim() ? row.artist.trim() : null,
-      cover: typeof row.cover === 'string' && row.cover.trim() ? row.cover.trim() : null,
-      name: typeof row.name === 'string' ? row.name : '',
-      masterId: Number.isInteger(row.masterId) && row.masterId > 0 ? row.masterId : null,
-    };
+    let artist = typeof row.artist === 'string' && row.artist.trim() ? row.artist.trim() : null;
+    let cover = typeof row.cover === 'string' && row.cover.trim() ? row.cover.trim() : null;
+    let name = typeof row.name === 'string' ? row.name : '';
+    const masterId = row.masterId ?? null;
+
+    // If masterId exists but no data from Master table, fetch from Discogs
+    if (masterId && !row.name) {
+      const isRelease = masterId.startsWith("r");
+      const numericId = isRelease ? masterId.slice(1) : masterId;
+      const discogsEndpoint = isRelease ? "releases" : "masters";
+      
+      try {
+        const discogsUrl = `https://api.discogs.com/${discogsEndpoint}/${numericId}`;
+        const discogsResponse = await fetch(discogsUrl, {
+          headers: {
+            "User-Agent": DISCOGS_USER_AGENT,
+            Accept: "application/json",
+          },
+        });
+        
+        if (discogsResponse.ok) {
+          const discogsData = await discogsResponse.json();
+          artist = typeof discogsData?.artists?.[0]?.name === "string" ? discogsData.artists[0].name : null;
+          cover = typeof discogsData?.images?.[0]?.uri === "string" && discogsData.images[0].uri.trim()
+            ? discogsData.images[0].uri.trim()
+            : null;
+          name = typeof discogsData?.title === "string" ? discogsData.title : '';
+        }
+      } catch (discogsError) {
+        console.warn("Failed to fetch listening to details from Discogs", discogsError);
+      }
+    }
+
+    const listeningTo = { artist, cover, name, masterId };
 
     res.json({ listeningTo });
   } catch (error) {
@@ -7457,30 +7544,61 @@ app.get("/api/user/listening-to", requireAuth, async (req, res) => {
 app.put("/api/user/listening-to", requireAuth, async (req, res) => {
   console.log("Updating listening to...");
   
-  const masterId = req.body?.masterId;
-  const masterIdNum = Number(masterId);
+  const masterId = parseMasterId(req.body?.masterId);
   
-  if (!Number.isInteger(masterIdNum) || masterIdNum <= 0) {
+  if (!isValidMasterId(masterId)) {
     return res.status(400).json({ error: "Valid masterId is required" });
   }
 
   try {
     const pool = await getPool();
     
-    // Verify master exists
+    // Try to get master info from database first
     const [masterRows] = await pool.query(
       `SELECT id, name, artist, cover FROM Master WHERE id = ? LIMIT 1`,
-      [masterIdNum]
+      [masterId]
     );
 
-    if (!masterRows || masterRows.length === 0) {
-      return res.status(404).json({ error: "Master record not found" });
-    }
+    let artist = null;
+    let cover = null;
+    let name = '';
 
-    const master = masterRows[0];
-    const artist = typeof master.artist === 'string' && master.artist.trim() ? master.artist.trim() : null;
-    const cover = typeof master.cover === 'string' && master.cover.trim() ? master.cover.trim() : null;
-    const name = typeof master.name === 'string' ? master.name : '';
+    if (masterRows && masterRows.length > 0) {
+      // Master exists in database
+      const master = masterRows[0];
+      artist = typeof master.artist === 'string' && master.artist.trim() ? master.artist.trim() : null;
+      cover = typeof master.cover === 'string' && master.cover.trim() ? master.cover.trim() : null;
+      name = typeof master.name === 'string' ? master.name : '';
+    } else {
+      // Master not in database - fetch from Discogs for 'r'-prefixed IDs (releases)
+      const isRelease = masterId.startsWith("r");
+      const numericId = isRelease ? masterId.slice(1) : masterId;
+      const discogsEndpoint = isRelease ? "releases" : "masters";
+      
+      try {
+        const discogsUrl = `https://api.discogs.com/${discogsEndpoint}/${numericId}`;
+        const discogsResponse = await fetch(discogsUrl, {
+          headers: {
+            "User-Agent": DISCOGS_USER_AGENT,
+            Accept: "application/json",
+          },
+        });
+        
+        if (discogsResponse.ok) {
+          const discogsData = await discogsResponse.json();
+          artist = typeof discogsData?.artists?.[0]?.name === "string" ? discogsData.artists[0].name : null;
+          cover = typeof discogsData?.images?.[0]?.uri === "string" && discogsData.images[0].uri.trim()
+            ? discogsData.images[0].uri.trim()
+            : null;
+          name = typeof discogsData?.title === "string" ? discogsData.title : '';
+        } else {
+          return res.status(404).json({ error: "Record not found on Discogs" });
+        }
+      } catch (discogsError) {
+        console.error("Failed to fetch from Discogs", discogsError);
+        return res.status(502).json({ error: "Failed to verify record with Discogs" });
+      }
+    }
 
     // Insert or update listening to
     await pool.execute(
@@ -7489,12 +7607,12 @@ app.put("/api/user/listening-to", requireAuth, async (req, res) => {
        ON DUPLICATE KEY UPDATE
          masterId = VALUES(masterId),
          created = UTC_TIMESTAMP()`,
-      [req.userUuid, masterIdNum]
+      [req.userUuid, masterId]
     );
 
     res.json({
       success: true,
-      listeningTo: { artist, cover, name, masterId: masterIdNum },
+      listeningTo: { artist, cover, name, masterId },
     });
   } catch (error) {
     console.error("Failed to update listening to", error);

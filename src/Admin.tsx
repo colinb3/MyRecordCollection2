@@ -100,7 +100,7 @@ type AdminRecord = {
   review: string | null;
   added: string | null;
   isCustom: boolean;
-  masterId: number | null;
+  masterId: string | null;
   releaseYear: number | null;
   owner: AdminRecordOwner;
   tableName: string | null;
@@ -157,7 +157,7 @@ type AdminListRecord = {
   releaseYear: number | null;
   added: string | null;
   isCustom: boolean;
-  masterId: number | null;
+  masterId: string | null;
   sortOrder: number | null;
 };
 
@@ -1156,13 +1156,20 @@ function RecordsTab() {
     if (masterIdEditInput.trim() === "") {
       body.masterId = null;
     } else {
-      const masterValue = Number(masterIdEditInput);
-      if (!Number.isInteger(masterValue) || masterValue <= 0) {
-        setError("Master ID must be a positive integer.");
+      const masterValue = masterIdEditInput.trim();
+      // Validate: must be numeric or 'r' followed by numeric
+      const isValidNumeric =
+        /^\d+$/.test(masterValue) && Number(masterValue) > 0;
+      const isValidRelease =
+        /^r\d+$/i.test(masterValue) && Number(masterValue.slice(1)) > 0;
+      if (!isValidNumeric && !isValidRelease) {
+        setError(
+          "Master ID must be a positive integer or 'r' followed by a positive integer."
+        );
         setSaving(false);
         return;
       }
-      body.masterId = masterValue;
+      body.masterId = isValidRelease ? masterValue.toLowerCase() : masterValue;
     }
 
     if (releaseYearInput.trim() === "") {

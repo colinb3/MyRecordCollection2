@@ -108,8 +108,15 @@ export default function MasterReviews() {
 
   const safeMasterId = useMemo(() => {
     if (!masterIdParam) return null;
-    const numeric = Number(masterIdParam);
-    return Number.isInteger(numeric) && numeric > 0 ? numeric : null;
+    const trimmed = masterIdParam.trim();
+    // Accept numeric masterId or 'r' prefixed release ID
+    if (/^\d+$/.test(trimmed) && Number(trimmed) > 0) {
+      return trimmed;
+    }
+    if (/^r\d+$/i.test(trimmed) && Number(trimmed.slice(1)) > 0) {
+      return trimmed.toLowerCase();
+    }
+    return null;
   }, [masterIdParam]);
 
   const [album, setAlbum] = useState<RecordListItem | null>(

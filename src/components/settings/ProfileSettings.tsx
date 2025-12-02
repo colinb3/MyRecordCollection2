@@ -140,12 +140,12 @@ export default function ProfileSettings({
     artist: string | null;
     cover: string | null;
     name: string;
-    masterId: number;
+    masterId: string;
   } | null>(null);
   const [listeningToSearch, setListeningToSearch] = useState("");
   const [listeningToResults, setListeningToResults] = useState<
     Array<{
-      masterId: number;
+      masterId: string;
       name: string;
       artist: string | null;
       cover: string | null;
@@ -440,7 +440,7 @@ export default function ProfileSettings({
   const handleSelectListeningTo = useCallback(
     async (
       master: {
-        masterId: number;
+        masterId: string;
         name: string;
         artist: string | null;
         cover: string | null;

@@ -54,7 +54,7 @@ interface RecordListItem {
 interface LocationState {
   album?: RecordListItem;
   query?: string;
-  masterId?: number;
+  masterId?: string;
   fromCollection?: {
     path: string;
     title?: string;
@@ -65,7 +65,7 @@ interface LocationState {
 }
 
 interface MasterInfo {
-  masterId: number | null;
+  masterId: string | null;
   ratingAverage: number | null;
   releaseYear: number | null;
   cover: string | null;
@@ -214,21 +214,28 @@ export default function MasterRecord() {
       : null;
   const cachedUser = getCachedUserInfo();
 
-  const parseMasterId = (value: string | null | undefined): number | null => {
+  const parseMasterId = (value: string | null | undefined): string | null => {
     if (!value) return null;
-    const numeric = Number(value);
-    return Number.isInteger(numeric) && numeric > 0 ? numeric : null;
+    const trimmed = value.trim();
+    // Accept numeric masterId or 'r' prefixed release ID
+    if (/^\d+$/.test(trimmed) && Number(trimmed) > 0) {
+      return trimmed;
+    }
+    if (/^r\d+$/i.test(trimmed) && Number(trimmed.slice(1)) > 0) {
+      return trimmed.toLowerCase();
+    }
+    return null;
   };
 
   const masterIdFromParam = parseMasterId(masterIdParam);
   const masterIdFromQuery = parseMasterId(searchParams.get("q"));
   const initialMasterId =
-    typeof locationState.masterId === "number" && locationState.masterId > 0
-      ? locationState.masterId
+    typeof locationState.masterId === "string" && locationState.masterId.trim()
+      ? locationState.masterId.trim()
       : masterIdFromParam ?? masterIdFromQuery;
 
   const [album, setAlbum] = useState<RecordListItem | null>(initialAlbum);
-  const [masterIdOverride, setMasterIdOverride] = useState<number | null>(
+  const [masterIdOverride, setMasterIdOverride] = useState<string | null>(
     initialMasterId ?? null
   );
   const [username, setUsername] = useState<string>(cachedUser?.username ?? "");
@@ -290,7 +297,7 @@ export default function MasterRecord() {
   const releaseYearTouchedRef = useRef(false);
   // Single ref to track the last successfully fetched master info
   const lastFetchedMasterRef = useRef<{
-    masterId: number | null;
+    masterId: string | null;
     albumKey: string | null;
   }>({
     masterId: null,
@@ -328,8 +335,9 @@ export default function MasterRecord() {
       new URLSearchParams(location.search).get("q")
     );
     const stateMasterId =
-      typeof locationState.masterId === "number" && locationState.masterId > 0
-        ? locationState.masterId
+      typeof locationState.masterId === "string" &&
+      locationState.masterId.trim()
+        ? locationState.masterId.trim()
         : null;
     const nextMasterId =
       stateMasterId ?? paramMasterId ?? queryMasterId ?? null;
@@ -556,7 +564,13 @@ export default function MasterRecord() {
           return;
         }
 
-        const masterIdValue = Number(data?.masterId);
+        // masterId can be a numeric string or 'r' prefixed string
+        const masterIdValue =
+          typeof data?.masterId === "string" && data.masterId.trim()
+            ? data.masterId.trim()
+            : typeof data?.masterId === "number" && data.masterId > 0
+            ? String(data.masterId)
+            : null;
         const ratingAverageValue =
           data?.ratingAverage !== null && data?.ratingAverage !== undefined
             ? Number(data.ratingAverage)
@@ -669,10 +683,7 @@ export default function MasterRecord() {
           : [];
 
         const normalized: MasterInfo = {
-          masterId:
-            Number.isInteger(masterIdValue) && masterIdValue > 0
-              ? masterIdValue
-              : null,
+          masterId: masterIdValue,
           ratingAverage:
             ratingAverageValue !== null && Number.isFinite(ratingAverageValue)
               ? Math.round(ratingAverageValue * 10) / 10
@@ -1535,8 +1546,7 @@ export default function MasterRecord() {
           onClose={() => setReportDialogOpen(false)}
           type="master"
           targetId={
-            masterIdOverride ??
-            (masterIdParam ? Number(masterIdParam) : undefined)
+            masterIdOverride ?? (masterIdParam ? masterIdParam : undefined)
           }
           targetName={album?.record || "Unknown"}
         />

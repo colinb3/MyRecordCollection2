@@ -78,9 +78,13 @@ export function normalizeApiRecord(raw: unknown): MrcRecord | null {
       : undefined;
 
   const masterIdRaw = source.masterId;
-  const masterIdNum = Number(masterIdRaw);
+  // masterId can be numeric string or 'r' prefixed string
   const masterId =
-    Number.isInteger(masterIdNum) && masterIdNum > 0 ? masterIdNum : null;
+    typeof masterIdRaw === 'string' && masterIdRaw.trim()
+      ? masterIdRaw.trim()
+      : typeof masterIdRaw === 'number' && masterIdRaw > 0
+        ? String(masterIdRaw)
+        : null;
 
   const review =
     typeof source.review === "string" && source.review.trim()

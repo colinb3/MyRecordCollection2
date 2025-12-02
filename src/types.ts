@@ -11,7 +11,7 @@ export interface Record {
   tableId?: number;
   tableName?: string | null;
   collectionName?: string | null;
-  masterId?: number | null;
+  masterId?: string | null;
   review?: string | null;
   reviewLikes?: number;
   viewerHasLikedReview?: boolean;
@@ -204,7 +204,7 @@ export interface CommunityFeedListeningToEntry {
   type: 'listening-to';
   listener: CommunityFeedOwner;
   record: {
-    masterId: number;
+    masterId: string;
     name: string;
     artist: string;
     cover: string | null;
@@ -253,7 +253,7 @@ export interface PublicUserProfile {
     artist: string | null;
     cover: string | null;
     name: string;
-    masterId: number | null;
+    masterId: string | null;
   } | null;
 }
 

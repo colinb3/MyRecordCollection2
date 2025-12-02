@@ -91,7 +91,7 @@ interface ListRecordEntry {
   cover: string | null;
   rating: number | null;
   releaseYear: number | null;
-  masterId: number | null;
+  masterId: string | null;
   added: string | null;
   sortOrder?: number;
 }
@@ -111,7 +111,7 @@ interface SortableRecordItemProps {
   removing: boolean;
   renderCover: (cover: string | null, name: string) => React.ReactElement;
   onRemove: (record: ListRecordEntry) => void;
-  onViewMaster: (masterId: number) => void;
+  onViewMaster: (masterId: string) => void;
   onEdit: (record: ListRecordEntry) => void;
 }
 
@@ -139,8 +139,9 @@ function SortableRecordItem({
     opacity: isDragging ? 0.5 : 1,
   };
 
+  // masterId can be numeric string or 'r' prefixed string
   const canViewMaster =
-    typeof record.masterId === "number" && record.masterId > 0;
+    typeof record.masterId === "string" && record.masterId.trim().length > 0;
 
   const handleMasterNavigate = useCallback(() => {
     if (!canViewMaster) {
@@ -411,7 +412,6 @@ export default function ListDetail() {
           if (!Number.isInteger(id) || id <= 0) {
             return null;
           }
-          const masterId = Number(row?.masterId);
           const rating = Number(row?.rating);
           const releaseYear = Number(row?.releaseYear);
           const sortOrder = Number(row?.sortOrder);
@@ -435,7 +435,9 @@ export default function ListDetail() {
                 ? releaseYear
                 : null,
             masterId:
-              Number.isInteger(masterId) && masterId > 0 ? masterId : null,
+              typeof row?.masterId === "string" && row.masterId
+                ? row.masterId
+                : null,
             added:
               typeof row?.added === "string" && row.added.trim()
                 ? row.added.trim()
@@ -949,8 +951,8 @@ export default function ListDetail() {
   }, [navigate]);
 
   const handleNavigateToMaster = useCallback(
-    (masterId: number | null) => {
-      if (!masterId || !Number.isInteger(masterId) || masterId <= 0) return;
+    (masterId: string | null) => {
+      if (!masterId) return;
 
       // Just navigate - browser history will handle the back button
       navigate(`/master/${masterId}`);

@@ -20,7 +20,7 @@ import { performLogout } from "./logout";
 
 interface BarcodeSearchResponse {
   status?: string;
-  masterId?: number | null;
+  masterId?: string | null;
   artist?: string | null;
   record?: string | null;
   cover?: string | null;
@@ -194,9 +194,12 @@ export default function BarcodeScanner() {
         const artist = typeof data?.artist === "string" ? data.artist : null;
         const record = typeof data?.record === "string" ? data.record : null;
         const cover = typeof data?.cover === "string" ? data.cover : null;
+        // masterId can be numeric string or 'r' prefixed string
         const masterId =
-          typeof data?.masterId === "number" && data.masterId > 0
-            ? data.masterId
+          typeof data?.masterId === "string" && data.masterId.trim()
+            ? data.masterId.trim()
+            : typeof data?.masterId === "number" && data.masterId > 0
+            ? String(data.masterId)
             : undefined;
         const releaseYear =
           typeof data?.releaseYear === "number" &&
