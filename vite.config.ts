@@ -1,10 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { visualizer } from 'rollup-plugin-visualizer'
-import { writeFileSync } from 'fs'
-
-// Generate a unique build ID for cache busting
-const buildId = Date.now().toString()
 
 // https://vite.dev/config/
 export default defineConfig(() => ({
@@ -21,17 +17,7 @@ export default defineConfig(() => ({
           }),
         ]
       : []),
-    // Generate version.json at build time for cache busting
-    {
-      name: 'generate-version',
-      closeBundle() {
-        writeFileSync('dist/version.json', JSON.stringify({ buildId }))
-      }
-    }
   ],
-  define: {
-    __BUILD_ID__: JSON.stringify(buildId),
-  },
   server: {
     proxy: {
       '/api': {

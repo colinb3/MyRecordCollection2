@@ -49,7 +49,7 @@ export default class ChunkErrorBoundary extends Component<Props, State> {
     // Log the error for debugging
     console.error("ChunkErrorBoundary caught an error:", error, errorInfo);
 
-    // For chunk errors, try auto-reloading once with cache bust
+    // For chunk errors, try auto-reloading once
     if (this.state.isChunkError) {
       const reloadCount = parseInt(
         sessionStorage.getItem(RELOAD_KEY) || "0",
@@ -57,11 +57,8 @@ export default class ChunkErrorBoundary extends Component<Props, State> {
       );
       if (reloadCount < MAX_AUTO_RELOADS) {
         sessionStorage.setItem(RELOAD_KEY, String(reloadCount + 1));
-        // Force a hard reload that bypasses the cache
-        // Navigate to the same URL with a cache-busting query param
-        const url = new URL(window.location.href);
-        url.searchParams.set("_v", Date.now().toString());
-        window.location.replace(url.toString());
+        // Clear the cached page and reload
+        window.location.reload();
         return;
       }
       // If we've already reloaded, clear the counter so future errors can auto-reload again
@@ -70,10 +67,8 @@ export default class ChunkErrorBoundary extends Component<Props, State> {
   }
 
   handleReload = () => {
-    // Force a hard reload that bypasses the cache
-    const url = new URL(window.location.href);
-    url.searchParams.set("_v", Date.now().toString());
-    window.location.replace(url.toString());
+    // Force a hard reload to get the latest chunks
+    window.location.reload();
   };
 
   render() {
@@ -102,8 +97,7 @@ export default class ChunkErrorBoundary extends Component<Props, State> {
                   sx={{ mb: 3, maxWidth: 400 }}
                 >
                   The app has been updated. Please reload to get the latest
-                  version. You may need to clear your browser cache if the
-                  problem persists.
+                  version.
                 </Typography>
               </>
             ) : (
