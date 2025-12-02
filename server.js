@@ -584,7 +584,6 @@ async function fetchTagsByRecordIds(pool, recordIds) {
 
 function buildDiscogsSearchUrl(artist, record) {
   const url = new URL(DISCOGS_API_URL);
-  url.searchParams.set("type", "master");
   url.searchParams.set("query", artist + " - " + record);
   url.searchParams.set("per_page", "5");
   if (DISCOGS_API_KEY && DISCOGS_API_SECRET) {
@@ -787,6 +786,16 @@ async function lookupDiscogsMaster(artist, record) {
       return null;
     }
 
+    // Helper to extract masterId from a result (prefer master_id if > 0, else use id)
+    const extractMasterId = (result) => {
+      const masterIdVal = Number(result?.master_id);
+      if (Number.isInteger(masterIdVal) && masterIdVal > 0) {
+        return masterIdVal;
+      }
+      const idVal = Number(result?.id);
+      return Number.isInteger(idVal) && idVal > 0 ? idVal : null;
+    };
+
     // Try to find a result that matches the artist and record name
     let matchingResult = results.find((result) =>
       doesDiscogsResultMatch(result, trimmedArtist, trimmedRecord)
@@ -800,9 +809,8 @@ async function lookupDiscogsMaster(artist, record) {
       matchingResult = results[0];
     }
 
-    // Prioritize results with master_id, similar to barcode lookup
-    const masterIdRaw = matchingResult?.master_id ?? matchingResult?.id;
-    const masterId = Number(masterIdRaw);
+    // Use master_id if > 0, otherwise fall back to id
+    const masterId = extractMasterId(matchingResult);
     const releaseYear = normalizeDiscogsReleaseYear(matchingResult?.year);
     const cover =
       typeof matchingResult?.cover_image === "string" && matchingResult.cover_image.trim()
@@ -816,7 +824,7 @@ async function lookupDiscogsMaster(artist, record) {
     const styles = Array.isArray(matchingResult?.style) ? matchingResult.style : [];
 
     return {
-      masterId: Number.isInteger(masterId) && masterId > 0 ? masterId : null,
+      masterId,
       releaseYear,
       cover,
       genres,
