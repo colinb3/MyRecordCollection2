@@ -1,4 +1,4 @@
-import React, { Component, type ReactNode } from "react";
+import { Component, type ReactNode } from "react";
 import {
   Box,
   Typography,
@@ -18,13 +18,9 @@ interface State {
   isChunkError: boolean;
 }
 
-// Session storage key to track reload attempts
-const RELOAD_KEY = "chunk_error_reload";
-const MAX_AUTO_RELOADS = 1;
-
 /**
  * Error boundary that catches chunk loading failures (common after deployments)
- * and automatically reloads once, or prompts the user to reload.
+ * and prompts the user to reload.
  */
 export default class ChunkErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
@@ -45,35 +41,14 @@ export default class ChunkErrorBoundary extends Component<Props, State> {
     return { hasError: true, isChunkError };
   }
 
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+  componentDidCatch(error: Error) {
     // Log the error for debugging
-    console.error("ChunkErrorBoundary caught an error:", error, errorInfo);
-
-    // For chunk errors, try auto-reloading once with cache bust
-    if (this.state.isChunkError) {
-      const reloadCount = parseInt(
-        sessionStorage.getItem(RELOAD_KEY) || "0",
-        10
-      );
-      if (reloadCount < MAX_AUTO_RELOADS) {
-        sessionStorage.setItem(RELOAD_KEY, String(reloadCount + 1));
-        // Force a hard reload that bypasses the cache
-        // Navigate to the same URL with a cache-busting query param
-        const url = new URL(window.location.href);
-        url.searchParams.set("_v", Date.now().toString());
-        window.location.replace(url.toString());
-        return;
-      }
-      // If we've already reloaded, clear the counter so future errors can auto-reload again
-      sessionStorage.removeItem(RELOAD_KEY);
-    }
+    console.error("ChunkErrorBoundary caught an error:", error);
   }
 
   handleReload = () => {
-    // Force a hard reload that bypasses the cache
-    const url = new URL(window.location.href);
-    url.searchParams.set("_v", Date.now().toString());
-    window.location.replace(url.toString());
+    // Force a hard reload
+    window.location.reload();
   };
 
   render() {
