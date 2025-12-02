@@ -1,4 +1,4 @@
-import { Component, type ReactNode } from "react";
+import React, { Component, type ReactNode } from "react";
 import {
   Box,
   Typography,
@@ -18,9 +18,13 @@ interface State {
   isChunkError: boolean;
 }
 
+// Session storage key to track reload attempts
+const RELOAD_KEY = "chunk_error_reload";
+const MAX_AUTO_RELOADS = 1;
+
 /**
  * Error boundary that catches chunk loading failures (common after deployments)
- * and prompts the user to reload.
+ * and automatically reloads once, or prompts the user to reload.
  */
 export default class ChunkErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
@@ -41,13 +45,29 @@ export default class ChunkErrorBoundary extends Component<Props, State> {
     return { hasError: true, isChunkError };
   }
 
-  componentDidCatch(error: Error) {
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     // Log the error for debugging
-    console.error("ChunkErrorBoundary caught an error:", error);
+    console.error("ChunkErrorBoundary caught an error:", error, errorInfo);
+
+    // For chunk errors, try auto-reloading once
+    if (this.state.isChunkError) {
+      const reloadCount = parseInt(
+        sessionStorage.getItem(RELOAD_KEY) || "0",
+        10
+      );
+      if (reloadCount < MAX_AUTO_RELOADS) {
+        sessionStorage.setItem(RELOAD_KEY, String(reloadCount + 1));
+        // Clear the cached page and reload
+        window.location.reload();
+        return;
+      }
+      // If we've already reloaded, clear the counter so future errors can auto-reload again
+      sessionStorage.removeItem(RELOAD_KEY);
+    }
   }
 
   handleReload = () => {
-    // Force a hard reload
+    // Force a hard reload to get the latest chunks
     window.location.reload();
   };
 
@@ -77,8 +97,7 @@ export default class ChunkErrorBoundary extends Component<Props, State> {
                   sx={{ mb: 3, maxWidth: 400 }}
                 >
                   The app has been updated. Please reload to get the latest
-                  version. You may need to clear your browser cache if the
-                  problem persists.
+                  version.
                 </Typography>
               </>
             ) : (
