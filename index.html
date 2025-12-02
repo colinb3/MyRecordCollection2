@@ -60,6 +60,47 @@
           history.replaceState(null, null, redirect);
         }
       })();
+
+      // Global error handler for chunk loading failures during initial load
+      window.addEventListener(
+        "error",
+        function (e) {
+          // Check if this is a script loading error (chunk failure)
+          if (e.target && e.target.tagName === "SCRIPT") {
+            showReloadMessage();
+          }
+        },
+        true
+      );
+
+      // Also catch unhandled promise rejections (dynamic imports fail this way)
+      window.addEventListener("unhandledrejection", function (e) {
+        var msg = e.reason && (e.reason.message || String(e.reason));
+        if (
+          msg &&
+          (msg.indexOf("Failed to fetch dynamically imported module") !== -1 ||
+            msg.indexOf("Loading chunk") !== -1 ||
+            msg.indexOf("Loading CSS chunk") !== -1 ||
+            msg.indexOf("error loading dynamically imported module") !== -1)
+        ) {
+          e.preventDefault();
+          showReloadMessage();
+        }
+      });
+
+      function showReloadMessage() {
+        var root = document.getElementById("root");
+        if (root && !root.dataset.errorShown) {
+          root.dataset.errorShown = "true";
+          root.innerHTML =
+            '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:24px;text-align:center;font-family:system-ui,-apple-system,sans-serif;">' +
+            '<h2 style="margin:0 0 8px 0;font-size:1.5rem;font-weight:500;">A new version is available</h2>' +
+            '<p style="margin:0 0 24px 0;color:#aaa;max-width:400px;">The app has been updated. Please reload to get the latest version. This may require a hard refresh or clearing your browser cache if the problem persists.</p>' +
+            '<button onclick="location.reload()" style="background:#1976d2;color:#fff;border:none;padding:10px 24px;border-radius:4px;font-size:1rem;cursor:pointer;display:flex;align-items:center;gap:8px;">' +
+            '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>' +
+            "Reload Page</button></div>";
+        }
+      }
     </script>
   </head>
   <body>
