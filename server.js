@@ -7442,6 +7442,153 @@ app.post('/api/admin/covers/replace', requireAuth, requireAdmin, async (req, res
   }
 });
 
+// Admin endpoint to merge two masters
+app.post('/api/admin/masters/merge', requireAuth, requireAdmin, async (req, res) => {
+  console.log('Admin merging masters...');
+  const { oldMasterId, newMasterId } = req.body;
+
+  const parsedOldMasterId = parseMasterId(oldMasterId);
+  const parsedNewMasterId = parseMasterId(newMasterId);
+
+  if (!isValidMasterId(parsedOldMasterId)) {
+    return res.status(400).json({ error: 'Valid oldMasterId is required' });
+  }
+  if (!isValidMasterId(parsedNewMasterId)) {
+    return res.status(400).json({ error: 'Valid newMasterId is required' });
+  }
+  if (parsedOldMasterId === parsedNewMasterId) {
+    return res.status(400).json({ error: 'Old and new Master IDs cannot be the same' });
+  }
+
+  try {
+    const pool = await getPool();
+
+    // Verify both masters exist and get their cover URLs
+    const [oldMasterRows] = await pool.query(
+      'SELECT id, cover FROM Master WHERE id = ? LIMIT 1',
+      [parsedOldMasterId]
+    );
+    if (!oldMasterRows || oldMasterRows.length === 0) {
+      return res.status(404).json({ error: `Old master ID ${parsedOldMasterId} not found` });
+    }
+    const oldMasterCover = oldMasterRows[0].cover;
+
+    const [newMasterRows] = await pool.query(
+      'SELECT id, cover FROM Master WHERE id = ? LIMIT 1',
+      [parsedNewMasterId]
+    );
+    if (!newMasterRows || newMasterRows.length === 0) {
+      return res.status(404).json({ error: `New master ID ${parsedNewMasterId} not found` });
+    }
+    const newMasterCover = newMasterRows[0].cover;
+
+    // Step 1: Find users who have records for BOTH masters
+    // For these users, mark the old master record as custom and remove its masterId
+    const [duplicateUsers] = await pool.query(
+      `SELECT DISTINCT r1.id AS oldRecordId
+       FROM Record r1
+       WHERE r1.masterId = ?
+         AND (r1.isCustom IS NULL OR r1.isCustom = FALSE)
+         AND EXISTS (
+           SELECT 1 FROM Record r2
+           WHERE r2.masterId = ?
+             AND r2.userUuid = r1.userUuid
+             AND (r2.isCustom IS NULL OR r2.isCustom = FALSE)
+         )`,
+      [parsedOldMasterId, parsedNewMasterId]
+    );
+
+    let duplicatesMarkedCustom = 0;
+    if (duplicateUsers && duplicateUsers.length > 0) {
+      const duplicateRecordIds = duplicateUsers.map(row => row.oldRecordId);
+      // Mark these records as custom and remove masterId
+      const [duplicateResult] = await pool.execute(
+        `UPDATE Record SET isCustom = TRUE, masterId = NULL WHERE id IN (${duplicateRecordIds.map(() => '?').join(',')})`,
+        duplicateRecordIds
+      );
+      duplicatesMarkedCustom = duplicateResult.affectedRows || 0;
+    }
+
+    // Step 2: Update remaining Record entries from old master to new master
+    // Also update cover URL if it matches the old master's cover
+    let recordsUpdated = 0;
+    if (oldMasterCover && newMasterCover) {
+      const [recordResult] = await pool.execute(
+        'UPDATE Record SET masterId = ?, cover = CASE WHEN cover = ? THEN ? ELSE cover END WHERE masterId = ?',
+        [parsedNewMasterId, oldMasterCover, newMasterCover, parsedOldMasterId]
+      );
+      recordsUpdated = recordResult.affectedRows || 0;
+    } else {
+      const [recordResult] = await pool.execute(
+        'UPDATE Record SET masterId = ? WHERE masterId = ?',
+        [parsedNewMasterId, parsedOldMasterId]
+      );
+      recordsUpdated = recordResult.affectedRows || 0;
+    }
+
+    // Step 3: Update ListRecord entries from old master to new master
+    // Also update cover URL if it matches the old master's cover
+    let listRecordsUpdated = 0;
+    if (oldMasterCover && newMasterCover) {
+      const [listRecordResult] = await pool.execute(
+        'UPDATE ListRecord SET masterId = ?, cover = CASE WHEN cover = ? THEN ? ELSE cover END WHERE masterId = ?',
+        [parsedNewMasterId, oldMasterCover, newMasterCover, parsedOldMasterId]
+      );
+      listRecordsUpdated = listRecordResult.affectedRows || 0;
+    } else {
+      const [listRecordResult] = await pool.execute(
+        'UPDATE ListRecord SET masterId = ? WHERE masterId = ?',
+        [parsedNewMasterId, parsedOldMasterId]
+      );
+      listRecordsUpdated = listRecordResult.affectedRows || 0;
+    }
+
+    // Step 4: Update ListeningTo entries from old master to new master
+    // First, delete ListeningTo entries for old master where user already has new master
+    await pool.execute(
+      `DELETE FROM ListeningTo 
+       WHERE masterId = ? 
+         AND userUuid IN (SELECT userUuid FROM (SELECT userUuid FROM ListeningTo WHERE masterId = ?) AS tmp)`,
+      [parsedOldMasterId, parsedNewMasterId]
+    );
+    // Then update remaining ListeningTo entries
+    const [listeningToResult] = await pool.execute(
+      'UPDATE ListeningTo SET masterId = ? WHERE masterId = ?',
+      [parsedNewMasterId, parsedOldMasterId]
+    );
+    const listeningToUpdated = listeningToResult.affectedRows || 0;
+
+    // Step 5: Update Report entries from old master to new master
+    const [reportResult] = await pool.execute(
+      'UPDATE Report SET targetMasterId = ? WHERE targetMasterId = ?',
+      [parsedNewMasterId, parsedOldMasterId]
+    );
+    const reportsUpdated = reportResult.affectedRows || 0;
+
+    // Step 6: Delete the old master (MasterGenre will cascade delete)
+    await pool.execute('DELETE FROM Master WHERE id = ?', [parsedOldMasterId]);
+
+    // Step 7: Recalculate ratings for the new master
+    await pool.execute('CALL update_master_ratings(?)', [parsedNewMasterId]);
+
+    console.log(`Masters merged: old=${parsedOldMasterId} -> new=${parsedNewMasterId}. ` +
+      `Duplicates marked custom: ${duplicatesMarkedCustom}, Records: ${recordsUpdated}, ` +
+      `ListRecords: ${listRecordsUpdated}, ListeningTo: ${listeningToUpdated}, Reports: ${reportsUpdated}`);
+
+    res.json({
+      success: true,
+      duplicatesMarkedCustom,
+      recordsUpdated,
+      listRecordsUpdated,
+      listeningToUpdated,
+      reportsUpdated
+    });
+  } catch (error) {
+    console.error('Failed to merge masters as admin', error);
+    res.status(500).json({ error: 'Failed to merge masters' });
+  }
+});
+
 // Search for master records (for listening to feature)
 app.get("/api/masters/search", requireAuth, async (req, res) => {
   console.log("Searching for master records...");

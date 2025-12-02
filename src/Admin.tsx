@@ -34,6 +34,7 @@ import {
   FormControl,
   InputLabel,
   Pagination,
+  Divider,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -61,7 +62,7 @@ type AdminTabKey =
   | "tags"
   | "lists"
   | "reports"
-  | "fixcovers";
+  | "fix";
 
 const TAB_OPTIONS: { label: string; value: AdminTabKey }[] = [
   { label: "Users", value: "users" },
@@ -70,7 +71,7 @@ const TAB_OPTIONS: { label: string; value: AdminTabKey }[] = [
   { label: "Tags", value: "tags" },
   { label: "Lists", value: "lists" },
   { label: "Reports", value: "reports" },
-  { label: "Fix Covers", value: "fixcovers" },
+  { label: "Fix", value: "fix" },
 ];
 
 type AdminUser = {
@@ -210,11 +211,12 @@ function getErrorMessage(payload: unknown, fallback: string): string {
   return fallback;
 }
 
-function FixCoversTab() {
+function FixTab() {
+  // Fix Covers state
   const [oldCoverUrl, setOldCoverUrl] = useState("");
   const [newCoverUrl, setNewCoverUrl] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<{
+  const [coverLoading, setCoverLoading] = useState(false);
+  const [coverResult, setCoverResult] = useState<{
     success: boolean;
     message: string;
     masterCount?: number;
@@ -222,12 +224,26 @@ function FixCoversTab() {
     listRecordCount?: number;
   } | null>(null);
 
+  // Merge Masters state
+  const [oldMasterId, setOldMasterId] = useState("");
+  const [newMasterId, setNewMasterId] = useState("");
+  const [mergeLoading, setMergeLoading] = useState(false);
+  const [mergeResult, setMergeResult] = useState<{
+    success: boolean;
+    message: string;
+    recordsUpdated?: number;
+    listRecordsUpdated?: number;
+    listeningToUpdated?: number;
+    reportsUpdated?: number;
+    duplicatesMarkedCustom?: number;
+  } | null>(null);
+
   const handleReplaceCover = async () => {
     const trimmedOld = oldCoverUrl.trim();
     const trimmedNew = newCoverUrl.trim();
 
     if (!trimmedOld || !trimmedNew) {
-      setResult({
+      setCoverResult({
         success: false,
         message: "Both old and new cover URLs are required",
       });
@@ -235,15 +251,15 @@ function FixCoversTab() {
     }
 
     if (trimmedOld === trimmedNew) {
-      setResult({
+      setCoverResult({
         success: false,
         message: "Old and new cover URLs cannot be the same",
       });
       return;
     }
 
-    setLoading(true);
-    setResult(null);
+    setCoverLoading(true);
+    setCoverResult(null);
 
     try {
       const response = await fetch(apiUrl("/api/admin/covers/replace"), {
@@ -259,14 +275,14 @@ function FixCoversTab() {
       const data = await response.json();
 
       if (!response.ok) {
-        setResult({
+        setCoverResult({
           success: false,
           message: data.error || "Failed to replace cover URLs",
         });
         return;
       }
 
-      setResult({
+      setCoverResult({
         success: true,
         message: "Cover URLs replaced successfully",
         masterCount: data.masterCount || 0,
@@ -279,17 +295,86 @@ function FixCoversTab() {
       setNewCoverUrl("");
     } catch (error) {
       console.error("Failed to replace cover URLs:", error);
-      setResult({
+      setCoverResult({
         success: false,
         message: "Network error: Failed to replace cover URLs",
       });
     } finally {
-      setLoading(false);
+      setCoverLoading(false);
+    }
+  };
+
+  const handleMergeMasters = async () => {
+    const trimmedOld = oldMasterId.trim();
+    const trimmedNew = newMasterId.trim();
+
+    if (!trimmedOld || !trimmedNew) {
+      setMergeResult({
+        success: false,
+        message: "Both old and new Master IDs are required",
+      });
+      return;
+    }
+
+    if (trimmedOld === trimmedNew) {
+      setMergeResult({
+        success: false,
+        message: "Old and new Master IDs cannot be the same",
+      });
+      return;
+    }
+
+    setMergeLoading(true);
+    setMergeResult(null);
+
+    try {
+      const response = await fetch(apiUrl("/api/admin/masters/merge"), {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          oldMasterId: trimmedOld,
+          newMasterId: trimmedNew,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setMergeResult({
+          success: false,
+          message: data.error || "Failed to merge masters",
+        });
+        return;
+      }
+
+      setMergeResult({
+        success: true,
+        message: "Masters merged successfully",
+        recordsUpdated: data.recordsUpdated || 0,
+        listRecordsUpdated: data.listRecordsUpdated || 0,
+        listeningToUpdated: data.listeningToUpdated || 0,
+        reportsUpdated: data.reportsUpdated || 0,
+        duplicatesMarkedCustom: data.duplicatesMarkedCustom || 0,
+      });
+
+      // Clear inputs on success
+      setOldMasterId("");
+      setNewMasterId("");
+    } catch (error) {
+      console.error("Failed to merge masters:", error);
+      setMergeResult({
+        success: false,
+        message: "Network error: Failed to merge masters",
+      });
+    } finally {
+      setMergeLoading(false);
     }
   };
 
   return (
     <Box>
+      {/* Fix Cover URLs Section */}
       <Typography variant="h5" sx={{ mb: 3, fontWeight: 600 }}>
         Fix Cover URLs
       </Typography>
@@ -305,7 +390,7 @@ function FixCoversTab() {
           value={oldCoverUrl}
           onChange={(e) => setOldCoverUrl(e.target.value)}
           placeholder="Enter the cover URL to replace"
-          disabled={loading}
+          disabled={coverLoading}
           helperText="The exact cover URL currently in the database"
           size="small"
         />
@@ -316,7 +401,7 @@ function FixCoversTab() {
           value={newCoverUrl}
           onChange={(e) => setNewCoverUrl(e.target.value)}
           placeholder="Enter the new cover URL"
-          disabled={loading}
+          disabled={coverLoading}
           helperText="The new cover URL to use as replacement"
           size="small"
         />
@@ -325,10 +410,12 @@ function FixCoversTab() {
           <Button
             variant="contained"
             onClick={handleReplaceCover}
-            disabled={loading || !oldCoverUrl.trim() || !newCoverUrl.trim()}
+            disabled={
+              coverLoading || !oldCoverUrl.trim() || !newCoverUrl.trim()
+            }
             sx={{ fontWeight: 600 }}
           >
-            {loading ? (
+            {coverLoading ? (
               <>
                 <CircularProgress size={20} sx={{ mr: 1 }} />
                 Replacing...
@@ -339,22 +426,103 @@ function FixCoversTab() {
           </Button>
         </Box>
 
-        {result && (
-          <Alert severity={result.success ? "success" : "error"}>
+        {coverResult && (
+          <Alert severity={coverResult.success ? "success" : "error"}>
             <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
-              {result.message}
+              {coverResult.message}
             </Typography>
-            {result.success && (
+            {coverResult.success && (
               <Box component="ul" sx={{ mt: 1, mb: 0, pl: 2 }}>
-                <li>Masters updated: {result.masterCount}</li>
-                <li>Records updated: {result.recordCount}</li>
-                <li>List records updated: {result.listRecordCount}</li>
+                <li>Masters updated: {coverResult.masterCount}</li>
+                <li>Records updated: {coverResult.recordCount}</li>
+                <li>List records updated: {coverResult.listRecordCount}</li>
                 <li>
                   Total:{" "}
-                  {(result.masterCount || 0) +
-                    (result.recordCount || 0) +
-                    (result.listRecordCount || 0)}
+                  {(coverResult.masterCount || 0) +
+                    (coverResult.recordCount || 0) +
+                    (coverResult.listRecordCount || 0)}
                 </li>
+              </Box>
+            )}
+          </Alert>
+        )}
+      </Stack>
+
+      {/* Merge Masters Section */}
+      <Divider sx={{ my: 5 }} />
+
+      <Typography variant="h5" sx={{ mb: 3, fontWeight: 600 }}>
+        Merge Masters
+      </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+        Merge two master records into one. All records, list records, listening
+        to entries, and reports referencing the old master will be updated to
+        reference the new master. Users with records for both masters will have
+        their old master record marked as custom. The old master will be deleted
+        and ratings will be recalculated.
+      </Typography>
+
+      <Stack spacing={3} sx={{ maxWidth: 800 }}>
+        <TextField
+          label="Old Master ID (To Delete)"
+          fullWidth
+          value={oldMasterId}
+          onChange={(e) => setOldMasterId(e.target.value)}
+          placeholder="Enter the master ID to merge from and delete"
+          disabled={mergeLoading}
+          helperText="This master will be deleted after merging"
+          size="small"
+        />
+
+        <TextField
+          label="New Master ID (To Keep)"
+          fullWidth
+          value={newMasterId}
+          onChange={(e) => setNewMasterId(e.target.value)}
+          placeholder="Enter the master ID to merge into and keep"
+          disabled={mergeLoading}
+          helperText="This master will remain and receive all references"
+          size="small"
+        />
+
+        <Box>
+          <Button
+            variant="contained"
+            color="warning"
+            onClick={handleMergeMasters}
+            disabled={
+              mergeLoading || !oldMasterId.trim() || !newMasterId.trim()
+            }
+            sx={{ fontWeight: 600 }}
+          >
+            {mergeLoading ? (
+              <>
+                <CircularProgress size={20} sx={{ mr: 1 }} />
+                Merging...
+              </>
+            ) : (
+              "Merge Masters"
+            )}
+          </Button>
+        </Box>
+
+        {mergeResult && (
+          <Alert severity={mergeResult.success ? "success" : "error"}>
+            <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
+              {mergeResult.message}
+            </Typography>
+            {mergeResult.success && (
+              <Box component="ul" sx={{ mt: 1, mb: 0, pl: 2 }}>
+                <li>
+                  Duplicates marked as custom:{" "}
+                  {mergeResult.duplicatesMarkedCustom}
+                </li>
+                <li>Records updated: {mergeResult.recordsUpdated}</li>
+                <li>List records updated: {mergeResult.listRecordsUpdated}</li>
+                <li>
+                  Listening to entries updated: {mergeResult.listeningToUpdated}
+                </li>
+                <li>Reports updated: {mergeResult.reportsUpdated}</li>
               </Box>
             )}
           </Alert>
@@ -3445,8 +3613,8 @@ export default function Admin() {
         return <ListsTab />;
       case "reports":
         return <ReportsTab />;
-      case "fixcovers":
-        return <FixCoversTab />;
+      case "fix":
+        return <FixTab />;
       case "tags":
       default:
         return <TagsTab />;

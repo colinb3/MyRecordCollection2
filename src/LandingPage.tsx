@@ -273,7 +273,7 @@ export default function LandingPage() {
           }}
         >
           <Container maxWidth="lg">
-            <Box sx={{ mb: 4, mr: { xs: -1, sm: -2 }, pt: { xs: 1, md: 1.5 } }}>
+            <Box sx={{ mb: 5, mr: { xs: -1, sm: -2 }, pt: { xs: 1, md: 1.5 } }}>
               <TopBar
                 title=""
                 onLogout={handleLogout}
@@ -301,17 +301,18 @@ export default function LandingPage() {
                   >
                     The better way to manage your music obsession
                   </Typography>
-                  <Typography
-                    variant="h6"
-                    fontSize={{ xs: "1.2rem", md: "1.3rem" }}
-                    color="grey.300"
-                    maxWidth={600}
-                    textAlign={{ xs: "center", md: "left" }}
-                  >
-                    My Record Collection helps you keep all your music
-                    beautifully organized—whether you've listened to 50 records
-                    or 5,000.
-                  </Typography>
+                  <Box alignSelf="center" px={{ xs: 3, md: 0 }}>
+                    <Typography
+                      variant="h6"
+                      fontSize={{ xs: "1.2rem", md: "1.3rem" }}
+                      color="grey.300"
+                      textAlign={{ xs: "center", md: "left" }}
+                    >
+                      My Record Collection helps you keep all your music
+                      beautifully organized—whether you've listened to 50
+                      records or 5,000.
+                    </Typography>
+                  </Box>
                   <Stack
                     direction={{ xs: "column", sm: "row" }}
                     spacing={2}

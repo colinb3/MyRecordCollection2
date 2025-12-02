@@ -264,7 +264,7 @@ export default function RecordDetails() {
   }, [ownerDisplayName, ownerUsername]);
   const ownerProfileAlt = ownerDisplayName ?? ownerHandle ?? "Record owner";
   const currentCollectionName =
-    record?.collectionName ?? record?.tableName ?? null;
+    record?.collectionName ?? record?.tableName ?? "N/A";
 
   const tagOptions = useMemo(() => {
     const seen = new Map<string, string>();
@@ -371,6 +371,18 @@ export default function RecordDetails() {
     }
   };
 
+  const navAfterDelete = ownerUsername
+    ? currentCollectionName === "My Collection" ||
+      currentCollectionName === "N/A"
+      ? `/community/${encodeURIComponent(ownerUsername)}/collection`
+      : `/community/${encodeURIComponent(ownerUsername)}/${encodeURIComponent(
+          currentCollectionName.toLowerCase()
+        )}`
+    : currentCollectionName === "My Collection" ||
+      currentCollectionName === "N/A"
+    ? "/mycollection"
+    : `/${encodeURIComponent(currentCollectionName.toLowerCase())}`;
+
   const handleRequestDelete = () => {
     if (!record) return;
     setDeleteDialogOpen(true);
@@ -380,7 +392,6 @@ export default function RecordDetails() {
     if (!record) return;
     setDeleteLoading(true);
     const successMessage = "Record deleted";
-    let navigateTo: string | null = null;
 
     try {
       const res = await fetch(apiUrl("/api/records/delete"), {
@@ -403,9 +414,6 @@ export default function RecordDetails() {
       clearCollectionRecordsCache();
       clearProfileHighlightsCache();
       clearCommunityCaches();
-      navigateTo = ownerUsername
-        ? `/community/${encodeURIComponent(ownerUsername)}/collection`
-        : "/mycollection";
     } catch {
       setSnackbar({
         open: true,
@@ -415,8 +423,8 @@ export default function RecordDetails() {
     } finally {
       setDeleteLoading(false);
       setDeleteDialogOpen(false);
-      if (navigateTo) {
-        navigate(navigateTo, {
+      if (navAfterDelete) {
+        navigate(navAfterDelete, {
           state: { message: successMessage },
         });
       }
@@ -486,6 +494,7 @@ export default function RecordDetails() {
   const addedText = record
     ? formatLocalDate(record.added, dateFormatter) ?? "Unknown"
     : "Unknown";
+  const masterText = record?.masterId ? `${record.masterId}` : "None";
   const showMasterButton = Boolean(record?.masterId);
   const showOwnerActions = isOwnerView && Boolean(record);
   const showActionRow = showMasterButton || showOwnerActions;
@@ -780,6 +789,20 @@ export default function RecordDetails() {
                                   {addedText}
                                 </Typography>
                               </Box>
+                              {record.masterId && (
+                                <Box mr={2.5} mb={1.5}>
+                                  <Typography
+                                    variant="overline"
+                                    color="text.secondary"
+                                    sx={{ letterSpacing: 0.6 }}
+                                  >
+                                    Master
+                                  </Typography>
+                                  <Typography variant="body1">
+                                    {masterText}
+                                  </Typography>
+                                </Box>
+                              )}
                               {record.isCustom ? (
                                 <Box mr={2.5} mb={1.5}>
                                   <Typography
