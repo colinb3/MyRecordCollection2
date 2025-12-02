@@ -89,6 +89,7 @@ export default function CommunityProfile() {
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
     cachedUser?.profilePicUrl ?? null
   );
+  const [userLoading, setUserLoading] = useState(!cachedUser);
 
   const targetUsername = params.username ?? "";
 
@@ -106,6 +107,7 @@ export default function CommunityProfile() {
     (async () => {
       const info = await loadUserInfo();
       if (cancelled) return;
+      setUserLoading(false);
       // Allow unauthenticated access - don't redirect to login
       if (info) {
         setUsername(info.username);
@@ -379,6 +381,7 @@ export default function CommunityProfile() {
           displayName={displayName}
           profilePicUrl={profilePicUrl ?? undefined}
           onLogout={handleLogout}
+          loading={userLoading}
         />
         <Box sx={{ flex: 1, overflowY: "auto", pb: 4, px: 1 }}>
           <Box maxWidth={860} mx="auto" sx={{ mt: 1 }}>

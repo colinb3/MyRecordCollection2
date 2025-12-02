@@ -35,6 +35,7 @@ import { performLogout } from "./logout";
 export default function LandingPage() {
   const navigate = useNavigate();
   const cachedUserInfo = getCachedUserInfo();
+  const [userLoading, setUserLoading] = useState(!cachedUserInfo);
   const [username, setUsername] = useState<string>(
     cachedUserInfo?.username ?? ""
   );
@@ -133,6 +134,7 @@ export default function LandingPage() {
     (async () => {
       const info = await loadUserInfo();
       if (cancelled) return;
+      setUserLoading(false);
       if (info) {
         setUsername(info.username);
         setDisplayName(info.displayName ?? "");
@@ -278,6 +280,7 @@ export default function LandingPage() {
                 username={username}
                 displayName={displayName}
                 profilePicUrl={profilePicUrl ?? undefined}
+                loading={userLoading}
               />
             </Box>
             <Box

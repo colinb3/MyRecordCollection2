@@ -69,6 +69,7 @@ export default function RecordDetails() {
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
     cachedUser?.profilePicUrl ?? null
   );
+  const [userLoading, setUserLoading] = useState(!cachedUser);
 
   const [record, setRecord] = useState<MrcRecord | null>(null);
   const [owner, setOwner] = useState<RecordOwnerInfo | null>(null);
@@ -109,6 +110,7 @@ export default function RecordDetails() {
       const [info, tags] = await Promise.all([loadUserInfo(), loadUserTags()]);
 
       if (cancelled) return;
+      setUserLoading(false);
       if (!info && !ownerUsername) {
         // Only require login if viewing own records, not community records
         if (location.pathname !== "/login") {
@@ -584,6 +586,7 @@ export default function RecordDetails() {
           displayName={displayName}
           profilePicUrl={profilePicUrl ?? undefined}
           onLogout={handleLogout}
+          loading={userLoading}
         />
 
         <Box sx={{ flex: 1, overflowY: "auto", pb: 4, px: 1 }}>

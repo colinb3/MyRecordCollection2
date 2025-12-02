@@ -58,6 +58,7 @@ export default function CommunityCollection({
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
     cachedUser?.profilePicUrl ?? null
   );
+  const [userLoading, setUserLoading] = useState(!cachedUser);
 
   const targetUsername = params.username ?? "";
   const normalizedViewer = (username ?? "").toLowerCase();
@@ -85,6 +86,7 @@ export default function CommunityCollection({
     (async () => {
       const info = await loadUserInfo();
       if (cancelled) return;
+      setUserLoading(false);
       // Allow unauthenticated access - don't redirect to login
       if (info) {
         setUsername(info.username);
@@ -285,6 +287,7 @@ export default function CommunityCollection({
           displayName={displayName}
           profilePicUrl={profilePicUrl ?? undefined}
           onLogout={handleLogout}
+          loading={userLoading}
         />
         <Box
           sx={{

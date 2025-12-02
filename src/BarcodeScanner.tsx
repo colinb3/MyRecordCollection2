@@ -76,6 +76,7 @@ export default function BarcodeScanner() {
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
     cachedUser?.profilePicUrl ?? null
   );
+  const [userLoading, setUserLoading] = useState(!cachedUser);
   const [status, setStatus] = useState<ScannerStatus>("initial");
   const [message, setMessage] = useState<string | null>(null);
   const [detectedBarcode, setDetectedBarcode] = useState<string | null>(null);
@@ -461,6 +462,7 @@ export default function BarcodeScanner() {
     (async () => {
       const info = await loadUserInfo();
       if (!isMounted) return;
+      setUserLoading(false);
       if (info) {
         setUsername(info.username);
         setDisplayName(info.displayName ?? "");
@@ -525,6 +527,7 @@ export default function BarcodeScanner() {
             displayName={displayName}
             profilePicUrl={profilePicUrl}
             onLogout={handleLogout}
+            loading={userLoading}
           />
         </Box>
         <Box

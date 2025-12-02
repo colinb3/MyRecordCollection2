@@ -90,6 +90,7 @@ export default function Search() {
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
     cachedUser?.profilePicUrl ?? null
   );
+  const [userLoading, setUserLoading] = useState(!cachedUser);
 
   const [activeTab, setActiveTab] = useState<SearchTab>(initialTab);
 
@@ -107,6 +108,7 @@ export default function Search() {
       const info = await loadUserInfo();
 
       if (cancelled) return;
+      setUserLoading(false);
 
       if (info) {
         setUsername(info.username);
@@ -582,6 +584,7 @@ export default function Search() {
           }
           onSearchChange={handleTopBarSearchChange}
           onSearchSubmit={handleTopBarSearchSubmit}
+          loading={userLoading}
         />
 
         <Box sx={{ flex: 1, overflowY: "hidden", pb: 3, px: 1 }}>

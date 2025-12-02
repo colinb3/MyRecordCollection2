@@ -63,6 +63,7 @@ export default function Community() {
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
     cachedUser?.profilePicUrl ?? null
   );
+  const [userLoading, setUserLoading] = useState(!cachedUser);
 
   const [searchParams, setSearchParams] = useSearchParams();
   const rawView = searchParams.get("view");
@@ -106,6 +107,7 @@ export default function Community() {
     (async () => {
       const info = await loadUserInfo();
       if (cancelled) return;
+      setUserLoading(false);
       if (!info) {
         if (location.pathname !== "/login") {
           const next = encodeURIComponent(
@@ -488,6 +490,7 @@ export default function Community() {
           displayName={displayName}
           profilePicUrl={profilePicUrl ?? undefined}
           onLogout={handleLogout}
+          loading={userLoading}
         />
         <Box
           sx={{

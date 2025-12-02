@@ -78,6 +78,7 @@ export default function Lists() {
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
     cachedUser?.profilePicUrl ?? null
   );
+  const [userLoading, setUserLoading] = useState(!cachedUser);
 
   const navigate = useNavigate();
 
@@ -228,6 +229,7 @@ export default function Lists() {
     (async () => {
       const info = await loadUserInfo();
       if (cancelled) return;
+      setUserLoading(false);
       if (info) {
         setUsername(info.username ?? "");
         setDisplayName(info.displayName ?? "");
@@ -832,6 +834,7 @@ export default function Lists() {
           displayName={displayName}
           profilePicUrl={profilePicUrl ?? undefined}
           searchPlaceholder="Search..."
+          loading={userLoading}
         />
         <Box sx={{ flex: 1, overflowY: "auto", pb: 4, px: 1 }}>
           <Box maxWidth={860} mx="auto" sx={{ mt: 1 }}>

@@ -125,6 +125,7 @@ export default function MasterReviews() {
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
     cachedUser?.profilePicUrl ?? null
   );
+  const [userLoading, setUserLoading] = useState(!cachedUser);
   const [reviews, setReviews] = useState<MasterReviewEntry[]>([]);
   const [fetchStatus, setFetchStatus] = useState<FetchStatus>("loading");
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -157,6 +158,7 @@ export default function MasterReviews() {
     (async () => {
       const info = await loadUserInfo();
       if (cancelled) return;
+      setUserLoading(false);
       if (info) {
         setUsername(info.username);
         setDisplayName(info.displayName ?? "");
@@ -496,6 +498,7 @@ export default function MasterReviews() {
           username={username}
           displayName={displayName}
           profilePicUrl={profilePicUrl ?? undefined}
+          loading={userLoading}
         />
 
         <Box sx={{ flex: 1, overflowY: "auto", pb: 4, px: 1 }}>

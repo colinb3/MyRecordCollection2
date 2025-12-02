@@ -72,6 +72,7 @@ export default function CommunityStats() {
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
     cachedUser?.profilePicUrl ?? null
   );
+  const [userLoading, setUserLoading] = useState(!cachedUser);
 
   const targetUsername = params.username ?? "";
 
@@ -116,6 +117,7 @@ export default function CommunityStats() {
     (async () => {
       const info = await loadUserInfo();
       if (cancelled) return;
+      setUserLoading(false);
       if (info) {
         setUsername(info.username);
         setDisplayName(info.displayName ?? "");
@@ -267,6 +269,7 @@ export default function CommunityStats() {
           username={username}
           displayName={displayName}
           profilePicUrl={profilePicUrl ?? undefined}
+          loading={userLoading}
         />
 
         <Box sx={{ flex: 1, overflowY: "auto", pb: 4, px: 1 }}>

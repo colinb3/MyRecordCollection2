@@ -64,6 +64,7 @@ export default function Compare() {
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
     cachedUser?.profilePicUrl ?? null
   );
+  const [userLoading, setUserLoading] = useState(!cachedUser);
   const profileInitial = (displayName || username || "?")
     .charAt(0)
     .toUpperCase();
@@ -136,6 +137,7 @@ export default function Compare() {
     (async () => {
       const info = await loadUserInfo();
       if (cancelled) return;
+      setUserLoading(false);
       if (!info) {
         const next = encodeURIComponent(`/community/${targetUsername}/compare`);
         navigate(`/login?next=${next}`, { replace: true });
@@ -361,6 +363,7 @@ export default function Compare() {
           username={username}
           displayName={displayName}
           profilePicUrl={profilePicUrl ?? undefined}
+          loading={userLoading}
         />
 
         <Box sx={{ flex: 1, overflowY: "auto", pb: 4, px: 1 }}>

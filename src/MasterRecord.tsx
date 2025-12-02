@@ -238,6 +238,7 @@ export default function MasterRecord() {
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
     cachedUser?.profilePicUrl ?? null
   );
+  const [userLoading, setUserLoading] = useState(!cachedUser);
 
   const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [wikiTags, setWikiTags] = useState<string[]>([]);
@@ -388,6 +389,7 @@ export default function MasterRecord() {
       const [info, tags] = await Promise.all([loadUserInfo(), loadUserTags()]);
 
       if (cancelled) return;
+      setUserLoading(false);
 
       if (info) {
         setUsername(info.username);
@@ -1338,6 +1340,7 @@ export default function MasterRecord() {
           username={username}
           displayName={displayName}
           profilePicUrl={profilePicUrl ?? undefined}
+          loading={userLoading}
         />
         <Box
           sx={{

@@ -55,6 +55,7 @@ export default function CommunityFollows() {
   const [targetProfilePicUrl, setTargetProfilePicUrl] = useState<string | null>(
     null
   );
+  const [userLoading, setUserLoading] = useState(!cachedUser);
 
   const [searchParams, setSearchParams] = useSearchParams();
   const queryTab = searchParams.get("tab") ?? "followers";
@@ -87,6 +88,7 @@ export default function CommunityFollows() {
     (async () => {
       const info = await loadUserInfo();
       if (cancelled) return;
+      setUserLoading(false);
       // Allow unauthenticated access - don't redirect to login
       if (info) {
         setUsername(info.username);
@@ -306,6 +308,7 @@ export default function CommunityFollows() {
           displayName={displayName}
           profilePicUrl={profilePicUrl ?? undefined}
           onLogout={handleLogout}
+          loading={userLoading}
         />
         <Box sx={{ flex: 1, overflowY: "hidden", pb: 4, px: 1 }}>
           <Box maxWidth={860} mx="auto" sx={{ height: "100%" }}>

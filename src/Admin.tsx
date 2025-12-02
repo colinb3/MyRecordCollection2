@@ -3372,6 +3372,7 @@ export default function Admin() {
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
     cached?.profilePicUrl ?? null
   );
+  const [userLoading, setUserLoading] = useState(!cached);
   const [userUuid, setUserUuid] = useState<string>(cached?.userUuid ?? "");
   const [adminPermissions, setAdminPermissions] = useState<AdminPermissions>(
     cached?.adminPermissions ?? {
@@ -3386,6 +3387,7 @@ export default function Admin() {
     (async () => {
       const info = await loadUserInfo();
       if (cancelled) return;
+      setUserLoading(false);
       if (!info) {
         if (location.pathname !== "/login") {
           const next = encodeURIComponent(
@@ -3463,6 +3465,7 @@ export default function Admin() {
           displayName={displayName}
           profilePicUrl={profilePicUrl ?? undefined}
           isAdmin
+          loading={userLoading}
         />
 
         <Paper

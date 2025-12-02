@@ -97,6 +97,7 @@ export default function Collection({ tableName, title }: CollectionProps) {
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
     cachedUserInfo?.profilePicUrl ?? null
   );
+  const [userLoading, setUserLoading] = useState(!cachedUserInfo);
 
   const [currentTableIsPrivate, setCurrentTableIsPrivate] = useState<
     boolean | null
@@ -284,6 +285,7 @@ export default function Collection({ tableName, title }: CollectionProps) {
     (async () => {
       const info = await loadUserInfo();
       if (cancelled) return;
+      setUserLoading(false);
       if (!info) {
         if (location.pathname !== "/login") {
           const next = encodeURIComponent(
@@ -370,6 +372,7 @@ export default function Collection({ tableName, title }: CollectionProps) {
             username={username}
             displayName={displayName}
             profilePicUrl={profilePicUrl ?? undefined}
+            loading={userLoading}
           />
         </Box>
 

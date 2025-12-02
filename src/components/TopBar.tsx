@@ -3,6 +3,7 @@ import {
   Avatar,
   Badge,
   Box,
+  CircularProgress,
   Typography,
   TextField,
   IconButton,
@@ -47,6 +48,8 @@ interface TopBarProps {
   isAdmin?: boolean;
   /** Whether there are pending reports (for admin notification badge) */
   hasPendingReports?: boolean;
+  /** Whether the frontend is waiting for a backend response */
+  loading?: boolean;
 }
 
 export default function TopBar({
@@ -61,6 +64,7 @@ export default function TopBar({
   onSearchSubmit,
   isAdmin,
   hasPendingReports,
+  loading,
 }: TopBarProps) {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
@@ -233,7 +237,11 @@ export default function TopBar({
                     disabled
                     sx={{
                       "&.Mui-disabled": {
-                        opacity: 0.85,
+                        opacity: 1,
+                        color: "text.primary",
+                        backgroundColor: "transparent",
+                        pointerEvents: "none",
+                        cursor: "default",
                       },
                     }}
                   >
@@ -382,6 +390,26 @@ export default function TopBar({
                     <ListItemText>Register</ListItemText>
                   </MenuItem>,
                 ]}
+            {loading && [
+              <Divider />,
+              <MenuItem
+                disabled
+                key="loading"
+                sx={{
+                  "&.Mui-disabled": {
+                    opacity: 1,
+                    color: "text.primary",
+                    backgroundColor: "transparent",
+                    pointerEvents: "none",
+                  },
+                }}
+              >
+                <ListItemIcon>
+                  <CircularProgress size={20} />
+                </ListItemIcon>
+                <ListItemText>Loading</ListItemText>
+              </MenuItem>,
+            ]}
           </Menu>
         </Box>
       </Box>
