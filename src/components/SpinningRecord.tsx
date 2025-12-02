@@ -34,7 +34,7 @@ export default function SpinningRecord({
             borderRadius: "50%",
             objectFit: "cover",
             zIndex: 1,
-            animation: "spin 4s linear infinite",
+            animation: "spin 3s linear infinite",
             "@keyframes spin": {
               from: {
                 transform: "rotate(0deg)",
