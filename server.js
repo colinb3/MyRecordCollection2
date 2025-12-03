@@ -1949,7 +1949,7 @@ app.get("/api/records/master-info", async (req, res) => {
     }
 
     const [rows] = await pool.query(
-      `SELECT ratingAve, rating1, rating2, rating3, rating4, rating5, rating6, rating7, rating8, rating9, rating10, release_year
+      `SELECT name, artist, cover, ratingAve, rating1, rating2, rating3, rating4, rating5, rating6, rating7, rating8, rating9, rating10, release_year
          FROM Master
          WHERE id = ?
          LIMIT 1`,
@@ -1962,6 +1962,17 @@ app.get("/api/records/master-info", async (req, res) => {
     // Prioritize database release year over Discogs release year
     const dbReleaseYear = ratingAveRow?.release_year != null ? Number(ratingAveRow.release_year) : null;
     const finalReleaseYear = Number.isInteger(dbReleaseYear) ? dbReleaseYear : result.releaseYear;
+    
+    // Use DB name/artist/cover if master is in database, otherwise use search/Discogs values
+    const finalName = ratingAveRow && typeof ratingAveRow.name === "string" && ratingAveRow.name.trim()
+      ? ratingAveRow.name.trim()
+      : recordName;
+    const finalArtist = ratingAveRow && typeof ratingAveRow.artist === "string" && ratingAveRow.artist.trim()
+      ? ratingAveRow.artist.trim()
+      : artist;
+    const finalCover = ratingAveRow && typeof ratingAveRow.cover === "string" && ratingAveRow.cover.trim()
+      ? ratingAveRow.cover.trim()
+      : result.cover;
     
     const ratingCounts = ratingAveRow
       ? Array.from({ length: 10 }, (_unused, index) => {
@@ -1986,10 +1997,10 @@ app.get("/api/records/master-info", async (req, res) => {
       masterId: result.masterId,
       releaseYear: finalReleaseYear,
       ratingAverage: Number.isFinite(ratingAverage) ? ratingAverage : null,
-      cover: result.cover,
+      cover: finalCover,
       ratingCounts,
-      record: recordName,
-      artist,
+      record: finalName,
+      artist: finalArtist,
       userCollections,
       userLists,
       inDb: !!ratingAveRow,
@@ -6690,6 +6701,32 @@ app.patch('/api/admin/masters/:masterId', requireAuth, requireAdmin, async (req,
     if (updates.length > 0) {
       params.push(masterId);
       await pool.execute(`UPDATE Master SET ${updates.join(', ')} WHERE id = ?`, params);
+      
+      // If name or artist changed, also update user records with this masterId
+      if (name !== undefined || artist !== undefined) {
+        const recordUpdates = [];
+        const recordParams = [];
+        if (name !== undefined) {
+          recordUpdates.push('name = ?');
+          recordParams.push(name.trim().slice(0, 255));
+        }
+        if (artist !== undefined) {
+          recordUpdates.push('artist = ?');
+          recordParams.push(artist === null ? null : artist.trim().slice(0, 255));
+        }
+        if (recordUpdates.length > 0) {
+          // Update Record table
+          await pool.execute(
+            `UPDATE Record SET ${recordUpdates.join(', ')} WHERE masterId = ?`,
+            [...recordParams, masterId]
+          );
+          // Update ListRecord table
+          await pool.execute(
+            `UPDATE ListRecord SET ${recordUpdates.join(', ')} WHERE masterId = ?`,
+            [...recordParams, masterId]
+          );
+        }
+      }
     }
 
     // Update genres and styles if provided
@@ -7463,24 +7500,24 @@ app.post('/api/admin/masters/merge', requireAuth, requireAdmin, async (req, res)
   try {
     const pool = await getPool();
 
-    // Verify both masters exist and get their cover URLs
+    // Verify both masters exist and get their details
     const [oldMasterRows] = await pool.query(
-      'SELECT id, cover FROM Master WHERE id = ? LIMIT 1',
+      'SELECT id, name, artist, cover FROM Master WHERE id = ? LIMIT 1',
       [parsedOldMasterId]
     );
     if (!oldMasterRows || oldMasterRows.length === 0) {
       return res.status(404).json({ error: `Old master ID ${parsedOldMasterId} not found` });
     }
-    const oldMasterCover = oldMasterRows[0].cover;
+    const oldMaster = oldMasterRows[0];
 
     const [newMasterRows] = await pool.query(
-      'SELECT id, cover FROM Master WHERE id = ? LIMIT 1',
+      'SELECT id, name, artist, cover FROM Master WHERE id = ? LIMIT 1',
       [parsedNewMasterId]
     );
     if (!newMasterRows || newMasterRows.length === 0) {
       return res.status(404).json({ error: `New master ID ${parsedNewMasterId} not found` });
     }
-    const newMasterCover = newMasterRows[0].cover;
+    const newMaster = newMasterRows[0];
 
     // Step 1: Find users who have records for BOTH masters
     // For these users, mark the old master record as custom and remove its masterId
@@ -7510,38 +7547,30 @@ app.post('/api/admin/masters/merge', requireAuth, requireAdmin, async (req, res)
     }
 
     // Step 2: Update remaining Record entries from old master to new master
-    // Also update cover URL if it matches the old master's cover
-    let recordsUpdated = 0;
-    if (oldMasterCover && newMasterCover) {
-      const [recordResult] = await pool.execute(
-        'UPDATE Record SET masterId = ?, cover = CASE WHEN cover = ? THEN ? ELSE cover END WHERE masterId = ?',
-        [parsedNewMasterId, oldMasterCover, newMasterCover, parsedOldMasterId]
-      );
-      recordsUpdated = recordResult.affectedRows || 0;
-    } else {
-      const [recordResult] = await pool.execute(
-        'UPDATE Record SET masterId = ? WHERE masterId = ?',
-        [parsedNewMasterId, parsedOldMasterId]
-      );
-      recordsUpdated = recordResult.affectedRows || 0;
-    }
+    // Also update name, artist, and cover if they match the old master's values
+    const [recordResult] = await pool.execute(
+      `UPDATE Record SET 
+        masterId = ?,
+        name = CASE WHEN name = ? THEN ? ELSE name END,
+        artist = CASE WHEN artist = ? THEN ? ELSE artist END,
+        cover = CASE WHEN cover = ? THEN ? ELSE cover END
+       WHERE masterId = ?`,
+      [parsedNewMasterId, oldMaster.name, newMaster.name, oldMaster.artist, newMaster.artist, oldMaster.cover, newMaster.cover, parsedOldMasterId]
+    );
+    const recordsUpdated = recordResult.affectedRows || 0;
 
     // Step 3: Update ListRecord entries from old master to new master
-    // Also update cover URL if it matches the old master's cover
-    let listRecordsUpdated = 0;
-    if (oldMasterCover && newMasterCover) {
-      const [listRecordResult] = await pool.execute(
-        'UPDATE ListRecord SET masterId = ?, cover = CASE WHEN cover = ? THEN ? ELSE cover END WHERE masterId = ?',
-        [parsedNewMasterId, oldMasterCover, newMasterCover, parsedOldMasterId]
-      );
-      listRecordsUpdated = listRecordResult.affectedRows || 0;
-    } else {
-      const [listRecordResult] = await pool.execute(
-        'UPDATE ListRecord SET masterId = ? WHERE masterId = ?',
-        [parsedNewMasterId, parsedOldMasterId]
-      );
-      listRecordsUpdated = listRecordResult.affectedRows || 0;
-    }
+    // Also update name, artist, and cover if they match the old master's values
+    const [listRecordResult] = await pool.execute(
+      `UPDATE ListRecord SET 
+        masterId = ?,
+        name = CASE WHEN name = ? THEN ? ELSE name END,
+        artist = CASE WHEN artist = ? THEN ? ELSE artist END,
+        cover = CASE WHEN cover = ? THEN ? ELSE cover END
+       WHERE masterId = ?`,
+      [parsedNewMasterId, oldMaster.name, newMaster.name, oldMaster.artist, newMaster.artist, oldMaster.cover, newMaster.cover, parsedOldMasterId]
+    );
+    const listRecordsUpdated = listRecordResult.affectedRows || 0;
 
     // Step 4: Update ListeningTo entries from old master to new master
     // First, delete ListeningTo entries for old master where user already has new master

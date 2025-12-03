@@ -449,7 +449,7 @@ function FixTab() {
       </Stack>
 
       {/* Merge Masters Section */}
-      <Divider sx={{ my: 5 }} />
+      <Divider sx={{ my: 3 }} />
 
       <Typography variant="h5" sx={{ mb: 3, fontWeight: 600 }}>
         Merge Masters
@@ -462,7 +462,7 @@ function FixTab() {
         and ratings will be recalculated.
       </Typography>
 
-      <Stack spacing={3} sx={{ maxWidth: 800 }}>
+      <Stack spacing={3} sx={{ maxWidth: 800, mb: 2 }}>
         <TextField
           label="Old Master ID (To Delete)"
           fullWidth
@@ -488,7 +488,6 @@ function FixTab() {
         <Box>
           <Button
             variant="contained"
-            color="warning"
             onClick={handleMergeMasters}
             disabled={
               mergeLoading || !oldMasterId.trim() || !newMasterId.trim()

@@ -278,7 +278,8 @@ export default function MasterRecord() {
     typeof masterInfo?.cover === "string" && masterInfo.cover.trim()
       ? masterInfo.cover.trim()
       : "";
-  const displayedCoverUrl = fromCollection ? masterCoverUrl : albumCoverUrl;
+  // Always prefer master cover if available, fall back to album cover
+  const displayedCoverUrl = masterCoverUrl || albumCoverUrl;
 
   const [cachedListNames] = useState<UserListEntry[]>(() => {
     // Initialize with cached list names on mount
@@ -743,16 +744,16 @@ export default function MasterRecord() {
           setMasterIdOverride(normalized.masterId);
         }
 
-        if (!album) {
-          const nameFromResponse =
-            typeof data?.record === "string" && data.record.trim()
-              ? data.record.trim()
-              : null;
-          const artistFromResponse =
-            typeof data?.artist === "string" && data.artist.trim()
-              ? data.artist.trim()
-              : null;
+        const nameFromResponse =
+          typeof data?.record === "string" && data.record.trim()
+            ? data.record.trim()
+            : null;
+        const artistFromResponse =
+          typeof data?.artist === "string" && data.artist.trim()
+            ? data.artist.trim()
+            : null;
 
+        if (!album) {
           if (nameFromResponse || artistFromResponse) {
             setAlbum({
               id: `master-${normalized.masterId ?? Date.now()}`,
@@ -761,17 +762,44 @@ export default function MasterRecord() {
               cover: coverValue ?? "",
             });
           }
-        }
+        } else {
+          // Check if name or artist from server differs from what user clicked
+          // Only show snackbar if master is in DB (meaning we're using official data)
+          const nameChanged =
+            nameFromResponse && album.record !== nameFromResponse;
+          const artistChanged =
+            artistFromResponse && album.artist !== artistFromResponse;
 
-        if (album && coverValue && (!album.cover || album.cover.length === 0)) {
-          setAlbum((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  cover: coverValue,
-                }
-              : prev
-          );
+          if (normalized.inDb && (nameChanged || artistChanged)) {
+            setSnackbar({
+              open: true,
+              message:
+                "Some details changed. If you believe the name or artist is incorrect, please report the master to let us know.",
+              severity: "success",
+            });
+          }
+
+          // Update album name/artist if they differ from server's values
+          // Only update cover if album doesn't have one yet (don't override existing cover)
+          const needsNameArtistUpdate = nameChanged || artistChanged;
+          const needsCoverUpdate =
+            coverValue && (!album.cover || album.cover.length === 0);
+
+          if (needsNameArtistUpdate || needsCoverUpdate) {
+            setAlbum((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    record: nameFromResponse ?? prev.record,
+                    artist: artistFromResponse ?? prev.artist,
+                    // Only update cover if album doesn't have one
+                    cover: needsCoverUpdate
+                      ? coverValue || prev.cover
+                      : prev.cover,
+                  }
+                : prev
+            );
+          }
         }
 
         setMasterInfo(normalized);
