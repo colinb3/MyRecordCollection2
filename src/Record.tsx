@@ -494,7 +494,7 @@ export default function RecordDetails() {
   const addedText = record
     ? formatLocalDate(record.added, dateFormatter) ?? "Unknown"
     : "Unknown";
-  const masterText = record?.masterId ? `${record.masterId}` : "None";
+  const masterRecordButtonTooltip = record?.masterId;
   const showMasterButton = Boolean(record?.masterId);
   const showOwnerActions = isOwnerView && Boolean(record);
   const showActionRow = showMasterButton || showOwnerActions;
@@ -789,20 +789,6 @@ export default function RecordDetails() {
                                   {addedText}
                                 </Typography>
                               </Box>
-                              {record.masterId && (
-                                <Box mr={2.5} mb={1.5}>
-                                  <Typography
-                                    variant="overline"
-                                    color="text.secondary"
-                                    sx={{ letterSpacing: 0.6 }}
-                                  >
-                                    Master
-                                  </Typography>
-                                  <Typography variant="body1">
-                                    {masterText}
-                                  </Typography>
-                                </Box>
-                              )}
                               {record.isCustom ? (
                                 <Box mr={2.5} mb={1.5}>
                                   <Typography
@@ -932,14 +918,16 @@ export default function RecordDetails() {
                               }}
                             >
                               {showMasterButton && (
-                                <Button
-                                  variant="contained"
-                                  color="primary"
-                                  startIcon={<LaunchIcon />}
-                                  onClick={handleOpenMasterRecord}
-                                >
-                                  Master
-                                </Button>
+                                <Tooltip title={masterRecordButtonTooltip}>
+                                  <Button
+                                    variant="contained"
+                                    color="primary"
+                                    startIcon={<LaunchIcon />}
+                                    onClick={handleOpenMasterRecord}
+                                  >
+                                    Master
+                                  </Button>
+                                </Tooltip>
                               )}
                               {showOwnerActions && (
                                 <>

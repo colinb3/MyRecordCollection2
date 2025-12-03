@@ -280,9 +280,7 @@ export default function MasterRecord() {
       : "";
   // From collection/record: prefer master cover (since record may have custom cover)
   // From search: prefer album cover (the search result cover)
-  const displayedCoverUrl = fromCollection
-    ? masterCoverUrl || albumCoverUrl
-    : albumCoverUrl || masterCoverUrl;
+  const displayedCoverUrl = masterCoverUrl || albumCoverUrl;
 
   const [cachedListNames] = useState<UserListEntry[]>(() => {
     // Initialize with cached list names on mount

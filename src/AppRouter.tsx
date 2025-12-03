@@ -333,7 +333,7 @@ function RouteTracker() {
       if (m) return `List ${decodeURIComponent(m[1])} | `;
 
       // Master record pages
-      m = pathname.match(/^\/master\/(\d+)(?:\/reviews)?$/);
+      m = pathname.match(/^\/master\/(r?\d+)(?:\/reviews)?$/);
       if (m) return `Master ${m[1]} | `;
       // Record pages
       m = pathname.match(/^\/record\/(\d+)$/);
