@@ -296,6 +296,8 @@ export default function MasterRecord() {
   });
   const isMountedRef = useRef(true);
   const releaseYearTouchedRef = useRef(false);
+  // Track when album has been corrected with server data (to prevent locationState from overwriting it)
+  const albumCorrectedFromServerRef = useRef(false);
   // Single ref to track the last successfully fetched master info
   const lastFetchedMasterRef = useRef<{
     masterId: string | null;
@@ -360,6 +362,10 @@ export default function MasterRecord() {
   }, [locationState.album, navigate, location.search, masterIdParam]);
 
   useEffect(() => {
+    // Skip if album was already corrected from server data
+    if (albumCorrectedFromServerRef.current) {
+      return;
+    }
     if (locationState.album) {
       setAlbum(locationState.album);
     }
@@ -786,6 +792,8 @@ export default function MasterRecord() {
             coverValue && (!album.cover || album.cover.length === 0);
 
           if (needsNameArtistUpdate || needsCoverUpdate) {
+            // Mark that we've corrected the album from server data
+            albumCorrectedFromServerRef.current = true;
             setAlbum((prev) =>
               prev
                 ? {

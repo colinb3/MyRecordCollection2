@@ -97,7 +97,8 @@ export default class ChunkErrorBoundary extends Component<Props, State> {
                   sx={{ mb: 3, maxWidth: 400 }}
                 >
                   The app has been updated. Please reload to get the latest
-                  version.
+                  version. If the problem persists, try clearing your browser
+                  cache.
                 </Typography>
               </>
             ) : (
