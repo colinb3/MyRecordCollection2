@@ -623,7 +623,7 @@ async function fetchTagsByRecordIds(pool, recordIds) {
 function buildDiscogsSearchUrl(artist, record) {
   const url = new URL(DISCOGS_API_URL);
   url.searchParams.set("query", artist + " - " + record);
-  url.searchParams.set("per_page", "5");
+  url.searchParams.set("per_page", "6");
   if (DISCOGS_API_KEY && DISCOGS_API_SECRET) {
     url.searchParams.set("key", DISCOGS_API_KEY);
     url.searchParams.set("secret", DISCOGS_API_SECRET);
@@ -643,7 +643,7 @@ function buildDiscogsBarcodeSearchUrl(barcode) {
   const url = new URL(DISCOGS_API_URL);
   url.searchParams.set("type", "release");
   url.searchParams.set("barcode", barcode);
-  url.searchParams.set("per_page", "5");
+  url.searchParams.set("per_page", "6");
   if (DISCOGS_API_KEY && DISCOGS_API_SECRET) {
     url.searchParams.set("key", DISCOGS_API_KEY);
     url.searchParams.set("secret", DISCOGS_API_SECRET);
@@ -664,7 +664,7 @@ function splitDiscogsTitle(title) {
       const artist = value.slice(0, index).trim();
       const record = value.slice(index + separator.length).trim();
       return {
-        artist: artist || null,
+        artist: cleanDiscogsArtist(artist) || null,
         record: record || null,
       };
     }
@@ -674,6 +674,19 @@ function splitDiscogsTitle(title) {
     artist: null,
     record: value || null,
   };
+}
+
+/**
+ * Cleans Discogs artist name by removing disambiguation suffixes like "(2)", "(3)", etc.
+ * @param {string} artist - The artist name from Discogs
+ * @returns {string|null} The cleaned artist name
+ */
+function cleanDiscogsArtist(artist) {
+  if (typeof artist !== "string") {
+    return null;
+  }
+  // Remove trailing disambiguation like " (2)", " (3)", " (42)", etc.
+  return artist.replace(/\s*\(\d+\)\s*$/, "").trim() || null;
 }
 
 /**
@@ -690,6 +703,138 @@ function normalizeForComparison(str) {
 }
 
 /**
+ * Expands common abbreviations in artist/record names for better matching.
+ * @param {string} str - The string to expand
+ * @returns {string} The expanded string
+ */
+function expandAbbreviations(str) {
+  if (typeof str !== "string") {
+    return "";
+  }
+  const lower = str.toLowerCase();
+  // Common abbreviations and their expansions
+  const expansions = [
+    [/\bltd\.?\b/gi, "limited"],
+    [/\binc\.?\b/gi, "incorporated"],
+    [/\bcorp\.?\b/gi, "corporation"],
+    [/\b&\b/g, "and"],
+    [/\bpt\.?\b/gi, "part"],
+    [/\bvol\.?\b/gi, "volume"],
+    [/\bfeat\.?\b/gi, "featuring"],
+    [/\bft\.?\b/gi, "featuring"],
+    [/\bintro\.?\b/gi, "introduction"],
+    [/\baka\b/gi, "also known as"],
+    [/\bep\b/gi, "extended play"],
+    [/\blp\b/gi, "long play"],
+  ];
+  
+  let result = lower;
+  for (const [pattern, replacement] of expansions) {
+    result = result.replace(pattern, replacement);
+  }
+  return result;
+}
+
+/**
+ * Extracts significant words from a string (removes common words and short words).
+ * @param {string} str - The string to extract words from
+ * @returns {string[]} Array of significant words
+ */
+function extractSignificantWords(str) {
+  if (typeof str !== "string") {
+    return [];
+  }
+  const stopWords = new Set(["the", "a", "an", "and", "or", "of", "in", "on", "at", "to", "for", "by", "with"]);
+  return str
+    .toLowerCase()
+    .replace(/[^\w\s]/g, " ")
+    .split(/\s+/)
+    .filter(word => word.length > 1 && !stopWords.has(word));
+}
+
+/**
+ * Calculates word overlap score between two strings.
+ * @param {string} str1 - First string
+ * @param {string} str2 - Second string
+ * @returns {number} Score between 0 and 1
+ */
+function wordOverlapScore(str1, str2) {
+  const words1 = new Set(extractSignificantWords(expandAbbreviations(str1)));
+  const words2 = new Set(extractSignificantWords(expandAbbreviations(str2)));
+  
+  if (words1.size === 0 || words2.size === 0) {
+    return 0;
+  }
+  
+  let matchCount = 0;
+  for (const word of words1) {
+    if (words2.has(word)) {
+      matchCount++;
+    }
+  }
+  
+  // Jaccard similarity: intersection / union
+  const union = new Set([...words1, ...words2]);
+  return matchCount / union.size;
+}
+
+/**
+ * Calculates a fuzzy similarity score between two strings.
+ * @param {string} str1 - First string
+ * @param {string} str2 - Second string  
+ * @returns {number} Score between 0 and 1
+ */
+function fuzzySimilarity(str1, str2) {
+  const norm1 = normalizeForComparison(expandAbbreviations(str1));
+  const norm2 = normalizeForComparison(expandAbbreviations(str2));
+  
+  // Exact match after normalization
+  if (norm1 === norm2) {
+    return 1.0;
+  }
+  
+  // One contains the other (for cases like "PiL" matching "Public Image Ltd")
+  if (norm1.length > 2 && norm2.length > 2) {
+    if (norm1.includes(norm2) || norm2.includes(norm1)) {
+      const shorter = Math.min(norm1.length, norm2.length);
+      const longer = Math.max(norm1.length, norm2.length);
+      return 0.7 + (0.3 * shorter / longer);
+    }
+  }
+  
+  // Word overlap scoring
+  return wordOverlapScore(str1, str2);
+}
+
+/**
+ * Calculates a match score for a Discogs result against expected artist and record.
+ * @param {object} discogsResult - The result object from Discogs
+ * @param {string} expectedArtist - The artist we're searching for
+ * @param {string} expectedRecord - The record name we're searching for
+ * @returns {number} Score between 0 and 1, where 1 is a perfect match
+ */
+function calculateMatchScore(discogsResult, expectedArtist, expectedRecord) {
+  if (!discogsResult?.title) {
+    return 0;
+  }
+
+  const { artist, record } = splitDiscogsTitle(discogsResult.title);
+  if (!artist || !record) {
+    return 0;
+  }
+
+  // Remove trailing (digit) from artist name
+  const cleanedArtist = artist.replace(/\s*\(\d+\)\s*$/, "").trim();
+
+  const artistScore = fuzzySimilarity(cleanedArtist, expectedArtist);
+  const recordScore = fuzzySimilarity(record, expectedRecord);
+  
+  // console.debug(`Discogs match scores - Artist ${cleanedArtist}: ${artistScore.toFixed(3)}, Record ${record}: ${recordScore.toFixed(3)}`);
+  // Weight record name slightly higher since artist names vary more
+  return (artistScore * 0.4) + (recordScore * 0.6);
+}
+
+/**
  * Checks if a Discogs result matches the expected artist and record name.
  * @param {object} discogsResult - The result object from Discogs
  * @param {string} expectedArtist - The artist we're searching for
@@ -697,27 +842,8 @@ function normalizeForComparison(str) {
  * @returns {boolean} True if the result matches the expected artist and record
  */
 function doesDiscogsResultMatch(discogsResult, expectedArtist, expectedRecord) {
-  if (!discogsResult?.title) {
-    return false;
-  }
-
-  const { artist, record } = splitDiscogsTitle(discogsResult.title);
-  if (!artist || !record) {
-    return false;
-  }
-
-  // Remove trailing (digit) from artist name, as seen in barcode lookup
-  const cleanedArtist = artist.replace(/\s*\(\d+\)\s*$/, "").trim();
-
-  const normalizedDiscogsArtist = normalizeForComparison(cleanedArtist);
-  const normalizedDiscogsRecord = normalizeForComparison(record);
-  const normalizedExpectedArtist = normalizeForComparison(expectedArtist);
-  const normalizedExpectedRecord = normalizeForComparison(expectedRecord);
-
-  return (
-    normalizedDiscogsArtist === normalizedExpectedArtist &&
-    normalizedDiscogsRecord === normalizedExpectedRecord
-  );
+  // Use a threshold for "good enough" match
+  return calculateMatchScore(discogsResult, expectedArtist, expectedRecord) >= 0.7;
 }
 
 async function lookupDiscogsByBarcode(barcode) {
@@ -808,6 +934,7 @@ async function lookupDiscogsMaster(artist, record) {
   }
 
   const requestUrl = buildDiscogsSearchUrl(trimmedArtist, trimmedRecord);
+  //console.debug(`Discogs search URL: ${requestUrl}`);
 
   try {
     const response = await fetch(requestUrl, {
@@ -844,16 +971,37 @@ async function lookupDiscogsMaster(artist, record) {
     };
 
     // Try to find a result that matches the artist and record name
+    // First look for a "good enough" match (score >= 0.7)
     let matchingResult = results.find((result) =>
       doesDiscogsResultMatch(result, trimmedArtist, trimmedRecord)
     );
 
-    // If no exact match found, use the first result as fallback
+    // If no good match found, find the best scoring result
     if (!matchingResult) {
-      console.log(
-        `No exact match found for "${trimmedArtist}" - "${trimmedRecord}", using first result`
-      );
-      matchingResult = results[0];
+      let bestScore = 0;
+      let bestResult = null;
+      
+      for (const result of results) {
+        const score = calculateMatchScore(result, trimmedArtist, trimmedRecord);
+        if (score > bestScore) {
+          bestScore = score;
+          bestResult = result;
+        }
+      }
+      
+      // Only use the best result if it has a reasonable score (>= 0.3)
+      // Otherwise return no match
+      if (bestScore >= 0.3) {
+        console.log(
+          `Best fuzzy match for "${trimmedArtist}" - "${trimmedRecord}" with score ${bestScore.toFixed(2)}: "${bestResult?.title}"`
+        );
+        matchingResult = bestResult;
+      } else {
+        console.log(
+          `No good match found for "${trimmedArtist}" - "${trimmedRecord}" (best score: ${bestScore.toFixed(2)}), returning no match`
+        );
+        return null;
+      }
     }
 
     // Use master_id if > 0, otherwise fall back to id
@@ -1847,7 +1995,7 @@ app.get("/api/records/master-info", async (req, res) => {
               typeof discogsData?.images?.[0]?.uri === "string" && discogsData.images[0].uri.trim()
                 ? discogsData.images[0].uri.trim()
                 : null;
-            const artist = typeof discogsData?.artists?.[0]?.name === "string" ? discogsData.artists[0].name : null;
+            const artist = typeof discogsData?.artists?.[0]?.name === "string" ? cleanDiscogsArtist(discogsData.artists[0].name) : null;
             const name = typeof discogsData?.title === "string" ? discogsData.title : null;
             
             return res.json({
@@ -5481,7 +5629,7 @@ app.post('/api/lists/:listId/records', requireAuth, async (req, res) => {
             const discogsName = typeof discogsData.title === 'string' ? discogsData.title : '';
             const discogsArtist = 
               Array.isArray(discogsData.artists) && discogsData.artists.length > 0 
-                ? discogsData.artists[0].name 
+                ? cleanDiscogsArtist(discogsData.artists[0].name)
                 : '';
             const discogsCover = 
               typeof discogsData.images?.[0]?.uri === 'string' 
@@ -7696,7 +7844,7 @@ app.get("/api/user/listening-to", requireAuth, async (req, res) => {
         
         if (discogsResponse.ok) {
           const discogsData = await discogsResponse.json();
-          artist = typeof discogsData?.artists?.[0]?.name === "string" ? discogsData.artists[0].name : null;
+          artist = typeof discogsData?.artists?.[0]?.name === "string" ? cleanDiscogsArtist(discogsData.artists[0].name) : null;
           cover = typeof discogsData?.images?.[0]?.uri === "string" && discogsData.images[0].uri.trim()
             ? discogsData.images[0].uri.trim()
             : null;
@@ -7762,7 +7910,7 @@ app.put("/api/user/listening-to", requireAuth, async (req, res) => {
         
         if (discogsResponse.ok) {
           const discogsData = await discogsResponse.json();
-          artist = typeof discogsData?.artists?.[0]?.name === "string" ? discogsData.artists[0].name : null;
+          artist = typeof discogsData?.artists?.[0]?.name === "string" ? cleanDiscogsArtist(discogsData.artists[0].name) : null;
           cover = typeof discogsData?.images?.[0]?.uri === "string" && discogsData.images[0].uri.trim()
             ? discogsData.images[0].uri.trim()
             : null;

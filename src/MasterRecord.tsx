@@ -278,8 +278,11 @@ export default function MasterRecord() {
     typeof masterInfo?.cover === "string" && masterInfo.cover.trim()
       ? masterInfo.cover.trim()
       : "";
-  // Always prefer master cover if available, fall back to album cover
-  const displayedCoverUrl = masterCoverUrl || albumCoverUrl;
+  // From collection/record: prefer master cover (since record may have custom cover)
+  // From search: prefer album cover (the search result cover)
+  const displayedCoverUrl = fromCollection
+    ? masterCoverUrl || albumCoverUrl
+    : albumCoverUrl || masterCoverUrl;
 
   const [cachedListNames] = useState<UserListEntry[]>(() => {
     // Initialize with cached list names on mount
