@@ -14,20 +14,20 @@ import {
 import Grid from "@mui/material/Grid";
 import FilterListAltIcon from "@mui/icons-material/FilterListAlt";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import TopBar from "./components/TopBar";
-import { darkTheme } from "./theme";
-import { getCachedUserInfo, loadUserInfo } from "./userInfo";
-import { setUserId } from "./analytics";
-import RecordTable from "./components/RecordTable";
-import type { PublicUserProfile, Record as MrcRecord, Filters } from "./types";
+import TopBar from "../components/TopBar";
+import { darkTheme } from "../theme";
+import { getCachedUserInfo, loadUserInfo } from "../userInfo";
+import { setUserId } from "../analytics";
+import RecordTable from "../components/RecordTable";
+import type { PublicUserProfile, Record as MrcRecord, Filters } from "../types";
 import {
   loadPublicUserCollection,
   loadPublicUserCollectionByGenre,
   loadPublicUserProfile,
-} from "./communityUsers";
-import FilterSidebar from "./components/FilterSidebar";
-import { performLogout } from "./logout";
-import ShareButton from "./components/ShareButton";
+} from "../communityUsers";
+import FilterSidebar from "../components/FilterSidebar";
+import { performLogout } from "../logout";
+import ShareButton from "../components/ShareButton";
 
 const MIN_RELEASE_YEAR = 1901;
 const MAX_RELEASE_YEAR = 2100;

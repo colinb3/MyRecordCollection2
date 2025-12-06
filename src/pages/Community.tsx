@@ -30,19 +30,19 @@ import ImageNotSupportedIcon from "@mui/icons-material/ImageNotSupported";
 import FavoriteIcon from "@mui/icons-material/Favorite";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
-import TopBar from "./components/TopBar";
-import { darkTheme } from "./theme";
-import { getCachedUserInfo, loadUserInfo } from "./userInfo";
-import { setUserId } from "./analytics";
+import TopBar from "../components/TopBar";
+import { darkTheme } from "../theme";
+import { getCachedUserInfo, loadUserInfo } from "../userInfo";
+import { setUserId } from "../analytics";
 import type {
   CommunityFeedEntry,
   CommunityFeedListPreviewRecord,
-} from "./types";
-import { loadActivityFeed } from "./communityUsers";
-import apiUrl from "./api";
+} from "../types";
+import { loadActivityFeed } from "../communityUsers";
+import apiUrl from "../api";
 import { Grid } from "@mui/system";
-import { formatRelativeTime } from "./dateUtils";
-import { performLogout } from "./logout";
+import { formatRelativeTime } from "../dateUtils";
+import { performLogout } from "../logout";
 
 type CommunityView = "friends" | "you";
 type FeedStatus = "idle" | "loading" | "error" | "ready";

@@ -31,10 +31,10 @@ import EditIcon from "@mui/icons-material/Edit";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
-import ShareButton from "./components/ShareButton";
-import ReportDialog from "./components/ReportDialog";
+import ShareButton from "../components/ShareButton";
+import ReportDialog from "../components/ReportDialog";
 import FlagIcon from "@mui/icons-material/Flag";
-import CoverImage from "./components/CoverImage";
+import CoverImage from "../components/CoverImage";
 import {
   DndContext,
   closestCenter,
@@ -53,16 +53,16 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useNavigate, useParams } from "react-router-dom";
-import TopBar from "./components/TopBar";
-import apiUrl from "./api";
-import { darkTheme } from "./theme";
-import { getCachedUserInfo, loadUserInfo } from "./userInfo";
-import { optimizeProfileImageFile } from "./profileImageOptimizer";
-import { formatLocalDate } from "./dateUtils";
+import TopBar from "../components/TopBar";
+import apiUrl from "../api";
+import { darkTheme } from "../theme";
+import { getCachedUserInfo, loadUserInfo } from "../userInfo";
+import { optimizeProfileImageFile } from "../profileImageOptimizer";
+import { formatLocalDate } from "../dateUtils";
 import LockIcon from "@mui/icons-material/Lock";
 import PublicIcon from "@mui/icons-material/Public";
 import AddIcon from "@mui/icons-material/Add";
-import { performLogout } from "./logout";
+import { performLogout } from "../logout";
 
 interface OwnerInfo {
   username: string;

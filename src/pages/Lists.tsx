@@ -29,15 +29,15 @@ import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
 import LockIcon from "@mui/icons-material/Lock";
 import PublicIcon from "@mui/icons-material/Public";
-import CoverImage from "./components/CoverImage";
+import CoverImage from "../components/CoverImage";
 import { useNavigate } from "react-router-dom";
-import TopBar from "./components/TopBar";
-import apiUrl from "./api";
-import { darkTheme } from "./theme";
-import { getCachedUserInfo, loadUserInfo } from "./userInfo";
-import { setCachedUserLists, removeCachedList } from "./userLists";
-import { optimizeProfileImageFile } from "./profileImageOptimizer";
-import { performLogout } from "./logout";
+import TopBar from "../components/TopBar";
+import apiUrl from "../api";
+import { darkTheme } from "../theme";
+import { getCachedUserInfo, loadUserInfo } from "../userInfo";
+import { setCachedUserLists, removeCachedList } from "../userLists";
+import { optimizeProfileImageFile } from "../profileImageOptimizer";
+import { performLogout } from "../logout";
 
 interface OwnerInfo {
   username: string;

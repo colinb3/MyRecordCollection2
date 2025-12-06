@@ -6,30 +6,30 @@ import {
   useLocation,
 } from "react-router-dom";
 import React, { Suspense, lazy, useEffect, useState } from "react";
-import LandingPage from "./LandingPage";
+import LandingPage from "./pages/LandingPage";
 import ChunkErrorBoundary from "./components/ChunkErrorBoundary";
-const Collection = lazy(() => import("./Collection"));
-const Search = lazy(() => import("./Search"));
-const Login = lazy(() => import("./Login"));
-const Register = lazy(() => import("./Register"));
+const Collection = lazy(() => import("./pages/Collection"));
+const Search = lazy(() => import("./pages/Search"));
+const Login = lazy(() => import("./pages/Login"));
+const Register = lazy(() => import("./pages/Register"));
 import RequireAuth from "./RequireAuth";
 import RequireAdmin from "./RequireAdmin";
-const NotFound = lazy(() => import("./NotFound"));
-const Settings = lazy(() => import("./Settings"));
-const Community = lazy(() => import("./Community"));
-const CommunityProfile = lazy(() => import("./CommunityProfile"));
-const CommunityCollection = lazy(() => import("./CommunityCollection"));
-const CommunityFollows = lazy(() => import("./CommunityFollows"));
-const CommunityStats = lazy(() => import("./CommunityStats"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const Settings = lazy(() => import("./pages/Settings"));
+const Community = lazy(() => import("./pages/Community"));
+const CommunityProfile = lazy(() => import("./pages/CommunityProfile"));
+const CommunityCollection = lazy(() => import("./pages/CommunityCollection"));
+const CommunityFollows = lazy(() => import("./pages/CommunityFollows"));
+const CommunityStats = lazy(() => import("./pages/CommunityStats"));
 import { loadUserInfo } from "./userInfo";
-const MasterRecordPage = lazy(() => import("./MasterRecord"));
-const RecordDetails = lazy(() => import("./Record"));
-const MasterReviews = lazy(() => import("./MasterReviews"));
-const BarcodeScanner = lazy(() => import("./BarcodeScanner"));
-const AdminPanel = lazy(() => import("./Admin"));
-const Lists = lazy(() => import("./Lists"));
-const ListDetail = lazy(() => import("./ListDetail"));
-const Compare = lazy(() => import("./Compare"));
+const MasterRecordPage = lazy(() => import("./pages/MasterRecord"));
+const RecordDetails = lazy(() => import("./pages/Record"));
+const MasterReviews = lazy(() => import("./pages/MasterReviews"));
+const BarcodeScanner = lazy(() => import("./pages/BarcodeScanner"));
+const AdminPanel = lazy(() => import("./pages/Admin"));
+const Lists = lazy(() => import("./pages/Lists"));
+const ListDetail = lazy(() => import("./pages/ListDetail"));
+const Compare = lazy(() => import("./pages/Compare"));
 
 // Component that prevents authenticated users from seeing auth pages
 function RedirectIfAuthed({ children }: { children: React.ReactNode }) {

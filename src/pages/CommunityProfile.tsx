@@ -24,18 +24,18 @@ import {
   ListItemText,
 } from "@mui/material";
 import { useNavigate, useParams } from "react-router-dom";
-import TopBar from "./components/TopBar";
-import { darkTheme } from "./theme";
-import { getCachedUserInfo, loadUserInfo } from "./userInfo";
-import { setUserId } from "./analytics";
-import RecordPreviewGrid from "./components/RecordPreviewGrid";
-import SpinningRecord from "./components/SpinningRecord";
-import type { PublicUserProfile } from "./types";
+import TopBar from "../components/TopBar";
+import { darkTheme } from "../theme";
+import { getCachedUserInfo, loadUserInfo } from "../userInfo";
+import { setUserId } from "../analytics";
+import RecordPreviewGrid from "../components/RecordPreviewGrid";
+import SpinningRecord from "../components/SpinningRecord";
+import type { PublicUserProfile } from "../types";
 import {
   loadPublicUserProfile,
   followUser,
   unfollowUser,
-} from "./communityUsers";
+} from "../communityUsers";
 import SettingsIcon from "@mui/icons-material/Settings";
 import CompareArrowsIcon from "@mui/icons-material/CompareArrows";
 import BarChartIcon from "@mui/icons-material/BarChart";
@@ -43,8 +43,8 @@ import VisibilityIcon from "@mui/icons-material/Visibility";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import ShareIcon from "@mui/icons-material/Share";
 import FlagIcon from "@mui/icons-material/Flag";
-import { performLogout } from "./logout";
-import ReportDialog from "./components/ReportDialog";
+import { performLogout } from "../logout";
+import ReportDialog from "../components/ReportDialog";
 
 const OWN_PREVIEW_LIMIT = 3;
 

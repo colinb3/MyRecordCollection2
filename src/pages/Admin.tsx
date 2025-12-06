@@ -41,13 +41,17 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import SecurityIcon from "@mui/icons-material/Security";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 
-import TopBar from "./components/TopBar";
-import { darkTheme } from "./theme";
-import apiUrl from "./api";
-import { getCachedUserInfo, setCachedUserInfo, loadUserInfo } from "./userInfo";
-import { setUserId } from "./analytics";
-import type { AdminPermissions } from "./types";
-import { performLogout } from "./logout";
+import TopBar from "../components/TopBar";
+import { darkTheme } from "../theme";
+import apiUrl from "../api";
+import {
+  getCachedUserInfo,
+  setCachedUserInfo,
+  loadUserInfo,
+} from "../userInfo";
+import { setUserId } from "../analytics";
+import type { AdminPermissions } from "../types";
+import { performLogout } from "../logout";
 
 const USERS_PAGE_SIZE = 25;
 const RECORDS_PAGE_SIZE = 25;

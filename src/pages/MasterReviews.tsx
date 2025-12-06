@@ -27,15 +27,15 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import FavoriteIcon from "@mui/icons-material/Favorite";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import TopBar from "./components/TopBar";
-import { darkTheme } from "./theme";
-import apiUrl from "./api";
-import CoverImage from "./components/CoverImage";
-import { getCachedUserInfo, loadUserInfo } from "./userInfo";
-import { setUserId } from "./analytics";
-import { performLogout } from "./logout";
-import { formatLocalDateTime } from "./dateUtils";
-import type { MasterReviewEntry } from "./types";
+import TopBar from "../components/TopBar";
+import { darkTheme } from "../theme";
+import apiUrl from "../api";
+import CoverImage from "../components/CoverImage";
+import { getCachedUserInfo, loadUserInfo } from "../userInfo";
+import { setUserId } from "../analytics";
+import { performLogout } from "../logout";
+import { formatLocalDateTime } from "../dateUtils";
+import type { MasterReviewEntry } from "../types";
 
 interface RecordListItem {
   id: string;

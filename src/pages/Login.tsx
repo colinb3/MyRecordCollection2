@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import apiUrl from "./api";
+import apiUrl from "../api";
 import {
   Box,
   Typography,
@@ -14,8 +14,8 @@ import {
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
 import { useNavigate, Link, useLocation } from "react-router-dom";
-import { darkTheme } from "./theme";
-import { loadUserInfo } from "./userInfo";
+import { darkTheme } from "../theme";
+import { loadUserInfo } from "../userInfo";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -43,7 +43,7 @@ export default function Login() {
           const info = await loadUserInfo(true);
           if (info) {
             // dynamically import analytics to avoid SSR issues
-            const { setUserId } = await import("./analytics");
+            const { setUserId } = await import("../analytics");
             setUserId(info.userUuid);
           }
         } catch {

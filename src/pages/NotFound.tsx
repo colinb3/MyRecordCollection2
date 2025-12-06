@@ -8,11 +8,11 @@ import {
   CssBaseline,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
-import { trackEvent } from "./analytics";
-import { darkTheme } from "./theme";
-import { getCachedUserInfo, loadUserInfo } from "./userInfo";
-import { performLogout } from "./logout";
-import TopBar from "./components/TopBar";
+import { trackEvent } from "../analytics";
+import { darkTheme } from "../theme";
+import { getCachedUserInfo, loadUserInfo } from "../userInfo";
+import { performLogout } from "../logout";
+import TopBar from "../components/TopBar";
 
 export default function NotFound() {
   const navigate = useNavigate();

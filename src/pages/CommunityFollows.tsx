@@ -20,19 +20,19 @@ import {
   ButtonBase,
 } from "@mui/material";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import TopBar from "./components/TopBar";
-import { darkTheme } from "./theme";
-import { getCachedUserInfo, loadUserInfo } from "./userInfo";
+import TopBar from "../components/TopBar";
+import { darkTheme } from "../theme";
+import { getCachedUserInfo, loadUserInfo } from "../userInfo";
 import {
   loadUserFollows,
   loadPublicUserProfile,
   followUser,
   unfollowUser,
   loadUserFollowsPaginated,
-} from "./communityUsers";
-import type { CommunityUserSummary } from "./types";
-import { setUserId } from "./analytics";
-import { performLogout } from "./logout";
+} from "../communityUsers";
+import type { CommunityUserSummary } from "../types";
+import { setUserId } from "../analytics";
+import { performLogout } from "../logout";
 
 const TAB_VALUES = ["followers", "following"] as const;
 type FollowTab = (typeof TAB_VALUES)[number];

@@ -15,12 +15,12 @@ import {
   Button,
 } from "@mui/material";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import TopBar from "./components/TopBar";
-import { darkTheme } from "./theme";
-import { getCachedUserInfo, loadUserInfo } from "./userInfo";
-import apiUrl from "./api";
-import { performLogout } from "./logout";
-import { loadPublicUserProfile } from "./communityUsers";
+import TopBar from "../components/TopBar";
+import { darkTheme } from "../theme";
+import { getCachedUserInfo, loadUserInfo } from "../userInfo";
+import apiUrl from "../api";
+import { performLogout } from "../logout";
+import { loadPublicUserProfile } from "../communityUsers";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import CompareArrowsIcon from "@mui/icons-material/CompareArrows";
 

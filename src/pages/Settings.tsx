@@ -9,22 +9,26 @@ import {
   Typography,
 } from "@mui/material";
 import Grid from "@mui/material/Grid";
-import { setUserId } from "./analytics";
-import { getCachedUserInfo, loadUserInfo, setCachedUserInfo } from "./userInfo";
+import { setUserId } from "../analytics.ts";
+import {
+  getCachedUserInfo,
+  loadUserInfo,
+  setCachedUserInfo,
+} from "../userInfo.ts";
 import { useNavigate, useLocation } from "react-router-dom";
-import { darkTheme } from "./theme";
+import { darkTheme } from "../theme.ts";
 import { useMediaQuery } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
-import { performLogout } from "./logout";
+import { performLogout } from "../logout.ts";
 
 // Import Components
-import TopBar from "./components/TopBar";
+import TopBar from "../components/TopBar.tsx";
 import SettingsMenu, {
   type SettingsMenuOption,
-} from "./components/SettingsMenu.tsx";
-import CollectionSettings from "./components/settings/CollectionSettings.tsx";
-import ProfileSettings from "./components/settings/ProfileSettings.tsx";
-import FeedbackSettings from "./components/settings/FeedbackSettings.tsx";
+} from "../components/SettingsMenu.tsx";
+import CollectionSettings from "../components/settings/CollectionSettings.tsx";
+import ProfileSettings from "../components/settings/ProfileSettings.tsx";
+import FeedbackSettings from "../components/settings/FeedbackSettings.tsx";
 
 const MENU_OPTIONS: SettingsMenuOption[] = [
   { id: "profile", label: "Profile" },

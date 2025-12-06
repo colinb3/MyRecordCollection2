@@ -12,11 +12,11 @@ import {
   TextField,
 } from "@mui/material";
 import { useNavigate, useLocation } from "react-router-dom";
-import TopBar from "./components/TopBar";
-import { darkTheme } from "./theme";
-import apiUrl from "./api";
-import { getCachedUserInfo, loadUserInfo } from "./userInfo";
-import { performLogout } from "./logout";
+import TopBar from "../components/TopBar";
+import { darkTheme } from "../theme";
+import apiUrl from "../api";
+import { getCachedUserInfo, loadUserInfo } from "../userInfo";
+import { performLogout } from "../logout";
 
 interface BarcodeSearchResponse {
   status?: string;

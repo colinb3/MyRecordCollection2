@@ -24,11 +24,11 @@ import {
   Legend,
   Tooltip,
 } from "recharts";
-import TopBar from "./components/TopBar";
-import { darkTheme } from "./theme";
-import { getCachedUserInfo, loadUserInfo } from "./userInfo";
-import apiUrl from "./api";
-import { performLogout } from "./logout";
+import TopBar from "../components/TopBar";
+import { darkTheme } from "../theme";
+import { getCachedUserInfo, loadUserInfo } from "../userInfo";
+import apiUrl from "../api";
+import { performLogout } from "../logout";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 
 type TableFilter = "All" | "My Collection" | "Wishlist" | "Listened";

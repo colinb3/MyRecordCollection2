@@ -11,17 +11,17 @@ import {
   Typography,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
-import "./LandingPage.css";
-import { darkTheme } from "./theme";
-import TopBar from "./components/TopBar";
-import { loadUserInfo, getCachedUserInfo } from "./userInfo";
-import icon from "./assets/icon.png";
-import collectionViewImg from "./assets/collectionview.png";
-import editViewImg from "./assets/editview.png";
-import activityViewImg from "./assets/activityview.png";
-import profileViewImg from "./assets/profileview.png";
-import listViewImg from "./assets/listview.png";
-import statsViewImg from "./assets/statsview.png";
+import "./styles/LandingPage.css";
+import { darkTheme } from "../theme";
+import TopBar from "../components/TopBar";
+import { loadUserInfo, getCachedUserInfo } from "../userInfo";
+import icon from "../assets/icon.png";
+import collectionViewImg from "../assets/collectionview.png";
+import editViewImg from "../assets/editview.png";
+import activityViewImg from "../assets/activityview.png";
+import profileViewImg from "../assets/profileview.png";
+import listViewImg from "../assets/listview.png";
+import statsViewImg from "../assets/statsview.png";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import LibraryMusicIcon from "@mui/icons-material/LibraryMusic";
 import FilterAltIcon from "@mui/icons-material/FilterAlt";
@@ -30,7 +30,7 @@ import FavoriteIcon from "@mui/icons-material/Favorite";
 import FeedIcon from "@mui/icons-material/Feed";
 import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
 import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
-import { performLogout } from "./logout";
+import { performLogout } from "../logout";
 
 export default function LandingPage() {
   const navigate = useNavigate();

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import apiUrl from "./api";
+import apiUrl from "../api";
 import {
   ThemeProvider,
   CssBaseline,
@@ -15,7 +15,7 @@ import {
 import Grid from "@mui/material/Grid";
 import FilterListAltIcon from "@mui/icons-material/FilterListAlt";
 import AddIcon from "@mui/icons-material/Add";
-import { darkTheme } from "./theme";
+import { darkTheme } from "../theme";
 import {
   type Record,
   type Filters,
@@ -23,25 +23,25 @@ import {
   type RecordTableSortPreference,
   createDefaultColumnVisibility,
   createDefaultRecordTablePreferences,
-} from "./types";
+} from "../types";
 import {
   getCachedRecordTablePreferences,
   loadRecordTablePreferences,
-} from "./preferences";
-import { getCachedUserInfo, loadUserInfo } from "./userInfo";
-import { loadUserTags } from "./userTags";
+} from "../preferences";
+import { getCachedUserInfo, loadUserInfo } from "../userInfo";
+import { loadUserTags } from "../userTags";
 import { useNavigate } from "react-router-dom";
 import { useLocation } from "react-router-dom";
-import { setUserId } from "./analytics";
-import ShareButton from "./components/ShareButton";
-import { performLogout } from "./logout";
+import { setUserId } from "../analytics";
+import ShareButton from "../components/ShareButton";
+import { performLogout } from "../logout";
 
 // Import Components
-import TopBar from "./components/TopBar";
-import RecordTable from "./components/RecordTable";
-import FilterSidebar from "./components/FilterSidebar";
-import ManageTagsDialog from "./components/ManageTagsDialog";
-import TutorialDialog from "./components/TutorialDialog";
+import TopBar from "../components/TopBar";
+import RecordTable from "../components/RecordTable";
+import FilterSidebar from "../components/FilterSidebar";
+import ManageTagsDialog from "../components/ManageTagsDialog";
+import TutorialDialog from "../components/TutorialDialog";
 
 interface CollectionProps {
   tableName: string;

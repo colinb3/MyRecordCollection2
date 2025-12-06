@@ -5,7 +5,7 @@ import {
   useCallback,
   type SyntheticEvent,
 } from "react";
-import apiUrl from "./api";
+import apiUrl from "../api";
 import {
   ThemeProvider,
   CssBaseline,
@@ -25,16 +25,16 @@ import {
   Button,
   Stack,
 } from "@mui/material";
-import CoverImage from "./components/CoverImage";
+import CoverImage from "../components/CoverImage";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import TopBar from "./components/TopBar";
-import { darkTheme } from "./theme";
-import { setUserId } from "./analytics";
-import { getCachedUserInfo, loadUserInfo } from "./userInfo";
-import { searchCommunityUsers } from "./communityUsers";
-import type { CommunityUserSummary } from "./types";
-import { formatLocalDate } from "./dateUtils";
-import { performLogout } from "./logout";
+import TopBar from "../components/TopBar";
+import { darkTheme } from "../theme";
+import { setUserId } from "../analytics";
+import { getCachedUserInfo, loadUserInfo } from "../userInfo";
+import { searchCommunityUsers } from "../communityUsers";
+import type { CommunityUserSummary } from "../types";
+import { formatLocalDate } from "../dateUtils";
+import { performLogout } from "../logout";
 
 interface AlbumResult {
   name: string;
