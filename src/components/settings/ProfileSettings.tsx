@@ -873,7 +873,7 @@ export default function ProfileSettings({
   };
 
   return (
-    <Box display="flex" flexDirection="column" gap={4}>
+    <Box display="flex" flexDirection="column" gap={3}>
       <Box>
         <Typography variant="h4" gutterBottom>
           Profile Settings
@@ -1007,68 +1007,131 @@ export default function ProfileSettings({
 
       <Box>
         <Typography variant="h6" sx={{ mb: 1 }}>
-          Email
+          Listening To
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
-          Update the email address associated with your account. You will need
-          to confirm this change with your current password.
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Set what record you're currently listening to. This will be displayed
+          on your profile.
+          <br />
+          Note: If you can't find a record, add it to your collection first.
         </Typography>
-        <Stack spacing={2}>
-          <TextField
-            label="Email address"
-            type="email"
-            value={emailValue}
-            onChange={(e) => {
-              setEmailValue(e.target.value);
-              setEmailAlert(null);
-              setEmailSuccess(null);
-              setEmailError(null);
+
+        {listeningTo && (
+          <Paper
+            sx={{
+              px: 2,
+              py: 1.5,
+              mb: 2,
+              display: "flex",
+              alignItems: "center",
+              gap: 2,
+              borderRadius: 2,
             }}
-            size="small"
-            autoComplete="email"
-            error={!!emailError}
-            helperText={emailError}
-            placeholder="email@example.com"
-            required
-          />
-          <TextField
-            label="Confirm with password"
-            type={showEmailPassword ? "text" : "password"}
-            value={emailPassword}
-            onChange={(e) => {
-              setEmailPassword(e.target.value);
-              setEmailAlert(null);
-              setEmailSuccess(null);
-              setEmailPasswordError(null);
-            }}
-            size="small"
-            autoComplete="current-password"
-            error={!!emailPasswordError}
-            helperText={emailPasswordError}
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton
-                    aria-label="toggle password visibility"
-                    onClick={() => setShowEmailPassword((prev) => !prev)}
-                    edge="end"
-                  >
-                    {showEmailPassword ? <VisibilityOff /> : <Visibility />}
-                  </IconButton>
-                </InputAdornment>
-              ),
-            }}
-          />
-          {emailAlert && <Alert severity="error">{emailAlert}</Alert>}
-          <Button
-            variant="outlined"
-            onClick={handleChangeEmail}
-            disabled={emailLoading || !emailPassword}
-            sx={{ alignSelf: "flex-start" }}
           >
-            {emailLoading ? "Updating..." : "Update email"}
-          </Button>
-        </Stack>
+            {listeningTo.cover && (
+              <Avatar
+                variant="rounded"
+                src={listeningTo.cover}
+                alt={listeningTo.name}
+                sx={{ width: 64, height: 64 }}
+              />
+            )}
+            <Box flex={1}>
+              <Typography variant="body1" fontWeight={600}>
+                {listeningTo.name}
+              </Typography>
+              {listeningTo.artist && (
+                <Typography variant="body2" color="text.secondary">
+                  {listeningTo.artist}
+                </Typography>
+              )}
+            </Box>
+            <Button
+              variant="text"
+              color="error"
+              onClick={handleClearListeningTo}
+              disabled={savingListeningTo}
+              size="small"
+            >
+              Clear
+            </Button>
+          </Paper>
+        )}
+
+        <TextField
+          label="Search for a record"
+          type="search"
+          value={listeningToSearch}
+          onChange={(e) => setListeningToSearch(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              e.stopPropagation();
+              void handleSearchListeningTo();
+            }
+          }}
+          onKeyPress={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              e.stopPropagation();
+            }
+          }}
+          placeholder="Press Enter to search..."
+          size="small"
+          fullWidth
+          sx={{ mb: 2 }}
+        />
+
+        {listeningToSearching && (
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+            <CircularProgress size={16} />
+            <Typography variant="body2" color="text.secondary">
+              Searching...
+            </Typography>
+          </Box>
+        )}
+
+        {!listeningToSearching && listeningToResults.length > 0 && (
+          <Stack spacing={0.5} sx={{ mb: 2 }}>
+            {listeningToResults.map((master) => (
+              <Paper
+                key={master.masterId}
+                variant="outlined"
+                sx={{
+                  p: 1.5,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 2,
+                  cursor: "pointer",
+                  borderRadius: 1,
+                  "&:hover": {
+                    bgcolor: "action.hover",
+                  },
+                }}
+                onClick={() => void handleSelectListeningTo(master)}
+              >
+                {master.cover && (
+                  <Avatar
+                    variant="rounded"
+                    src={master.cover}
+                    alt={master.name}
+                    sx={{ width: 48, height: 48 }}
+                  />
+                )}
+                <Box flex={1}>
+                  <Typography variant="body2" fontWeight={600}>
+                    {master.name}
+                  </Typography>
+                  {master.artist && (
+                    <Typography variant="caption" color="text.secondary">
+                      {master.artist}
+                    </Typography>
+                  )}
+                </Box>
+              </Paper>
+            ))}
+          </Stack>
+        )}
       </Box>
 
       <Divider />
@@ -1301,131 +1364,68 @@ export default function ProfileSettings({
 
       <Box>
         <Typography variant="h6" sx={{ mb: 1 }}>
-          Listening To
+          Email
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Set what record you're currently listening to. This will be displayed
-          on your profile.
-          <br />
-          Note: If you can't find a record, add it to your collection first.
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
+          Update the email address associated with your account. You will need
+          to confirm this change with your current password.
         </Typography>
-
-        {listeningTo && (
-          <Paper
-            sx={{
-              px: 2,
-              py: 1.5,
-              mb: 2,
-              display: "flex",
-              alignItems: "center",
-              gap: 2,
-              borderRadius: 2,
+        <Stack spacing={2}>
+          <TextField
+            label="Email address"
+            type="email"
+            value={emailValue}
+            onChange={(e) => {
+              setEmailValue(e.target.value);
+              setEmailAlert(null);
+              setEmailSuccess(null);
+              setEmailError(null);
             }}
+            size="small"
+            autoComplete="email"
+            error={!!emailError}
+            helperText={emailError}
+            placeholder="email@example.com"
+            required
+          />
+          <TextField
+            label="Confirm with password"
+            type={showEmailPassword ? "text" : "password"}
+            value={emailPassword}
+            onChange={(e) => {
+              setEmailPassword(e.target.value);
+              setEmailAlert(null);
+              setEmailSuccess(null);
+              setEmailPasswordError(null);
+            }}
+            size="small"
+            autoComplete="current-password"
+            error={!!emailPasswordError}
+            helperText={emailPasswordError}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    aria-label="toggle password visibility"
+                    onClick={() => setShowEmailPassword((prev) => !prev)}
+                    edge="end"
+                  >
+                    {showEmailPassword ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+          />
+          {emailAlert && <Alert severity="error">{emailAlert}</Alert>}
+          <Button
+            variant="outlined"
+            onClick={handleChangeEmail}
+            disabled={emailLoading || !emailPassword}
+            sx={{ alignSelf: "flex-start" }}
           >
-            {listeningTo.cover && (
-              <Avatar
-                variant="rounded"
-                src={listeningTo.cover}
-                alt={listeningTo.name}
-                sx={{ width: 64, height: 64 }}
-              />
-            )}
-            <Box flex={1}>
-              <Typography variant="body1" fontWeight={600}>
-                {listeningTo.name}
-              </Typography>
-              {listeningTo.artist && (
-                <Typography variant="body2" color="text.secondary">
-                  {listeningTo.artist}
-                </Typography>
-              )}
-            </Box>
-            <Button
-              variant="text"
-              color="error"
-              onClick={handleClearListeningTo}
-              disabled={savingListeningTo}
-              size="small"
-            >
-              Clear
-            </Button>
-          </Paper>
-        )}
-
-        <TextField
-          label="Search for a record"
-          type="search"
-          value={listeningToSearch}
-          onChange={(e) => setListeningToSearch(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              e.stopPropagation();
-              void handleSearchListeningTo();
-            }
-          }}
-          onKeyPress={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              e.stopPropagation();
-            }
-          }}
-          placeholder="Press Enter to search..."
-          size="small"
-          fullWidth
-          sx={{ mb: 2 }}
-        />
-
-        {listeningToSearching && (
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
-            <CircularProgress size={16} />
-            <Typography variant="body2" color="text.secondary">
-              Searching...
-            </Typography>
-          </Box>
-        )}
-
-        {!listeningToSearching && listeningToResults.length > 0 && (
-          <Stack spacing={0.5} sx={{ mb: 2 }}>
-            {listeningToResults.map((master) => (
-              <Paper
-                key={master.masterId}
-                variant="outlined"
-                sx={{
-                  p: 1.5,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 2,
-                  cursor: "pointer",
-                  borderRadius: 1,
-                  "&:hover": {
-                    bgcolor: "action.hover",
-                  },
-                }}
-                onClick={() => void handleSelectListeningTo(master)}
-              >
-                {master.cover && (
-                  <Avatar
-                    variant="rounded"
-                    src={master.cover}
-                    alt={master.name}
-                    sx={{ width: 48, height: 48 }}
-                  />
-                )}
-                <Box flex={1}>
-                  <Typography variant="body2" fontWeight={600}>
-                    {master.name}
-                  </Typography>
-                  {master.artist && (
-                    <Typography variant="caption" color="text.secondary">
-                      {master.artist}
-                    </Typography>
-                  )}
-                </Box>
-              </Paper>
-            ))}
-          </Stack>
-        )}
+            {emailLoading ? "Updating..." : "Update email"}
+          </Button>
+        </Stack>
       </Box>
 
       <Divider />

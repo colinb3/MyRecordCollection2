@@ -278,9 +278,40 @@ export default function MasterRecord() {
     typeof masterInfo?.cover === "string" && masterInfo.cover.trim()
       ? masterInfo.cover.trim()
       : "";
-  // From collection/record: prefer master cover (since record may have custom cover)
-  // From search: prefer album cover (the search result cover)
-  const displayedCoverUrl = masterCoverUrl || albumCoverUrl;
+
+  // Determine which cover to display based on context
+  // Priority logic:
+  // 1. From collection/record/list: Use master cover (if in DB), fallback to album cover
+  // 2. From barcode scanner: Use master cover (only source), fallback to album cover
+  // 3. From search: Use album cover (Last.fm, better quality), unless master is in DB
+  const displayedCoverUrl = (() => {
+    const cameFromSearch = !fromCollection && !locationState.fromScanner;
+    const masterExistsInDb = masterInfo?.inDb === true;
+
+    // From collection/record: prefer master cover if it exists in DB
+    if (fromCollection) {
+      return masterExistsInDb && masterCoverUrl
+        ? masterCoverUrl
+        : albumCoverUrl || masterCoverUrl;
+    }
+
+    // From barcode scanner: prefer master cover (it's the only source)
+    if (locationState.fromScanner) {
+      return masterCoverUrl || albumCoverUrl;
+    }
+
+    // From search: prefer album cover (Last.fm) unless master is in DB
+    if (cameFromSearch) {
+      return masterExistsInDb && masterCoverUrl
+        ? masterCoverUrl
+        : albumCoverUrl || masterCoverUrl;
+    }
+
+    // Default: prefer master if in DB, otherwise album
+    return masterExistsInDb && masterCoverUrl
+      ? masterCoverUrl
+      : albumCoverUrl || masterCoverUrl;
+  })();
 
   const [cachedListNames] = useState<UserListEntry[]>(() => {
     // Initialize with cached list names on mount

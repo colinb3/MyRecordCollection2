@@ -701,105 +701,109 @@ export default function CollectionSettings() {
   };
 
   return (
-    <Box display="flex" flexDirection="column">
+    <Box display="flex" flexDirection="column" gap={3}>
       <Box>
-        <Typography variant="h4" gutterBottom>
-          Collection Settings
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Make your collection your own.
-        </Typography>
+        <Box>
+          <Typography variant="h4" gutterBottom>
+            Collection Settings
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Make your collection your own.
+          </Typography>
+        </Box>
+
+        <Stack spacing={1.5}>
+          <Typography variant="h6">Privacy</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Control who can see your main collection or wishlist. Collection
+            highlights remain visible even when these collections are private.
+          </Typography>
+          <Stack
+            direction={"row"}
+            spacing={0}
+            alignItems={"center"}
+            sx={{ flexWrap: "wrap" }}
+          >
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                flexWrap: "wrap",
+              }}
+            >
+              <FormControlLabel
+                control={
+                  <Switch
+                    color="primary"
+                    checked={isCollectionPrivate}
+                    onChange={handleToggleCollectionPrivacy}
+                    disabled={
+                      collectionPrivacyLoading || collectionPrivacySaving
+                    }
+                  />
+                }
+                label="Private Collection"
+                sx={{ pr: 1 }}
+              />
+            </Box>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                flexWrap: "wrap",
+              }}
+            >
+              <FormControlLabel
+                control={
+                  <Switch
+                    color="primary"
+                    checked={isListenedPrivate}
+                    onChange={handleToggleListenedPrivacy}
+                    disabled={listenedPrivacyLoading || listenedPrivacySaving}
+                  />
+                }
+                label="Private Listened"
+              />
+            </Box>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                flexWrap: "wrap",
+              }}
+            >
+              <FormControlLabel
+                control={
+                  <Switch
+                    color="primary"
+                    checked={isWishlistPrivate}
+                    onChange={handleToggleWishlistPrivacy}
+                    disabled={wishlistPrivacyLoading || wishlistPrivacySaving}
+                  />
+                }
+                label="Private Wishlist"
+                sx={{ pr: 1 }}
+              />
+            </Box>
+            {(collectionPrivacyLoading ||
+              collectionPrivacySaving ||
+              wishlistPrivacyLoading ||
+              wishlistPrivacySaving ||
+              listenedPrivacyLoading ||
+              listenedPrivacySaving) && (
+              <CircularProgress size={22} sx={{ ml: { sm: 1 } }} />
+            )}
+          </Stack>
+        </Stack>
       </Box>
 
-      <Stack spacing={1.5}>
-        <Typography variant="h6">Privacy</Typography>
-        <Typography variant="body2" color="text.secondary">
-          Control who can see your main collection or wishlist. Collection
-          highlights remain visible even when these collections are private.
-        </Typography>
-        <Stack
-          direction={"row"}
-          spacing={0}
-          alignItems={"center"}
-          sx={{ flexWrap: "wrap" }}
-        >
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              gap: 1,
-              flexWrap: "wrap",
-            }}
-          >
-            <FormControlLabel
-              control={
-                <Switch
-                  color="primary"
-                  checked={isCollectionPrivate}
-                  onChange={handleToggleCollectionPrivacy}
-                  disabled={collectionPrivacyLoading || collectionPrivacySaving}
-                />
-              }
-              label="Private Collection"
-              sx={{ pr: 1 }}
-            />
-          </Box>
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              gap: 1,
-              flexWrap: "wrap",
-            }}
-          >
-            <FormControlLabel
-              control={
-                <Switch
-                  color="primary"
-                  checked={isListenedPrivate}
-                  onChange={handleToggleListenedPrivacy}
-                  disabled={listenedPrivacyLoading || listenedPrivacySaving}
-                />
-              }
-              label="Private Listened"
-            />
-          </Box>
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              gap: 1,
-              flexWrap: "wrap",
-            }}
-          >
-            <FormControlLabel
-              control={
-                <Switch
-                  color="primary"
-                  checked={isWishlistPrivate}
-                  onChange={handleToggleWishlistPrivacy}
-                  disabled={wishlistPrivacyLoading || wishlistPrivacySaving}
-                />
-              }
-              label="Private Wishlist"
-              sx={{ pr: 1 }}
-            />
-          </Box>
-          {(collectionPrivacyLoading ||
-            collectionPrivacySaving ||
-            wishlistPrivacyLoading ||
-            wishlistPrivacySaving ||
-            listenedPrivacyLoading ||
-            listenedPrivacySaving) && (
-            <CircularProgress size={22} sx={{ ml: { sm: 1 } }} />
-          )}
-        </Stack>
-      </Stack>
+      <Divider />
 
-      <Divider sx={{ my: 3 }} />
-
-      <Stack spacing={2}>
-        <Box>
+      <Box>
+        <Box sx={{ pb: 2 }}>
           <Typography variant="h6" gutterBottom>
             Record Table Display
           </Typography>
@@ -808,8 +812,8 @@ export default function CollectionSettings() {
             and pick the column that should be pre-sorted.
           </Typography>
         </Box>
-        {prefsLoading && <LinearProgress sx={{ mt: 1 }} />}
-        <FormGroup row sx={{ flexWrap: "wrap" }}>
+        {prefsLoading && <LinearProgress />}
+        <FormGroup row sx={{ flexWrap: "wrap", pb: 2 }}>
           {RECORD_TABLE_COLUMNS.filter((column) => column.hideable).map(
             (column) => (
               <FormControlLabel
@@ -834,6 +838,7 @@ export default function CollectionSettings() {
         <Stack
           direction={{ xs: "column", sm: "row" }}
           spacing={2}
+          pb={2}
           alignItems={{ xs: "stretch", sm: "flex-end" }}
         >
           <FormControl fullWidth size="small">
@@ -868,11 +873,7 @@ export default function CollectionSettings() {
             </Select>
           </FormControl>
         </Stack>
-        <Stack
-          direction={{ xs: "column", sm: "row" }}
-          spacing={2}
-          sx={{ pt: 1 }}
-        >
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
           <Button
             variant="contained"
             onClick={handleSavePreferences}
@@ -888,193 +889,197 @@ export default function CollectionSettings() {
             Reset to defaults
           </Button>
         </Stack>
-      </Stack>
-
-      <Divider sx={{ my: 3 }} />
-
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h6" gutterBottom>
-          Import Discogs Collection
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Import your Discogs collection directly into My Record Collection.
-          Export your{" "}
-          <Link
-            href="https://www.discogs.com/users/export"
-            sx={{ color: "primary.main" }}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Discogs collection
-          </Link>
-          , choose your exported Discogs CSV file below, optionally enrich
-          records with genre tags and date added values, and click import.
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-          Note: Large collections may take some time to import. After your
-          (optional) suggested tags have been added, you may leave the page
-          while the server continues processing. Please remain on the page if
-          you would like to see import results. Import can take 2 seconds per
-          record if record is not already in our database.
-        </Typography>
       </Box>
-      <Paper
-        sx={{
-          p: 3,
-          mb: 2,
-          borderRadius: 2,
-          backgroundColor: "background.paper",
-        }}
-      >
-        <Stack direction="column" spacing={2} alignItems="stretch">
-          <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
-            <Button
-              variant="contained"
-              startIcon={<CloudUploadIcon />}
-              component="label"
-              disabled={importing}
-              sx={{ mb: 0 }}
+
+      <Divider />
+
+      <Box>
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            Import Discogs Collection
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Import your Discogs collection directly into My Record Collection.
+            Export your{" "}
+            <Link
+              href="https://www.discogs.com/users/export"
+              sx={{ color: "primary.main" }}
+              target="_blank"
+              rel="noopener noreferrer"
             >
-              {fileName ? "Replace CSV" : "Select Discogs CSV"}
-              <input
-                hidden
-                ref={fileInputRef}
-                type="file"
-                accept=".csv,text/csv"
-                onChange={handleFileChange}
-              />
-            </Button>
-            {fileName && (
-              <Chip
-                label={fileName}
-                onDelete={importing ? undefined : resetSelection}
-                deleteIcon={<RestartAltIcon />}
-                color="primary"
-                variant="outlined"
-                sx={{ maxWidth: "100%" }}
-              />
-            )}
-          </Box>
-
-          <Box>
-            <FormControlLabel
-              control={
-                <Switch
-                  color="primary"
-                  checked={includeWikiTags}
-                  onChange={(_, checked) => setIncludeWikiTags(checked)}
-                  disabled={importing}
+              Discogs collection
+            </Link>
+            , choose your exported Discogs CSV file below, optionally enrich
+            records with genre tags and date added values, and click import.
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            Note: Large collections may take some time to import. After your
+            (optional) suggested tags have been added, you may leave the page
+            while the server continues processing. Please remain on the page if
+            you would like to see import results. Import can take 2 seconds per
+            record if record is not already in our database.
+          </Typography>
+        </Box>
+        <Paper
+          sx={{
+            p: 3,
+            mb: 2,
+            borderRadius: 2,
+            backgroundColor: "background.paper",
+          }}
+        >
+          <Stack direction="column" spacing={2} alignItems="stretch">
+            <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
+              <Button
+                variant="contained"
+                startIcon={<CloudUploadIcon />}
+                component="label"
+                disabled={importing}
+                sx={{ mb: 0 }}
+              >
+                {fileName ? "Replace CSV" : "Select Discogs CSV"}
+                <input
+                  hidden
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv,text/csv"
+                  onChange={handleFileChange}
                 />
-              }
-              label="Add suggested tags from record genres"
-              sx={{ mb: -2 }}
-            />
-          </Box>
-
-          <Box>
-            <FormControlLabel
-              control={
-                <Switch
+              </Button>
+              {fileName && (
+                <Chip
+                  label={fileName}
+                  onDelete={importing ? undefined : resetSelection}
+                  deleteIcon={<RestartAltIcon />}
                   color="primary"
-                  checked={useDateAdded}
-                  onChange={(_, checked) => setUseDateAdded(checked)}
-                  disabled={importing}
+                  variant="outlined"
+                  sx={{ maxWidth: "100%" }}
                 />
-              }
-              label="Import Discogs 'Date Added' values"
-            />
-          </Box>
+              )}
+            </Box>
 
-          <Box>
-            <Button
-              variant="contained"
-              color="success"
-              onClick={handleImport}
-              disabled={importing || parsedRecords.length === 0}
-            >
-              {importing
-                ? "Importing..."
-                : `Import ${parsedRecords.length || "0"} records`}
-            </Button>
-          </Box>
-        </Stack>
-
-        {importing && (
-          <Box sx={{ mt: 2 }}>
-            <LinearProgress
-              variant={
-                includeWikiTags && !submittingRecords
-                  ? "determinate"
-                  : "indeterminate"
-              }
-              value={
-                includeWikiTags && !submittingRecords ? tagProgress : undefined
-              }
-            />
-            <Typography variant="caption" display="block" sx={{ mt: 1 }}>
-              {includeWikiTags && !submittingRecords
-                ? `Fetching wiki tags... ${tagProgress}% | Do not leave this page`
-                : "Submitted records to the server. Your import will continue in the background. You can leave this page."}
-            </Typography>
-          </Box>
-        )}
-
-        {parseError && (
-          <Alert severity="error" sx={{ mt: 2 }}>
-            {parseError}
-          </Alert>
-        )}
-
-        {parsedRecords.length > 0 && (
-          <Box sx={{ mt: 3 }}>
-            <Divider sx={{ mb: 2 }} />
-            <Typography variant="subtitle1" gutterBottom>
-              Preview ({parsedRecords.length} record
-              {parsedRecords.length === 1 ? "" : "s"} found)
-            </Typography>
-            <List dense disablePadding>
-              {sampleRecords.map((rec, idx) => (
-                <ListItem
-                  key={`${rec.artist}-${rec.record}-${idx}`}
-                  sx={{ py: 0.5 }}
-                >
-                  <ListItemText
-                    primary={`${rec.artist} — ${rec.record}`}
-                    secondary={`Year: ${rec.release} • Rating: ${rec.rating}${
-                      useDateAdded && rec.rawDateAdded
-                        ? ` • Added: ${rec.rawDateAdded}`
-                        : ""
-                    }`}
+            <Box>
+              <FormControlLabel
+                control={
+                  <Switch
+                    color="primary"
+                    checked={includeWikiTags}
+                    onChange={(_, checked) => setIncludeWikiTags(checked)}
+                    disabled={importing}
                   />
-                </ListItem>
-              ))}
-            </List>
-            {parsedRecords.length > sampleRecords.length && (
-              <Typography variant="caption" color="text.secondary">
-                Showing {sampleRecords.length} of {parsedRecords.length}{" "}
-                entries.
-              </Typography>
-            )}
-          </Box>
-        )}
+                }
+                label="Add suggested tags from record genres"
+                sx={{ mb: -2 }}
+              />
+            </Box>
 
-        {importSummary && (
-          <Alert severity="success" sx={{ mt: 3 }}>
-            Imported {importSummary.created} record
-            {importSummary.created === 1 ? "" : "s"}.
-            {importSummary.skipped
-              ? ` Skipped ${importSummary.skipped} duplicate${
-                  importSummary.skipped === 1 ? "" : "s"
-                }.`
-              : ""}
-            {importSummary.withoutCover
-              ? ` ${importSummary.withoutCover} record${
-                  importSummary.withoutCover === 1 ? "" : "s"
-                } missing cover art.`
-              : ""}
-          </Alert>
-        )}
-      </Paper>
+            <Box>
+              <FormControlLabel
+                control={
+                  <Switch
+                    color="primary"
+                    checked={useDateAdded}
+                    onChange={(_, checked) => setUseDateAdded(checked)}
+                    disabled={importing}
+                  />
+                }
+                label="Import Discogs 'Date Added' values"
+              />
+            </Box>
+
+            <Box>
+              <Button
+                variant="contained"
+                color="success"
+                onClick={handleImport}
+                disabled={importing || parsedRecords.length === 0}
+              >
+                {importing
+                  ? "Importing..."
+                  : `Import ${parsedRecords.length || "0"} records`}
+              </Button>
+            </Box>
+          </Stack>
+
+          {importing && (
+            <Box sx={{ mt: 2 }}>
+              <LinearProgress
+                variant={
+                  includeWikiTags && !submittingRecords
+                    ? "determinate"
+                    : "indeterminate"
+                }
+                value={
+                  includeWikiTags && !submittingRecords
+                    ? tagProgress
+                    : undefined
+                }
+              />
+              <Typography variant="caption" display="block" sx={{ mt: 1 }}>
+                {includeWikiTags && !submittingRecords
+                  ? `Fetching wiki tags... ${tagProgress}% | Do not leave this page`
+                  : "Submitted records to the server. Your import will continue in the background. You can leave this page."}
+              </Typography>
+            </Box>
+          )}
+
+          {parseError && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {parseError}
+            </Alert>
+          )}
+
+          {parsedRecords.length > 0 && (
+            <Box sx={{ mt: 3 }}>
+              <Divider sx={{ mb: 2 }} />
+              <Typography variant="subtitle1" gutterBottom>
+                Preview ({parsedRecords.length} record
+                {parsedRecords.length === 1 ? "" : "s"} found)
+              </Typography>
+              <List dense disablePadding>
+                {sampleRecords.map((rec, idx) => (
+                  <ListItem
+                    key={`${rec.artist}-${rec.record}-${idx}`}
+                    sx={{ py: 0.5 }}
+                  >
+                    <ListItemText
+                      primary={`${rec.artist} — ${rec.record}`}
+                      secondary={`Year: ${rec.release} • Rating: ${rec.rating}${
+                        useDateAdded && rec.rawDateAdded
+                          ? ` • Added: ${rec.rawDateAdded}`
+                          : ""
+                      }`}
+                    />
+                  </ListItem>
+                ))}
+              </List>
+              {parsedRecords.length > sampleRecords.length && (
+                <Typography variant="caption" color="text.secondary">
+                  Showing {sampleRecords.length} of {parsedRecords.length}{" "}
+                  entries.
+                </Typography>
+              )}
+            </Box>
+          )}
+
+          {importSummary && (
+            <Alert severity="success" sx={{ mt: 3 }}>
+              Imported {importSummary.created} record
+              {importSummary.created === 1 ? "" : "s"}.
+              {importSummary.skipped
+                ? ` Skipped ${importSummary.skipped} duplicate${
+                    importSummary.skipped === 1 ? "" : "s"
+                  }.`
+                : ""}
+              {importSummary.withoutCover
+                ? ` ${importSummary.withoutCover} record${
+                    importSummary.withoutCover === 1 ? "" : "s"
+                  } missing cover art.`
+                : ""}
+            </Alert>
+          )}
+        </Paper>
+      </Box>
 
       <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
         <Button

@@ -76,7 +76,7 @@ export default function FeedbackSettings() {
   };
 
   return (
-    <Box display="flex" flexDirection="column" gap={4}>
+    <Box display="flex" flexDirection="column" gap={3}>
       <Box>
         <Typography variant="h4" gutterBottom>
           Leave Feedback
