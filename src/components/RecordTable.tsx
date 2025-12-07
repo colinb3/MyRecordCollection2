@@ -297,6 +297,16 @@ export default function RecordTable({
       sx={{
         border: "none",
         height: "100%",
+        backgroundColor: "transparent",
+        // Make header background transparent to match table body
+        "& .MuiDataGrid-columnHeaders": {
+          backgroundColor: "transparent",
+          borderBottom: "none",
+        },
+        // Ensure individual header cells are transparent (override defaults)
+        "& .MuiDataGrid-columnHeader": {
+          backgroundColor: "transparent !important",
+        },
         // Smooth transition for row hover background-color
         "& .MuiDataGrid-row": {
           transition: "background-color 0.2s ease",
