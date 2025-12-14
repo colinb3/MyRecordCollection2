@@ -45,6 +45,8 @@ import ShareIcon from "@mui/icons-material/Share";
 import FlagIcon from "@mui/icons-material/Flag";
 import { performLogout } from "../logout";
 import ReportDialog from "../components/ReportDialog";
+import HeadphonesIcon from "@mui/icons-material/Headphones";
+import FavoriteIcon from "@mui/icons-material/Favorite";
 
 const OWN_PREVIEW_LIMIT = 3;
 
@@ -184,16 +186,6 @@ export default function CommunityProfile() {
 
   const recentRecords = useMemo(() => {
     const records = profile?.recentRecords ?? [];
-    return isViewingOwnProfile ? records.slice(0, OWN_PREVIEW_LIMIT) : records;
-  }, [profile, isViewingOwnProfile]);
-
-  const wishlistRecords = useMemo(() => {
-    const records = profile?.wishlistRecords ?? [];
-    return isViewingOwnProfile ? records.slice(0, OWN_PREVIEW_LIMIT) : records;
-  }, [profile, isViewingOwnProfile]);
-
-  const listenedRecords = useMemo(() => {
-    const records = profile?.listenedRecords ?? [];
     return isViewingOwnProfile ? records.slice(0, OWN_PREVIEW_LIMIT) : records;
   }, [profile, isViewingOwnProfile]);
 
@@ -351,16 +343,14 @@ export default function CommunityProfile() {
   const recentEmptyCopy = isViewingOwnProfile
     ? "No recent additions yet."
     : "No recent additions shared yet.";
-  const showRecentSection = isViewingOwnProfile || !profile?.collectionPrivate;
-  const wishlistEmptyCopy = isViewingOwnProfile
-    ? "No wishlist records yet."
-    : "No wishlist shared yet.";
-  const showWishlistSection = isViewingOwnProfile || !profile?.wishlistPrivate;
-
-  const showListenedSection = isViewingOwnProfile || !profile?.listenedPrivate;
-  const listenedEmptyCopy = isViewingOwnProfile
-    ? "No listened records yet."
-    : "No listened records shared yet.";
+  const privateCollection = isViewingOwnProfile || !profile?.collectionPrivate;
+  const privateWishlist = isViewingOwnProfile || !profile?.wishlistPrivate;
+  const privateListened = isViewingOwnProfile || !profile?.listenedPrivate;
+  const showRecentSection =
+    isViewingOwnProfile ||
+    !profile?.collectionPrivate ||
+    !profile?.wishlistPrivate ||
+    !profile?.listenedPrivate;
 
   return (
     <ThemeProvider theme={darkTheme}>
@@ -743,9 +733,74 @@ export default function CommunityProfile() {
                 </SectionCard>
               </Box>
 
+              <Box sx={{ mt: 2, mb: 1 }}>
+                {privateCollection && (
+                  <Button
+                    variant="contained"
+                    onClick={handleSeeCollection}
+                    startIcon={<VisibilityIcon />}
+                    sx={{
+                      width: "100%",
+                      fontWeight: 700,
+                      fontSize: "0.95rem",
+                      py: 1,
+                    }}
+                  >
+                    View Collection (
+                    {(profile?.collectionCount ?? 0).toLocaleString()})
+                  </Button>
+                )}
+                {!loading && (
+                  <Stack
+                    direction={{ xs: "column", sm: "row" }}
+                    spacing={1.5}
+                    sx={{ mt: 1.5 }}
+                  >
+                    {privateListened && (
+                      <Button
+                        variant="outlined"
+                        onClick={handleSeeListened}
+                        startIcon={<FavoriteIcon />}
+                        sx={{
+                          width: {
+                            xs: "100%",
+                            sm: privateWishlist ? "50%" : "100%",
+                          },
+                          fontWeight: 700,
+                          fontSize: "0.95rem",
+                          py: 1,
+                        }}
+                      >
+                        View Listened (
+                        {(profile?.listenedCount ?? 0).toLocaleString()})
+                      </Button>
+                    )}
+                    {privateWishlist && (
+                      <Button
+                        variant="outlined"
+                        onClick={handleSeeWishlist}
+                        startIcon={<HeadphonesIcon />}
+                        sx={{
+                          width: {
+                            xs: "100%",
+                            sm: privateListened ? "50%" : "100%",
+                          },
+                          fontWeight: 700,
+                          fontSize: "0.95rem",
+                          py: 1,
+                        }}
+                      >
+                        View Wishlist (
+                        {(profile?.wishlistCount ?? 0).toLocaleString()})
+                      </Button>
+                    )}
+                  </Stack>
+                )}
+              </Box>
+
               {showRecentSection && (
                 <Box sx={{ mt: 2 }}>
-                  <SectionCard title="Recently Collected">
+                  <SectionCard title="Recent Activity">
                     {loading ? (
                       <Box
                         sx={{ display: "flex", alignItems: "center", gap: 2 }}
@@ -764,143 +819,11 @@ export default function CommunityProfile() {
                         records={recentRecords}
                         keyPrefix="recent"
                         showDateAdded
+                        showTableName
                         ownerUsername={profileUsername}
                         isOwnerViewing={isViewingOwnProfile}
                       />
                     )}
-                    {(!loading && recentRecords.length > 0) ||
-                    isViewingOwnProfile ? (
-                      <Stack direction="row" gap={1} flexWrap={"wrap"}>
-                        <Button
-                          variant="contained"
-                          onClick={handleSeeCollection}
-                          startIcon={<VisibilityIcon />}
-                        >
-                          View
-                        </Button>
-                        {!isViewingOwnProfile && (
-                          <Button
-                            variant="outlined"
-                            startIcon={<CompareArrowsIcon />}
-                            onClick={() =>
-                              navigate(
-                                `/community/${profileUsername}/compare?filter=collection`
-                              )
-                            }
-                          >
-                            Compare
-                          </Button>
-                        )}
-                      </Stack>
-                    ) : null}
-                  </SectionCard>
-                </Box>
-              )}
-
-              {showListenedSection && (
-                <Box sx={{ mt: 2 }}>
-                  <SectionCard title="Recently Listened">
-                    {loading ? (
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 2 }}
-                      >
-                        <CircularProgress size={20} />
-                        <Typography color="text.secondary">
-                          Loading listened records…
-                        </Typography>
-                      </Box>
-                    ) : listenedRecords.length === 0 ? (
-                      <Typography color="text.secondary">
-                        {listenedEmptyCopy}
-                      </Typography>
-                    ) : (
-                      <RecordPreviewGrid
-                        records={listenedRecords}
-                        keyPrefix="listened"
-                        showDateAdded={true}
-                        ownerUsername={profileUsername}
-                        isOwnerViewing={isViewingOwnProfile}
-                      />
-                    )}
-                    {(!loading && listenedRecords.length > 0) ||
-                    isViewingOwnProfile ? (
-                      <Stack direction="row" gap={1} flexWrap={"wrap"}>
-                        <Button
-                          variant="contained"
-                          onClick={handleSeeListened}
-                          startIcon={<VisibilityIcon />}
-                        >
-                          View
-                        </Button>
-                        {!isViewingOwnProfile && (
-                          <Button
-                            variant="outlined"
-                            startIcon={<CompareArrowsIcon />}
-                            onClick={() =>
-                              navigate(
-                                `/community/${profileUsername}/compare?filter=listened`
-                              )
-                            }
-                          >
-                            Compare
-                          </Button>
-                        )}
-                      </Stack>
-                    ) : null}
-                  </SectionCard>
-                </Box>
-              )}
-
-              {showWishlistSection && (
-                <Box sx={{ mt: 2 }}>
-                  <SectionCard title="Wishlist">
-                    {loading ? (
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 2 }}
-                      >
-                        <CircularProgress size={20} />
-                        <Typography color="text.secondary">
-                          Loading wishlist…
-                        </Typography>
-                      </Box>
-                    ) : wishlistRecords.length === 0 ? (
-                      <Typography color="text.secondary">
-                        {wishlistEmptyCopy}
-                      </Typography>
-                    ) : (
-                      <RecordPreviewGrid
-                        records={wishlistRecords}
-                        keyPrefix="wishlist"
-                        ownerUsername={profileUsername}
-                        isOwnerViewing={isViewingOwnProfile}
-                      />
-                    )}
-
-                    {(!loading && wishlistRecords.length > 0) ||
-                    isViewingOwnProfile ? (
-                      <Stack direction="row" gap={1} flexWrap={"wrap"}>
-                        <Button
-                          variant="contained"
-                          onClick={handleSeeWishlist}
-                          startIcon={<VisibilityIcon />}
-                        >
-                          View
-                        </Button>
-                        {!isViewingOwnProfile && (
-                          <Button
-                            variant="outlined"
-                            startIcon={<CompareArrowsIcon />}
-                            onClick={() =>
-                              navigate(
-                                `/community/${profileUsername}/compare?filter=wishlist`
-                              )
-                            }
-                          >
-                            Compare
-                          </Button>
-                        )}
-                      </Stack>
-                    ) : null}
                   </SectionCard>
                 </Box>
               )}

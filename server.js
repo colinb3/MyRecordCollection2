@@ -2517,13 +2517,13 @@ app.get("/api/community/users/:username", async (req, res) => {
     let recentRecords = [];
     if (!collectionPrivate || isOwner) {
     const [recentRows] = await pool.query(
-  `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId, r.isCustom as isCustom, r.masterId as masterId, r.review as review
+  `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId, r.isCustom as isCustom, r.masterId as masterId, r.review as review, t.name as tableName
        FROM Record r
        JOIN RecTable t ON r.tableId = t.id
-       WHERE r.userUuid = ? AND t.name = ?
+       WHERE r.userUuid = ?
        ORDER BY r.added DESC
        LIMIT ?`,
-        [userRow.uuid, DEFAULT_COLLECTION_NAME, PROFILE_RECENT_PREVIEW_LIMIT]
+        [userRow.uuid, PROFILE_RECENT_PREVIEW_LIMIT]
       );
 
       const recentRecordIds = recentRows.map((row) => row.id);
@@ -2534,44 +2534,40 @@ app.get("/api/community/users/:username", async (req, res) => {
       }));
     }
 
-    let wishlistRecords = [];
-    if (wishlistRow && (!wishlistPrivate || isOwner)) {
-      const [wishlistRows] = await pool.query(
-  `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId, r.isCustom as isCustom, r.masterId as masterId, r.review as review
-       FROM Record r
-       JOIN RecTable t ON r.tableId = t.id
-       WHERE r.userUuid = ? AND t.name = ?
-       ORDER BY r.rating DESC, r.added DESC
-       LIMIT ?`,
-        [userRow.uuid, WISHLIST_COLLECTION_NAME, PROFILE_WISHLIST_PREVIEW_LIMIT]
-      );
-
-      const wishlistIds = wishlistRows.map((row) => row.id);
-      const wishlistTags = await fetchTagsByRecordIds(pool, wishlistIds);
-      wishlistRecords = wishlistRows.map((row) => ({
-        ...row,
-        tags: wishlistTags[row.id] || [],
-      }));
-    }
-
-    let listenedRecords = [];
-    if (listenedRow && (!listenedPrivate || isOwner)) {
-      const [listenedRows] = await pool.query(
-        `SELECT r.id, r.name as record, r.artist, r.cover, r.rating, r.release_year as 'release', r.added as added, r.tableId, r.isCustom as isCustom, r.masterId as masterId, r.review as review
+    let collectionCount = 0;
+    if (defaultCollectionRow && (!collectionPrivate || isOwner)) {
+      const [collectionCountRows] = await pool.query(
+        `SELECT COUNT(*) as count
          FROM Record r
          JOIN RecTable t ON r.tableId = t.id
-         WHERE r.userUuid = ? AND t.name = ?
-         ORDER BY r.added DESC
-         LIMIT ?`,
-        [userRow.uuid, LISTENED_COLLECTION_NAME, PROFILE_LISTENED_PREVIEW_LIMIT]
+         WHERE r.userUuid = ? AND t.name = ?`,
+        [userRow.uuid, DEFAULT_COLLECTION_NAME]
       );
+      collectionCount = collectionCountRows[0]?.count || 0;
+    }
 
-      const listenedIds = listenedRows.map((row) => row.id);
-      const listenedTags = await fetchTagsByRecordIds(pool, listenedIds);
-      listenedRecords = listenedRows.map((row) => ({
-        ...row,
-        tags: listenedTags[row.id] || [],
-      }));
+    let wishlistCount = 0;
+    if (wishlistRow && (!wishlistPrivate || isOwner)) {
+      const [wishlistCountRows] = await pool.query(
+        `SELECT COUNT(*) as count
+         FROM Record r
+         JOIN RecTable t ON r.tableId = t.id
+         WHERE r.userUuid = ? AND t.name = ?`,
+        [userRow.uuid, WISHLIST_COLLECTION_NAME]
+      );
+      wishlistCount = wishlistCountRows[0]?.count || 0;
+    }
+
+    let listenedCount = 0;
+    if (listenedRow && (!listenedPrivate || isOwner)) {
+      const [listenedCountRows] = await pool.query(
+        `SELECT COUNT(*) as count
+         FROM Record r
+         JOIN RecTable t ON r.tableId = t.id
+         WHERE r.userUuid = ? AND t.name = ?`,
+        [userRow.uuid, LISTENED_COLLECTION_NAME]
+      );
+      listenedCount = listenedCountRows[0]?.count || 0;
     }
 
     // Fetch listening to record
@@ -2598,10 +2594,11 @@ app.get("/api/community/users/:username", async (req, res) => {
       highlights,
       recentRecords,
       isFollowing,
+      collectionCount,
       collectionPrivate,
-      wishlistRecords,
+      wishlistCount,
       wishlistPrivate,
-      listenedRecords,
+      listenedCount,
       listenedPrivate,
       listeningTo,
     });

@@ -240,8 +240,9 @@ export interface PublicUserProfile {
   profilePicUrl: string | null;
   highlights: Record[];
   recentRecords: Record[];
-  wishlistRecords: Record[];
-  listenedRecords: Record[];
+  collectionCount: number;
+  wishlistCount: number;
+  listenedCount: number;
   followersCount: number;
   followingCount: number;
   isFollowing: boolean | null;

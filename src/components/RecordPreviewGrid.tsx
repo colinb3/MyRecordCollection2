@@ -13,6 +13,7 @@ interface RecordPreviewGridProps {
   records: Record[];
   keyPrefix?: string;
   showDateAdded?: boolean;
+  showTableName?: boolean;
   ownerUsername: string;
   isOwnerViewing?: boolean;
 }
@@ -21,6 +22,7 @@ export default function RecordPreviewGrid({
   records,
   keyPrefix,
   showDateAdded = false,
+  showTableName = false,
   ownerUsername,
   isOwnerViewing = false,
 }: RecordPreviewGridProps) {
@@ -106,6 +108,17 @@ export default function RecordPreviewGrid({
                 <Typography variant="body2" color="text.secondary" noWrap>
                   {record.artist}
                 </Typography>
+                {showTableName && record.tableName && (
+                  <Typography
+                    variant="body2"
+                    color="primary"
+                    noWrap
+                    pt={0.5}
+                    sx={{ fontStyle: "italic" }}
+                  >
+                    {record.tableName}
+                  </Typography>
+                )}
                 {hasRating && (
                   <Typography
                     variant="body2"

@@ -615,7 +615,6 @@ export async function loadPublicUserProfile(
         ...cached,
         highlights: cloneRecords(cached.highlights),
         recentRecords: cloneRecords(cached.recentRecords),
-        wishlistRecords: cloneRecords(cached.wishlistRecords),
       };
     }
     if (profileInFlight.has(key)) {
@@ -654,8 +653,9 @@ export async function loadPublicUserProfile(
         profilePicUrl: normalizeProfilePicUrl(data.profilePicUrl),
         highlights: normalizeRecords(data.highlights),
         recentRecords: normalizeRecords(data.recentRecords),
-        wishlistRecords: normalizeRecords(data.wishlistRecords),
-        listenedRecords: normalizeRecords(data.listenedRecords),
+        collectionCount: normalizeCount(data.collectionCount),
+        wishlistCount: normalizeCount(data.wishlistCount),
+        listenedCount: normalizeCount(data.listenedCount),
         followersCount: normalizeCount(data.followersCount),
         followingCount: normalizeCount(data.followingCount),
         isFollowing:
@@ -698,8 +698,6 @@ export async function loadPublicUserProfile(
         ...normalizedProfile,
         highlights: cloneRecords(normalizedProfile.highlights),
         recentRecords: cloneRecords(normalizedProfile.recentRecords),
-        wishlistRecords: cloneRecords(normalizedProfile.wishlistRecords),
-        listenedRecords: cloneRecords(normalizedProfile.listenedRecords),
       });
       return normalizedProfile;
     } finally {
