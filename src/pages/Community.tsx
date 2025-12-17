@@ -26,7 +26,6 @@ import {
   Tooltip,
   IconButton,
 } from "@mui/material";
-import ImageNotSupportedIcon from "@mui/icons-material/ImageNotSupported";
 import FavoriteIcon from "@mui/icons-material/Favorite";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
@@ -43,6 +42,7 @@ import apiUrl from "../api";
 import { Grid } from "@mui/system";
 import { formatRelativeTime } from "../dateUtils";
 import { performLogout } from "../logout";
+import CoverImage from "../components/CoverImage";
 
 type CommunityView = "friends" | "you";
 type FeedStatus = "idle" | "loading" | "error" | "ready";
@@ -1187,37 +1187,19 @@ export default function Community() {
                                   </Typography>
                                 )}
                               </Grid>
-                              {recordCoverSrc ? (
-                                <Avatar
-                                  src={recordCoverSrc}
-                                  alt={`${entry.record.record} cover`}
-                                  variant="rounded"
-                                  sx={{
-                                    width: { xs: 100, sm: 125, md: 150 },
-                                    height: { xs: 100, sm: 125, md: 150 },
-                                    borderRadius: 1,
-                                    flexShrink: 0,
-                                    boxShadow: 1,
-                                  }}
-                                />
-                              ) : (
-                                <Avatar
-                                  variant="rounded"
-                                  sx={{
-                                    width: { xs: 100, sm: 125, md: 150 },
-                                    height: { xs: 100, sm: 125, md: 150 },
-                                    borderRadius: 1,
-                                    bgcolor: "grey.800",
-                                    flexShrink: 0,
-                                  }}
-                                >
-                                  <ImageNotSupportedIcon
-                                    sx={{
-                                      fontSize: { xs: 40, sm: 60, md: 70 },
-                                    }}
-                                  />
-                                </Avatar>
-                              )}
+                              <CoverImage
+                                src={recordCoverSrc ?? null}
+                                alt={`${entry.record.record} cover`}
+                                variant="rounded"
+                                iconSize="large"
+                                sx={{
+                                  width: { xs: 100, sm: 125, md: 150 },
+                                  height: { xs: 100, sm: 125, md: 150 },
+                                  borderRadius: 1,
+                                  flexShrink: 0,
+                                  boxShadow: 1,
+                                }}
+                              />
                               <Box
                                 sx={{
                                   flex: 1,
@@ -1455,37 +1437,19 @@ export default function Community() {
                                   </Typography>
                                 )}
                               </Grid>
-                              {listPictureSrc ? (
-                                <Avatar
-                                  src={listPictureSrc}
-                                  alt={`${entry.list.name} cover`}
-                                  variant="rounded"
-                                  sx={{
-                                    width: { xs: 100, sm: 125, md: 150 },
-                                    height: { xs: 100, sm: 125, md: 150 },
-                                    borderRadius: 1,
-                                    flexShrink: 0,
-                                    boxShadow: 1,
-                                  }}
-                                />
-                              ) : (
-                                <Avatar
-                                  variant="rounded"
-                                  sx={{
-                                    width: { xs: 100, sm: 150, md: 175 },
-                                    height: { xs: 100, sm: 150, md: 175 },
-                                    borderRadius: 1,
-                                    bgcolor: "grey.800",
-                                    flexShrink: 0,
-                                  }}
-                                >
-                                  <ImageNotSupportedIcon
-                                    sx={{
-                                      fontSize: { xs: 40, sm: 60, md: 70 },
-                                    }}
-                                  />
-                                </Avatar>
-                              )}
+                              <CoverImage
+                                src={listPictureSrc ?? null}
+                                alt={`${entry.list.name} cover`}
+                                variant="rounded"
+                                iconSize="large"
+                                sx={{
+                                  width: { xs: 100, sm: 125, md: 150 },
+                                  height: { xs: 100, sm: 125, md: 150 },
+                                  borderRadius: 1,
+                                  flexShrink: 0,
+                                  boxShadow: 1,
+                                }}
+                              />
                               <Box
                                 sx={{
                                   flex: 1,
@@ -1602,31 +1566,30 @@ export default function Community() {
                                           }
                                           key={previewKey}
                                         >
-                                          <Avatar
-                                            key={previewKey}
-                                            variant="rounded"
-                                            src={previewSrc}
-                                            alt={preview.name || "List record"}
-                                            sx={{
-                                              width: { xs: 45, sm: 55, md: 70 },
-                                              height: {
-                                                xs: 45,
-                                                sm: 55,
-                                                md: 70,
-                                              },
-                                              borderRadius: 1,
-                                              bgcolor: previewSrc
-                                                ? "transparent"
-                                                : "grey.800",
-                                              boxShadow: previewSrc ? 1 : 0,
-                                            }}
-                                          >
-                                            {!previewSrc && (
-                                              <ImageNotSupportedIcon
-                                                sx={{ fontSize: 24 }}
-                                              />
-                                            )}
-                                          </Avatar>
+                                          <Box>
+                                            <CoverImage
+                                              src={previewSrc ?? null}
+                                              alt={
+                                                preview.name || "List record"
+                                              }
+                                              variant="rounded"
+                                              iconSize="small"
+                                              sx={{
+                                                width: {
+                                                  xs: 45,
+                                                  sm: 55,
+                                                  md: 70,
+                                                },
+                                                height: {
+                                                  xs: 45,
+                                                  sm: 55,
+                                                  md: 70,
+                                                },
+                                                borderRadius: 1,
+                                                boxShadow: 1,
+                                              }}
+                                            />
+                                          </Box>
                                         </Tooltip>
                                       );
                                     })}

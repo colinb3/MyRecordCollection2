@@ -77,6 +77,9 @@ export default function CommunityStats() {
   const targetUsername = params.username ?? "";
 
   const [tableFilter, setTableFilter] = useState<TableFilter>("All");
+  const [genreSortBy, setGenreSortBy] = useState<
+    "collectionPercent" | "rating"
+  >("collectionPercent");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [allGenreData, setAllGenreData] = useState<{
@@ -461,9 +464,31 @@ export default function CommunityStats() {
 
                   {/* Genre Ratings Table */}
                   <Paper sx={{ p: 3 }}>
-                    <Typography variant="h6" sx={{ mb: 2 }}>
-                      Average Ratings by Genre
-                    </Typography>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        mb: 2,
+                      }}
+                    >
+                      <Typography variant="h6">Avg. Genre Ratings</Typography>
+                      <ToggleButtonGroup
+                        value={genreSortBy}
+                        exclusive
+                        onChange={(_, value) => {
+                          if (value !== null) {
+                            setGenreSortBy(value);
+                          }
+                        }}
+                        size="small"
+                      >
+                        <ToggleButton value="collectionPercent">
+                          Collection
+                        </ToggleButton>
+                        <ToggleButton value="rating">Rating</ToggleButton>
+                      </ToggleButtonGroup>
+                    </Box>
                     <Box
                       sx={{
                         display: "flex",
@@ -473,11 +498,16 @@ export default function CommunityStats() {
                     >
                       {genreData
                         .sort((a, b) => {
-                          // Sort by rating (highest first), putting null ratings at the end
-                          if (a.rating === null && b.rating === null) return 0;
-                          if (a.rating === null) return 1;
-                          if (b.rating === null) return -1;
-                          return b.rating - a.rating;
+                          if (genreSortBy === "collectionPercent") {
+                            return b.collectionPercent - a.collectionPercent;
+                          } else {
+                            // Sort by rating (highest first), putting null ratings at the end
+                            if (a.rating === null && b.rating === null)
+                              return 0;
+                            if (a.rating === null) return 1;
+                            if (b.rating === null) return -1;
+                            return b.rating - a.rating;
+                          }
                         })
                         .map((genre) => (
                           <Box
