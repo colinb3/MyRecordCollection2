@@ -233,7 +233,7 @@ export default function CommunityStats() {
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       return (
-        <Paper sx={{ p: 1.5 }}>
+        <Paper sx={{ p: 1.5, borderRadius: 2 }}>
           <Typography variant="body2" fontWeight={600}>
             {payload[0].name}
           </Typography>
@@ -463,7 +463,7 @@ export default function CommunityStats() {
                   </Box>
 
                   {/* Genre Ratings Table */}
-                  <Paper sx={{ p: 3 }}>
+                  <Paper sx={{ p: 3, borderRadius: 2 }}>
                     <Box
                       sx={{
                         display: "flex",

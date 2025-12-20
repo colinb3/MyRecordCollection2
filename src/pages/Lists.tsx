@@ -24,11 +24,13 @@ import {
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
+import AddIcon from "@mui/icons-material/Add";
 import FavoriteIcon from "@mui/icons-material/Favorite";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
 import LockIcon from "@mui/icons-material/Lock";
 import PublicIcon from "@mui/icons-material/Public";
+import AlbumIcon from "@mui/icons-material/Album";
 import CoverImage from "../components/CoverImage";
 import { useNavigate } from "react-router-dom";
 import TopBar from "../components/TopBar";
@@ -134,6 +136,7 @@ export default function Lists() {
   const [hasMorePopularLists, setHasMorePopularLists] = useState(true);
   const [loadingMoreMine, setLoadingMoreMine] = useState(false);
   const [loadingMorePopular, setLoadingMorePopular] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -528,6 +531,14 @@ export default function Lists() {
     [myLists]
   );
 
+  const handleOpenCreateDialog = useCallback(() => {
+    setCreateDialogOpen(true);
+  }, []);
+
+  const handleCloseCreateDialog = useCallback(() => {
+    setCreateDialogOpen(false);
+  }, []);
+
   const handleCreateList = useCallback(async () => {
     const name = createForm.name.trim();
     if (!name) {
@@ -560,6 +571,7 @@ export default function Lists() {
       showMessage("List created", "success");
       setCreateForm({ name: "", description: "", isPrivate: false });
       handleCreatePictureChange(null);
+      handleCloseCreateDialog();
       await loadMine(); // Refresh to get newly created list
       if (!wasPrivate) {
         await loadPopular();
@@ -577,6 +589,7 @@ export default function Lists() {
     createForm,
     createPictureFile,
     handleCreatePictureChange,
+    handleCloseCreateDialog,
     loadMine,
     loadPopular,
     showMessage,
@@ -871,331 +884,45 @@ export default function Lists() {
                       display: "flex",
                       flexDirection: "column",
                       minWidth: 0,
+                      maxHeight: { xs: 400, md: 763 },
+                      overflow: "hidden",
+                      ml: -0.5,
                     }}
                   >
-                    <Paper
-                      sx={{
-                        p: 2,
-                        pr: 1,
-                        maxHeight: { xs: 400, md: 763 },
-                        display: "flex",
-                        flexDirection: "column",
-                        minWidth: 0,
-                        overflow: "hidden",
-                      }}
-                    >
-                      <Box>
-                        <Typography variant="h6" fontWeight={700} gutterBottom>
-                          Popular lists
-                        </Typography>
-                      </Box>
-                      <Box
-                        sx={{
-                          flex: 1,
-                          pr: 1,
-                          overflowY: "auto",
-                          minHeight: 0,
-                          display: "flex",
-                          flexDirection: "column",
-                        }}
+                    <Box>
+                      <Typography
+                        variant="h6"
+                        fontWeight={700}
+                        gutterBottom
+                        px={0.5}
                       >
-                        {loadingPopular ? (
-                          <Box display="flex" justifyContent="center" py={4}>
-                            <CircularProgress />
-                          </Box>
-                        ) : popularLists.length === 0 ? (
-                          <Typography color="text.secondary">
-                            No public lists yet.
-                          </Typography>
-                        ) : (
-                          <>
-                            <Stack spacing={0.75}>
-                              {popularLists.map((list) => {
-                                const liked = list.likedByCurrentUser === true;
-                                const likeBusy = likeBusyIds.has(list.id);
-                                const isOwner =
-                                  list.owner?.username === username;
-                                return (
-                                  <Paper
-                                    key={list.id}
-                                    variant="outlined"
-                                    sx={{
-                                      p: 0,
-                                      overflow: "hidden",
-                                      cursor: "pointer",
-                                      transition: "background-color 0.2s ease",
-                                      "&:hover": {
-                                        bgcolor: "action.hover",
-                                      },
-                                    }}
-                                    onClick={() =>
-                                      navigate(`/lists/${list.id}`)
-                                    }
-                                  >
-                                    <Box sx={{ p: 2 }}>
-                                      <Stack direction="row" spacing={2}>
-                                        {renderListPicture(
-                                          list.pictureUrl,
-                                          list.name
-                                        )}
-                                        <Box
-                                          sx={{
-                                            ml: { xs: 2, md: 0 },
-                                            minWidth: 0,
-                                            flex: 1,
-                                          }}
-                                        >
-                                          <Stack
-                                            direction="row"
-                                            justifyContent={"space-between"}
-                                          >
-                                            <Typography
-                                              variant="subtitle1"
-                                              fontWeight={700}
-                                              noWrap
-                                            >
-                                              {list.name}
-                                            </Typography>
-                                            {!isOwner && (
-                                              <Tooltip
-                                                title={
-                                                  liked ? "Unlike" : "Like"
-                                                }
-                                              >
-                                                <span>
-                                                  <IconButton
-                                                    color={
-                                                      liked
-                                                        ? "error"
-                                                        : "default"
-                                                    }
-                                                    size="small"
-                                                    onClick={(e) => {
-                                                      e.stopPropagation();
-                                                      void handleToggleLike(
-                                                        list.id,
-                                                        liked
-                                                      );
-                                                    }}
-                                                    disabled={likeBusy}
-                                                  >
-                                                    {liked ? (
-                                                      <FavoriteIcon />
-                                                    ) : (
-                                                      <FavoriteBorderIcon />
-                                                    )}
-                                                  </IconButton>
-                                                </span>
-                                              </Tooltip>
-                                            )}
-                                          </Stack>
-                                          {list.owner && (
-                                            <Typography
-                                              variant="body2"
-                                              color="text.secondary"
-                                              noWrap
-                                            >
-                                              by{" "}
-                                              {list.owner.displayName ??
-                                                list.owner.username}
-                                            </Typography>
-                                          )}
-                                          <Stack
-                                            direction="row"
-                                            spacing={1}
-                                            alignItems="center"
-                                            mt={1}
-                                            flexWrap="wrap"
-                                          >
-                                            <Chip
-                                              size="small"
-                                              label={`${list.recordCount} records`}
-                                            />
-                                            <Chip
-                                              size="small"
-                                              label={
-                                                list.likes === 1
-                                                  ? "1 like"
-                                                  : `${list.likes} likes`
-                                              }
-                                            />
-                                          </Stack>
-                                        </Box>
-                                      </Stack>
-                                    </Box>
-                                  </Paper>
-                                );
-                              })}
-                            </Stack>
-                            {hasMorePopularLists && (
-                              <Box sx={{ pt: 2, pb: 1, textAlign: "center" }}>
-                                <Button
-                                  variant="outlined"
-                                  onClick={() => void loadMorePopular()}
-                                  disabled={loadingMorePopular}
-                                >
-                                  {loadingMorePopular ? (
-                                    <CircularProgress size={24} />
-                                  ) : (
-                                    "Load More"
-                                  )}
-                                </Button>
-                              </Box>
-                            )}
-                          </>
-                        )}
-                      </Box>
-                    </Paper>
-                  </Box>
-
-                  <Box
-                    sx={{
-                      display: "flex",
-                      flexDirection: "column",
-                      minWidth: 0,
-                    }}
-                  >
-                    <Paper sx={{ p: 2, mb: 2 }}>
-                      <Typography variant="h6" sx={{ mb: 1, fontWeight: 700 }}>
-                        Create a new list
+                        Popular
                       </Typography>
-                      <Stack direction={"row"} spacing={2} mb={2}>
-                        {createPicturePreview ? (
-                          <Avatar
-                            src={createPicturePreview}
-                            variant="rounded"
-                            sx={{ width: 80, height: 80, borderRadius: 2 }}
-                          />
-                        ) : (
-                          <CoverImage
-                            src={null}
-                            alt="List picture"
-                            variant="rounded"
-                            sx={{ width: 80, height: 80, borderRadius: 2 }}
-                          />
-                        )}
-                        <Stack direction={"column"} spacing={1.5}>
-                          <Button
-                            variant="outlined"
-                            component="label"
-                            size="small"
-                            startIcon={<PhotoCameraIcon />}
-                            disabled={saving}
-                          >
-                            Choose Image
-                            <input
-                              type="file"
-                              hidden
-                              accept={ACCEPTED_IMAGE_TYPES}
-                              onChange={(event) => {
-                                const file = event.target.files?.[0] ?? null;
-                                handleCreatePictureChange(file);
-                                event.target.value = "";
-                              }}
-                            />
-                          </Button>
-                          {createPicturePreview && (
-                            <Button
-                              variant="text"
-                              size="small"
-                              onClick={() => handleClearCreatePicture()}
-                              disabled={saving}
-                            >
-                              Remove Image
-                            </Button>
-                          )}
-                          {!createPicturePreview && (
-                            <Typography variant="body2" color="text.secondary">
-                              JPG, PNG, WEBP, or AVIF (3 MB)
-                            </Typography>
-                          )}
-                        </Stack>
-                      </Stack>
-                      <Stack spacing={0.75}>
-                        <TextField
-                          label="List name"
-                          value={createForm.name}
-                          size="small"
-                          onChange={(event) =>
-                            setCreateForm((prev) => ({
-                              ...prev,
-                              name: event.target.value,
-                            }))
-                          }
-                          required
-                          sx={{ pb: 1 }}
-                        />
-                        <TextField
-                          label="Description"
-                          value={createForm.description}
-                          size="small"
-                          onChange={(event) =>
-                            setCreateForm((prev) => ({
-                              ...prev,
-                              description: event.target.value,
-                            }))
-                          }
-                          multiline
-                          minRows={2}
-                          maxRows={4}
-                          sx={{
-                            "& .MuiInputBase-root": {
-                              height: "auto",
-                            },
-                            mb: 1,
-                          }}
-                        />
-                        <FormControlLabel
-                          control={
-                            <Switch
-                              checked={createForm.isPrivate}
-                              onChange={(event) =>
-                                setCreateForm((prev) => ({
-                                  ...prev,
-                                  isPrivate: event.target.checked,
-                                }))
-                              }
-                            />
-                          }
-                          label="Private"
-                          sx={{ mb: 1 }}
-                        />
-
-                        <Button
-                          variant="contained"
-                          onClick={() => void handleCreateList()}
-                          disabled={saving || !createForm.name.trim()}
-                        >
-                          Create List
-                        </Button>
-                      </Stack>
-                    </Paper>
-                    <Typography variant="h6" fontWeight={700} mb={1}>
-                      My lists
-                    </Typography>
+                    </Box>
                     <Box
                       sx={{
-                        maxHeight: 335,
+                        flex: 1,
                         overflowY: "auto",
+                        minHeight: 0,
                         display: "flex",
                         flexDirection: "column",
-                        mr: sortedMyLists.length == 0 ? 0 : -1,
                       }}
                     >
-                      {loadingMine ? (
+                      {loadingPopular ? (
                         <Box display="flex" justifyContent="center" py={4}>
                           <CircularProgress />
                         </Box>
-                      ) : sortedMyLists.length === 0 ? (
-                        <Paper sx={{ p: 2 }}>
-                          <Typography color="text.secondary">
-                            You have not created any lists yet.
-                          </Typography>
-                        </Paper>
+                      ) : popularLists.length === 0 ? (
+                        <Typography color="text.secondary">
+                          No public lists yet.
+                        </Typography>
                       ) : (
                         <>
-                          <Stack spacing={1} pr={1}>
-                            {sortedMyLists.map((list) => {
+                          <Stack spacing={1} px={0.5} py={0.5}>
+                            {popularLists.map((list) => {
+                              const liked = list.likedByCurrentUser === true;
+                              const likeBusy = likeBusyIds.has(list.id);
+                              const isOwner = list.owner?.username === username;
                               return (
                                 <Paper
                                   key={list.id}
@@ -1207,6 +934,183 @@ export default function Lists() {
                                     "&:hover": {
                                       bgcolor: "action.hover",
                                     },
+                                    borderRadius: 2,
+                                  }}
+                                  onClick={() => navigate(`/lists/${list.id}`)}
+                                >
+                                  <Box sx={{ p: 2 }}>
+                                    <Stack direction="row" spacing={2}>
+                                      {renderListPicture(
+                                        list.pictureUrl,
+                                        list.name
+                                      )}
+                                      <Box
+                                        sx={{
+                                          ml: { xs: 2, md: 0 },
+                                          minWidth: 0,
+                                          flex: 1,
+                                        }}
+                                      >
+                                        <Stack
+                                          direction="row"
+                                          justifyContent={"space-between"}
+                                        >
+                                          <Typography
+                                            variant="subtitle1"
+                                            fontWeight={700}
+                                            noWrap
+                                          >
+                                            {list.name}
+                                          </Typography>
+                                          {!isOwner && (
+                                            <Tooltip
+                                              title={liked ? "Unlike" : "Like"}
+                                            >
+                                              <span>
+                                                <IconButton
+                                                  color={
+                                                    liked ? "error" : "default"
+                                                  }
+                                                  size="small"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    void handleToggleLike(
+                                                      list.id,
+                                                      liked
+                                                    );
+                                                  }}
+                                                  disabled={likeBusy}
+                                                >
+                                                  {liked ? (
+                                                    <FavoriteIcon />
+                                                  ) : (
+                                                    <FavoriteBorderIcon />
+                                                  )}
+                                                </IconButton>
+                                              </span>
+                                            </Tooltip>
+                                          )}
+                                        </Stack>
+                                        {list.owner && (
+                                          <Typography
+                                            variant="body2"
+                                            color="text.secondary"
+                                            noWrap
+                                          >
+                                            by{" "}
+                                            {list.owner.displayName ??
+                                              list.owner.username}
+                                          </Typography>
+                                        )}
+                                        <Stack
+                                          direction="row"
+                                          spacing={1}
+                                          alignItems="center"
+                                          mt={1}
+                                          flexWrap="wrap"
+                                        >
+                                          <Chip
+                                            size="small"
+                                            icon={<AlbumIcon />}
+                                            label={list.recordCount}
+                                          />
+                                          <Chip
+                                            size="small"
+                                            icon={
+                                              <FavoriteIcon fontSize="small" />
+                                            }
+                                            label={list.likes}
+                                          />
+                                        </Stack>
+                                      </Box>
+                                    </Stack>
+                                  </Box>
+                                </Paper>
+                              );
+                            })}
+                          </Stack>
+                          {hasMorePopularLists && (
+                            <Box sx={{ pt: 2, pb: 1, textAlign: "center" }}>
+                              <Button
+                                variant="outlined"
+                                onClick={() => void loadMorePopular()}
+                                disabled={loadingMorePopular}
+                              >
+                                {loadingMorePopular ? (
+                                  <CircularProgress size={24} />
+                                ) : (
+                                  "Load More"
+                                )}
+                              </Button>
+                            </Box>
+                          )}
+                        </>
+                      )}
+                    </Box>
+                  </Box>
+
+                  <Paper
+                    sx={{
+                      display: "flex",
+                      flexDirection: "column",
+                      minWidth: 0,
+                      p: 2,
+                      borderRadius: 2,
+                    }}
+                  >
+                    <Stack
+                      direction="row"
+                      justifyContent="space-between"
+                      alignItems="center"
+                      mb={1}
+                    >
+                      <Typography variant="h6" fontWeight={700} px={0.5}>
+                        My lists
+                      </Typography>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        onClick={handleOpenCreateDialog}
+                        startIcon={<AddIcon />}
+                      >
+                        Create
+                      </Button>
+                    </Stack>
+                    <Box
+                      sx={{
+                        maxHeight: 663,
+                        overflowY: "auto",
+                        display: "flex",
+                        flexDirection: "column",
+                      }}
+                    >
+                      {loadingMine ? (
+                        <Box display="flex" justifyContent="center" py={4}>
+                          <CircularProgress />
+                        </Box>
+                      ) : sortedMyLists.length === 0 ? (
+                        <Box sx={{ p: 1 }}>
+                          <Typography color="text.secondary">
+                            You have not created any lists yet.
+                          </Typography>
+                        </Box>
+                      ) : (
+                        <>
+                          <Stack spacing={1} px={0.5} py={0.5}>
+                            {sortedMyLists.map((list) => {
+                              return (
+                                <Paper
+                                  variant="outlined"
+                                  key={list.id}
+                                  sx={{
+                                    p: 0,
+                                    overflow: "hidden",
+                                    cursor: "pointer",
+                                    transition: "background-color 0.2s ease",
+                                    "&:hover": {
+                                      bgcolor: "action.hover",
+                                    },
+                                    borderRadius: 2,
                                   }}
                                   onClick={() => navigate(`/lists/${list.id}`)}
                                 >
@@ -1286,24 +1190,15 @@ export default function Lists() {
                                             />
                                             <Chip
                                               size="small"
-                                              label={
-                                                list.recordCount === 0
-                                                  ? "No records"
-                                                  : list.recordCount === 1
-                                                  ? `${list.recordCount} record`
-                                                  : `${list.recordCount} records`
-                                              }
+                                              icon={<AlbumIcon />}
+                                              label={list.recordCount}
                                             />
                                             <Chip
                                               size="small"
                                               icon={
                                                 <FavoriteIcon fontSize="small" />
                                               }
-                                              label={
-                                                list.likes === 1
-                                                  ? "1 like"
-                                                  : `${list.likes} likes`
-                                              }
+                                              label={list.likes}
                                             />
                                           </Stack>
                                         </Stack>
@@ -1332,7 +1227,7 @@ export default function Lists() {
                         </>
                       )}
                     </Box>
-                  </Box>
+                  </Paper>
                 </Box>
               </Box>
             </Paper>
@@ -1505,6 +1400,154 @@ export default function Lists() {
               disabled={saving}
             >
               Save
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Create List Dialog */}
+        <Dialog
+          open={createDialogOpen}
+          onClose={handleCloseCreateDialog}
+          maxWidth="sm"
+          fullWidth
+          slotProps={{
+            backdrop: {
+              sx: {
+                backgroundColor: "rgba(0, 0, 0, 0.4)",
+                backdropFilter: "blur(3.5px)",
+              },
+            },
+            paper: {
+              sx: {
+                backgroundColor: "background.default",
+                boxShadow: 15,
+                maxHeight: "85vh",
+                m: 2,
+                overflow: "visible",
+                borderRadius: 3,
+              },
+            },
+          }}
+        >
+          <DialogTitle
+            sx={{ bgcolor: "background.paper", borderRadius: "8px 8px 0 0" }}
+          >
+            Create a new list
+          </DialogTitle>
+          <DialogContent sx={{ bgcolor: "background.paper" }}>
+            <Stack direction={"row"} spacing={2} alignItems="center" mb={1}>
+              {createPicturePreview ? (
+                <Avatar
+                  src={createPicturePreview}
+                  variant="rounded"
+                  sx={{ width: 96, height: 96, borderRadius: 2 }}
+                />
+              ) : (
+                <CoverImage
+                  src={null}
+                  alt="List picture"
+                  variant="rounded"
+                  sx={{ width: 96, height: 96, borderRadius: 2 }}
+                />
+              )}
+              <Stack spacing={1}>
+                <Button
+                  variant="outlined"
+                  component="label"
+                  size="small"
+                  startIcon={<PhotoCameraIcon />}
+                  disabled={saving}
+                >
+                  Upload Image
+                  <input
+                    type="file"
+                    hidden
+                    accept={ACCEPTED_IMAGE_TYPES}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0] ?? null;
+                      handleCreatePictureChange(file);
+                      event.target.value = "";
+                    }}
+                  />
+                </Button>
+                {createPicturePreview && (
+                  <Button
+                    variant="text"
+                    size="small"
+                    onClick={handleClearCreatePicture}
+                    disabled={saving}
+                  >
+                    Remove Image
+                  </Button>
+                )}
+                <Typography variant="caption" color="text.secondary">
+                  JPG, PNG, WEBP, or AVIF (3 MB)
+                </Typography>
+              </Stack>
+            </Stack>
+            <Stack sx={{ mt: 2 }}>
+              <TextField
+                label="List name"
+                value={createForm.name}
+                size="small"
+                onChange={(event) =>
+                  setCreateForm((prev) => ({
+                    ...prev,
+                    name: event.target.value,
+                  }))
+                }
+                required
+                sx={{ mb: 2 }}
+              />
+              <TextField
+                label="Description"
+                value={createForm.description}
+                size="small"
+                onChange={(event) =>
+                  setCreateForm((prev) => ({
+                    ...prev,
+                    description: event.target.value,
+                  }))
+                }
+                multiline
+                minRows={2}
+                maxRows={4}
+                sx={{
+                  "& .MuiInputBase-root": {
+                    height: "auto",
+                  },
+                  mb: 1,
+                }}
+              />
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={createForm.isPrivate}
+                    onChange={(event) =>
+                      setCreateForm((prev) => ({
+                        ...prev,
+                        isPrivate: event.target.checked,
+                      }))
+                    }
+                  />
+                }
+                label="Private"
+              />
+            </Stack>
+          </DialogContent>
+          <DialogActions
+            sx={{
+              bgcolor: "background.paper",
+              borderRadius: "0 0 8px 8px",
+            }}
+          >
+            <Button onClick={handleCloseCreateDialog}>Cancel</Button>
+            <Button
+              variant="contained"
+              onClick={() => void handleCreateList()}
+              disabled={saving || !createForm.name.trim()}
+            >
+              Create List
             </Button>
           </DialogActions>
         </Dialog>

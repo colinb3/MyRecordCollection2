@@ -60,7 +60,7 @@ function SectionCard({ title, children }: SectionCardProps) {
     <Paper
       sx={{
         p: { xs: 2, md: 3 },
-        borderRadius: 1,
+        borderRadius: 2,
         display: "flex",
         flexDirection: "column",
         gap: 2,

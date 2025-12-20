@@ -460,7 +460,7 @@ export default function Compare() {
                   sx={{
                     display: "flex",
                     justifyContent: "end",
-                    mb: 2,
+                    mb: 1,
                   }}
                 >
                   <ToggleButtonGroup
@@ -502,14 +502,13 @@ export default function Compare() {
                   </ToggleButtonGroup>
                 </Box>
 
-                <Paper
+                <Box
                   sx={{
-                    p: 2,
                     display: "flex",
                     flexDirection: "column",
                   }}
                 >
-                  <Typography variant="h6" sx={{ mb: 1.5 }}>
+                  <Typography variant="h6" sx={{ mb: 0.5 }}>
                     {`You Have`} {records.length}{" "}
                     {`Record${records.length !== 1 ? "s" : ""} in Common`}
                   </Typography>
@@ -535,9 +534,9 @@ export default function Compare() {
                     <Box
                       sx={{
                         display: "flex",
-                        gap: 2,
                         overflowX: "auto",
-                        pb: 2,
+                        gap: 0.25,
+                        pb: 1,
                         "&::-webkit-scrollbar": {
                           height: 8,
                         },
@@ -549,12 +548,13 @@ export default function Compare() {
                           sx={{
                             minWidth: { xs: 140, sm: 160, md: 180 },
                             maxWidth: { xs: 140, sm: 160, md: 180 },
+                            p: 1,
                             cursor: "pointer",
+                            transition: "background-color 0.2s ease",
                             "&:hover": {
-                              "& .cover-image": {
-                                transform: "scale(1.05)",
-                              },
+                              bgcolor: "action.hover",
                             },
+                            borderRadius: 2,
                           }}
                           onClick={() => navigate(`/master/${record.masterId}`)}
                         >
@@ -727,7 +727,7 @@ export default function Compare() {
                       ))}
                     </Box>
                   )}
-                </Paper>
+                </Box>
 
                 {/* Genre Comparison Section */}
                 <Paper
@@ -736,6 +736,7 @@ export default function Compare() {
                     p: 2,
                     display: "flex",
                     flexDirection: "column",
+                    borderRadius: 2,
                   }}
                 >
                   <Typography variant="h6" sx={{ mb: 2 }}>
