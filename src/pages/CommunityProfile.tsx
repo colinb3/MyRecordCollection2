@@ -733,70 +733,72 @@ export default function CommunityProfile() {
                 </SectionCard>
               </Box>
 
-              <Box sx={{ mt: 2, mb: 1 }}>
-                {privateCollection && (
-                  <Button
-                    variant="contained"
-                    onClick={handleSeeCollection}
-                    startIcon={<VisibilityIcon />}
-                    sx={{
-                      width: "100%",
-                      fontWeight: 700,
-                      fontSize: "0.95rem",
-                      py: 1,
-                    }}
-                  >
-                    View Collection (
-                    {(profile?.collectionCount ?? 0).toLocaleString()})
-                  </Button>
-                )}
-                {!loading && (
-                  <Stack
-                    direction={{ xs: "column", sm: "row" }}
-                    spacing={1.5}
-                    sx={{ mt: 1.5 }}
-                  >
-                    {privateListened && (
-                      <Button
-                        variant="outlined"
-                        onClick={handleSeeListened}
-                        startIcon={<FavoriteIcon />}
-                        sx={{
-                          width: {
-                            xs: "100%",
-                            sm: privateWishlist ? "50%" : "100%",
-                          },
-                          fontWeight: 700,
-                          fontSize: "0.95rem",
-                          py: 1,
-                        }}
-                      >
-                        View Listened (
-                        {(profile?.listenedCount ?? 0).toLocaleString()})
-                      </Button>
-                    )}
-                    {privateWishlist && (
-                      <Button
-                        variant="outlined"
-                        onClick={handleSeeWishlist}
-                        startIcon={<HeadphonesIcon />}
-                        sx={{
-                          width: {
-                            xs: "100%",
-                            sm: privateListened ? "50%" : "100%",
-                          },
-                          fontWeight: 700,
-                          fontSize: "0.95rem",
-                          py: 1,
-                        }}
-                      >
-                        View Wishlist (
-                        {(profile?.wishlistCount ?? 0).toLocaleString()})
-                      </Button>
-                    )}
-                  </Stack>
-                )}
-              </Box>
+              {!loading && (
+                <Box sx={{ mt: 2, mb: 1 }}>
+                  {privateCollection && (
+                    <Button
+                      variant="contained"
+                      onClick={handleSeeCollection}
+                      startIcon={<VisibilityIcon />}
+                      sx={{
+                        width: "100%",
+                        fontWeight: 700,
+                        fontSize: "0.95rem",
+                        py: 1,
+                      }}
+                    >
+                      View Collection (
+                      {(profile?.collectionCount ?? 0).toLocaleString()})
+                    </Button>
+                  )}
+                  {!loading && (
+                    <Stack
+                      direction={{ xs: "column", sm: "row" }}
+                      spacing={1.5}
+                      sx={{ mt: 1.5 }}
+                    >
+                      {privateListened && (
+                        <Button
+                          variant="outlined"
+                          onClick={handleSeeListened}
+                          startIcon={<FavoriteIcon />}
+                          sx={{
+                            width: {
+                              xs: "100%",
+                              sm: privateWishlist ? "50%" : "100%",
+                            },
+                            fontWeight: 700,
+                            fontSize: "0.95rem",
+                            py: 1,
+                          }}
+                        >
+                          View Listened (
+                          {(profile?.listenedCount ?? 0).toLocaleString()})
+                        </Button>
+                      )}
+                      {privateWishlist && (
+                        <Button
+                          variant="outlined"
+                          onClick={handleSeeWishlist}
+                          startIcon={<HeadphonesIcon />}
+                          sx={{
+                            width: {
+                              xs: "100%",
+                              sm: privateListened ? "50%" : "100%",
+                            },
+                            fontWeight: 700,
+                            fontSize: "0.95rem",
+                            py: 1,
+                          }}
+                        >
+                          View Wishlist (
+                          {(profile?.wishlistCount ?? 0).toLocaleString()})
+                        </Button>
+                      )}
+                    </Stack>
+                  )}
+                </Box>
+              )}
 
               {showRecentSection && (
                 <Box sx={{ mt: 2 }}>

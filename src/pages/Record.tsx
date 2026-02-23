@@ -23,7 +23,7 @@ import {
   Tooltip,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import LaunchIcon from "@mui/icons-material/Launch";
+import AlbumIcon from "@mui/icons-material/Album";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import DriveFileMoveOutlinedIcon from "@mui/icons-material/DriveFileMoveOutlined";
@@ -922,7 +922,7 @@ export default function RecordDetails() {
                                   <Button
                                     variant="contained"
                                     color="primary"
-                                    startIcon={<LaunchIcon />}
+                                    startIcon={<AlbumIcon />}
                                     onClick={handleOpenMasterRecord}
                                   >
                                     Master

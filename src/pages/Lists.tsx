@@ -1127,7 +1127,7 @@ export default function Lists() {
                                             justifyContent="space-between"
                                           >
                                             <Typography
-                                              variant="h6"
+                                              variant="subtitle1"
                                               fontWeight={700}
                                               textOverflow={"ellipsis"}
                                               overflow={"hidden"}

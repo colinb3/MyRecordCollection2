@@ -165,6 +165,12 @@ async function deleteListPicFile(relativePath) {
   }
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
 function normalizeFollowCount(value) {
   const num = Number(value);
   if (!Number.isFinite(num) || num < 0) {
