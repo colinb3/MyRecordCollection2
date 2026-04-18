@@ -5,7 +5,7 @@ This is a social media web app that lets users search the Last.FM database for r
 
 It is meant to make it easier for a user to view their whole (physical) record collection and more easier pick what to listen to next. They can sort and filter their collection with tags, rating, release year, and collected date. 
 
-Users can add records to their collection, withlist, or listened list. They can search for their friends, see their collections, and analytically compare their collections. Additionally, they can create lists of records for any occasion.
+Users can add records to their collection, withlist, or listened list. They can search for their friends, see their collections, and analytically compare their collections. Additionally, they can create lists of records for any occasion, and search for any record and see what ratings or reviews it has been given by others.
 
 ## Running
 Setup a database "mrc_db" with the schema.sql file. 
