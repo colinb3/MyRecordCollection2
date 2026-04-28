@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Master database record detail page component for viewing master record information
+ * @fileformat Page component
+ */
+
 import {
   useState,
   useEffect,
@@ -119,7 +125,7 @@ function RatingsHistogram({ counts }: { counts: number[] }) {
   const maxValue = counts.reduce(
     (max, current) =>
       Number.isFinite(current) && current > max ? current : max,
-    0
+    0,
   );
 
   const safeMax = maxValue > 0 ? maxValue : 1;
@@ -232,18 +238,18 @@ export default function MasterRecord() {
   const initialMasterId =
     typeof locationState.masterId === "string" && locationState.masterId.trim()
       ? locationState.masterId.trim()
-      : masterIdFromParam ?? masterIdFromQuery;
+      : (masterIdFromParam ?? masterIdFromQuery);
 
   const [album, setAlbum] = useState<RecordListItem | null>(initialAlbum);
   const [masterIdOverride, setMasterIdOverride] = useState<string | null>(
-    initialMasterId ?? null
+    initialMasterId ?? null,
   );
   const [username, setUsername] = useState<string>(cachedUser?.username ?? "");
   const [displayName, setDisplayName] = useState<string>(
-    cachedUser?.displayName ?? ""
+    cachedUser?.displayName ?? "",
   );
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
-    cachedUser?.profilePicUrl ?? null
+    cachedUser?.profilePicUrl ?? null,
   );
   const [userLoading, setUserLoading] = useState(!cachedUser);
 
@@ -253,7 +259,7 @@ export default function MasterRecord() {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [rating, setRating] = useState(0);
   const [releaseYear, setReleaseYear] = useState(
-    suggestedReleaseYear ?? new Date().getFullYear()
+    suggestedReleaseYear ?? new Date().getFullYear(),
   );
   const [reviewText, setReviewText] = useState("");
   const [adding, setAdding] = useState(false);
@@ -367,7 +373,7 @@ export default function MasterRecord() {
   useEffect(() => {
     const paramMasterId = parseMasterId(masterIdParam);
     const queryMasterId = parseMasterId(
-      new URLSearchParams(location.search).get("q")
+      new URLSearchParams(location.search).get("q"),
     );
     const stateMasterId =
       typeof locationState.masterId === "string" &&
@@ -377,7 +383,7 @@ export default function MasterRecord() {
     const nextMasterId =
       stateMasterId ?? paramMasterId ?? queryMasterId ?? null;
     setMasterIdOverride((prev) =>
-      prev === nextMasterId ? prev : nextMasterId
+      prev === nextMasterId ? prev : nextMasterId,
     );
   }, [location.search, locationState.masterId, masterIdParam]);
 
@@ -385,7 +391,7 @@ export default function MasterRecord() {
     if (!locationState.album) {
       const paramMasterId = parseMasterId(masterIdParam);
       const hasMasterQuery = parseMasterId(
-        new URLSearchParams(location.search).get("q")
+        new URLSearchParams(location.search).get("q"),
       );
       if (!paramMasterId && !hasMasterQuery) {
         navigate("/search", { replace: true });
@@ -419,7 +425,7 @@ export default function MasterRecord() {
       {
         replace: true,
         state: { ...locationState, masterId: masterIdOverride },
-      }
+      },
     );
   }, [
     masterIdOverride,
@@ -503,7 +509,7 @@ export default function MasterRecord() {
 
   const handleToggleTag = useCallback((tag: string) => {
     setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
     );
   }, []);
 
@@ -608,8 +614,8 @@ export default function MasterRecord() {
           typeof data?.masterId === "string" && data.masterId.trim()
             ? data.masterId.trim()
             : typeof data?.masterId === "number" && data.masterId > 0
-            ? String(data.masterId)
-            : null;
+              ? String(data.masterId)
+              : null;
         const ratingAverageValue =
           data?.ratingAverage !== null && data?.ratingAverage !== undefined
             ? Number(data.ratingAverage)
@@ -657,8 +663,8 @@ export default function MasterRecord() {
               })
               .filter(
                 (
-                  value: UserCollectionEntry | null
-                ): value is UserCollectionEntry => value !== null
+                  value: UserCollectionEntry | null,
+                ): value is UserCollectionEntry => value !== null,
               )
           : [];
 
@@ -704,20 +710,20 @@ export default function MasterRecord() {
               })
               .filter(
                 (value: UserListEntry | null): value is UserListEntry =>
-                  value !== null
+                  value !== null,
               )
           : [];
 
         const genresValue = Array.isArray(data?.genres)
           ? data.genres.filter(
               (g: unknown): g is string =>
-                typeof g === "string" && g.trim().length > 0
+                typeof g === "string" && g.trim().length > 0,
             )
           : [];
         const stylesValue = Array.isArray(data?.styles)
           ? data.styles.filter(
               (s: unknown): s is string =>
-                typeof s === "string" && s.trim().length > 0
+                typeof s === "string" && s.trim().length > 0,
             )
           : [];
 
@@ -837,7 +843,7 @@ export default function MasterRecord() {
                       ? coverValue || prev.cover
                       : prev.cover,
                   }
-                : prev
+                : prev,
             );
           }
         }
@@ -864,12 +870,12 @@ export default function MasterRecord() {
         setMasterError(
           error instanceof Error
             ? error.message
-            : "Failed to load community rating"
+            : "Failed to load community rating",
         );
         setMasterLoading(false);
       }
     },
-    [album, masterIdOverride]
+    [album, masterIdOverride],
   );
 
   useEffect(() => {
@@ -920,7 +926,7 @@ export default function MasterRecord() {
         setAdding(false);
       }
     },
-    [loadMasterInfo]
+    [loadMasterInfo],
   );
 
   const submitRecord = useCallback(
@@ -1047,14 +1053,14 @@ export default function MasterRecord() {
       masterInfo,
       masterIdOverride,
       loadMasterInfo,
-    ]
+    ],
   );
 
   const handleAddRecord = useCallback(() => {
     if (!username) {
       if (location.pathname !== "/login") {
         const next = encodeURIComponent(
-          `${location.pathname}${location.search || ""}${location.hash || ""}`
+          `${location.pathname}${location.search || ""}${location.hash || ""}`,
         );
         navigate(`/login?next=${next}`);
       }
@@ -1067,7 +1073,7 @@ export default function MasterRecord() {
     if (!username) {
       if (location.pathname !== "/login") {
         const next = encodeURIComponent(
-          `${location.pathname}${location.search || ""}${location.hash || ""}`
+          `${location.pathname}${location.search || ""}${location.hash || ""}`,
         );
         navigate(`/login?next=${next}`);
       }
@@ -1080,7 +1086,7 @@ export default function MasterRecord() {
     if (!username) {
       if (location.pathname !== "/login") {
         const next = encodeURIComponent(
-          `${location.pathname}${location.search || ""}${location.hash || ""}`
+          `${location.pathname}${location.search || ""}${location.hash || ""}`,
         );
         navigate(`/login?next=${next}`);
       }
@@ -1125,7 +1131,7 @@ export default function MasterRecord() {
       : cachedListNames;
 
     return [...lists].sort((a, b) =>
-      a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+      a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
     );
   }, [masterInfo?.userLists, cachedListNames]);
 
@@ -1134,7 +1140,7 @@ export default function MasterRecord() {
       if (!username) {
         if (location.pathname !== "/login") {
           const next = encodeURIComponent(
-            `${location.pathname}${location.search || ""}${location.hash || ""}`
+            `${location.pathname}${location.search || ""}${location.hash || ""}`,
           );
           navigate(`/login?next=${next}`);
         }
@@ -1149,7 +1155,7 @@ export default function MasterRecord() {
       const coverForList = masterInfo?.cover ?? album?.cover ?? null;
       const releaseYearForList = Number.isFinite(releaseYear)
         ? releaseYear
-        : masterInfo?.releaseYear ?? null;
+        : (masterInfo?.releaseYear ?? null);
 
       const listOption = listOptions.find((opt) => opt.listId === listId);
       const listName = listOption?.name ?? "list";
@@ -1178,7 +1184,7 @@ export default function MasterRecord() {
           throw new Error(
             typeof problem.error === "string"
               ? problem.error
-              : "Failed to add record to list"
+              : "Failed to add record to list",
           );
         }
         setSnackbar({
@@ -1211,7 +1217,7 @@ export default function MasterRecord() {
       location.pathname,
       location.search,
       location.hash,
-    ]
+    ],
   );
 
   const handleManageLists = useCallback(() => {
@@ -1241,7 +1247,7 @@ export default function MasterRecord() {
     (
       entry: UserCollectionEntry | null,
       successMessage: string,
-      infoMessage: string
+      infoMessage: string,
     ) => {
       if (!entry) {
         return;
@@ -1270,7 +1276,7 @@ export default function MasterRecord() {
         ),
       });
     },
-    [adding, navigate, removeExistingRecord, username]
+    [adding, navigate, removeExistingRecord, username],
   );
 
   const wishlistButtonConfig = membership.wishlist
@@ -1282,7 +1288,7 @@ export default function MasterRecord() {
           promptRecordRemoval(
             membership.wishlist,
             "Record removed from Wishlist",
-            "Record already in Wishlist. Remove it?"
+            "Record already in Wishlist. Remove it?",
           ),
         icon: <FavoriteIcon />,
       }
@@ -1303,7 +1309,7 @@ export default function MasterRecord() {
           promptRecordRemoval(
             membership.listened,
             "Record removed from Listened",
-            "Record already in Listened. Remove it?"
+            "Record already in Listened. Remove it?",
           ),
         icon: <HeadphonesIcon />,
       }
@@ -1324,7 +1330,7 @@ export default function MasterRecord() {
           promptRecordRemoval(
             membership.collection,
             "Record removed from My Collection",
-            "Record already in My Collection. Remove it?"
+            "Record already in My Collection. Remove it?",
           ),
         icon: <AddBoxIcon />,
       }

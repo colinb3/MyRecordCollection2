@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Profile highlights caching and management utility for user profile showcase records
+ * @fileformat TypeScript
+ */
+
 import apiUrl from "./api";
 import type { Record as MrcRecord, ProfileHighlights } from "./types";
 import { normalizeApiRecord } from "./collectionRecords";

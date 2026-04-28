@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Minimal analytics helper that supports Google Analytics (gtag) if a measurement ID is provided via Vite env. Falls back to console logging.
+ * @fileformat TypeScript
+ */
+
 // Minimal analytics helper that supports Google Analytics (gtag) if a measurement ID
 // is provided via Vite env (VITE_GA_MEASUREMENT_ID). Falls back to console logging.
 

@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Community follows list page component for managing followed users
+ * @fileformat Page component
+ */
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { SyntheticEvent } from "react";
 import {
@@ -45,15 +51,15 @@ export default function CommunityFollows() {
   const cachedUser = getCachedUserInfo();
   const [username, setUsername] = useState<string>(cachedUser?.username ?? "");
   const [displayName, setDisplayName] = useState<string>(
-    cachedUser?.displayName ?? ""
+    cachedUser?.displayName ?? "",
   );
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
-    cachedUser?.profilePicUrl ?? null
+    cachedUser?.profilePicUrl ?? null,
   );
 
   const [targetDisplayName, setTargetDisplayName] = useState<string>("");
   const [targetProfilePicUrl, setTargetProfilePicUrl] = useState<string | null>(
-    null
+    null,
   );
   const [userLoading, setUserLoading] = useState(!cachedUser);
 
@@ -71,7 +77,7 @@ export default function CommunityFollows() {
   const [myFollowing, setMyFollowing] = useState<Set<string>>(new Set());
   const [followPending, setFollowPending] = useState<Set<string>>(new Set());
   const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">(
-    "idle"
+    "idle",
   );
   const [error, setError] = useState<string | null>(null);
 
@@ -105,7 +111,7 @@ export default function CommunityFollows() {
           const myFollowsData = await loadUserFollows(info.username);
           if (!cancelled) {
             const followingSet = new Set(
-              myFollowsData.following.map((u) => u.username.toLowerCase())
+              myFollowsData.following.map((u) => u.username.toLowerCase()),
             );
             setMyFollowing(followingSet);
           }
@@ -181,7 +187,7 @@ export default function CommunityFollows() {
     (_event: SyntheticEvent, value: FollowTab) => {
       setSearchParams({ tab: value }, { replace: true });
     },
-    [setSearchParams]
+    [setSearchParams],
   );
 
   const activeList = activeTab === "followers" ? followers : following;
@@ -210,7 +216,7 @@ export default function CommunityFollows() {
         targetUsername,
         USERS_PER_PAGE,
         followersOffset,
-        followingOffset
+        followingOffset,
       );
 
       if (activeTab === "followers") {
@@ -223,7 +229,7 @@ export default function CommunityFollows() {
     } catch (err) {
       console.error("Failed to load more users:", err);
       setError(
-        err instanceof Error ? err.message : "Failed to load more users"
+        err instanceof Error ? err.message : "Failed to load more users",
       );
     } finally {
       setLoadingMore(false);
@@ -242,7 +248,7 @@ export default function CommunityFollows() {
     (selectedUsername: string) => {
       navigate(`/community/${encodeURIComponent(selectedUsername)}`);
     },
-    [navigate]
+    [navigate],
   );
 
   const handleFollowToggle = useCallback(
@@ -286,7 +292,7 @@ export default function CommunityFollows() {
         });
       }
     },
-    [username, navigate, myFollowing, followPending]
+    [username, navigate, myFollowing, followPending],
   );
 
   return (
@@ -422,10 +428,10 @@ export default function CommunityFollows() {
                         username &&
                         user.username.toLowerCase() === username.toLowerCase();
                       const isFollowingThisUser = myFollowing.has(
-                        user.username.toLowerCase()
+                        user.username.toLowerCase(),
                       );
                       const isPending = followPending.has(
-                        user.username.toLowerCase()
+                        user.username.toLowerCase(),
                       );
 
                       return (
@@ -484,8 +490,8 @@ export default function CommunityFollows() {
                               {isPending
                                 ? "..."
                                 : isFollowingThisUser
-                                ? "Unfollow"
-                                : "Follow"}
+                                  ? "Unfollow"
+                                  : "Follow"}
                             </Button>
                           )}
                         </ListItemButton>

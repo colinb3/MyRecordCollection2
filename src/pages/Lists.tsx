@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Lists management page component for creating and managing record lists
+ * @fileformat Page component
+ */
+
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   ThemeProvider,
@@ -75,10 +81,10 @@ export default function Lists() {
   const cachedUser = getCachedUserInfo();
   const [username, setUsername] = useState<string>(cachedUser?.username ?? "");
   const [displayName, setDisplayName] = useState<string>(
-    cachedUser?.displayName ?? ""
+    cachedUser?.displayName ?? "",
   );
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
-    cachedUser?.profilePicUrl ?? null
+    cachedUser?.profilePicUrl ?? null,
   );
   const [userLoading, setUserLoading] = useState(!cachedUser);
 
@@ -123,7 +129,7 @@ export default function Lists() {
   });
   const [editPictureFile, setEditPictureFile] = useState<File | null>(null);
   const [editPicturePreview, setEditPicturePreview] = useState<string | null>(
-    null
+    null,
   );
   const [removePictureFlag, setRemovePictureFlag] = useState(false);
 
@@ -248,7 +254,7 @@ export default function Lists() {
     (message: string, severity: SnackbarState["severity"] = "success") => {
       setSnackbar({ open: true, message, severity });
     },
-    []
+    [],
   );
 
   const closeSnackbar = useCallback(() => {
@@ -263,7 +269,7 @@ export default function Lists() {
         apiUrl("/api/lists/mine?limit=10&offset=0"),
         {
           credentials: "include",
-        }
+        },
       );
       if (!response.ok) {
         const problem = await response.json().catch(() => ({}));
@@ -309,7 +315,7 @@ export default function Lists() {
       console.error(error);
       showMessage(
         error instanceof Error ? error.message : "Failed to load your lists",
-        "error"
+        "error",
       );
     } finally {
       setLoadingMine(false);
@@ -325,7 +331,7 @@ export default function Lists() {
         apiUrl(`/api/lists/mine?limit=10&offset=${offset}`),
         {
           credentials: "include",
-        }
+        },
       );
       if (!response.ok) {
         const problem = await response.json().catch(() => ({}));
@@ -364,7 +370,7 @@ export default function Lists() {
       console.error(error);
       showMessage(
         error instanceof Error ? error.message : "Failed to load more lists",
-        "error"
+        "error",
       );
     } finally {
       setLoadingMoreMine(false);
@@ -378,7 +384,7 @@ export default function Lists() {
         apiUrl("/api/lists/popular?limit=10&offset=0"),
         {
           credentials: "include",
-        }
+        },
       );
       if (!response.ok) {
         const problem = await response.json().catch(() => ({}));
@@ -433,7 +439,7 @@ export default function Lists() {
       console.error(error);
       showMessage(
         error instanceof Error ? error.message : "Failed to load popular lists",
-        "error"
+        "error",
       );
     } finally {
       setLoadingPopular(false);
@@ -449,7 +455,7 @@ export default function Lists() {
         apiUrl(`/api/lists/popular?limit=10&offset=${offset}`),
         {
           credentials: "include",
-        }
+        },
       );
       if (!response.ok) {
         const problem = await response.json().catch(() => ({}));
@@ -506,7 +512,7 @@ export default function Lists() {
         error instanceof Error
           ? error.message
           : "Failed to load more popular lists",
-        "error"
+        "error",
       );
     } finally {
       setLoadingMorePopular(false);
@@ -526,9 +532,9 @@ export default function Lists() {
   const sortedMyLists = useMemo(
     () =>
       [...myLists].sort((a, b) =>
-        a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+        a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
       ),
-    [myLists]
+    [myLists],
   );
 
   const handleOpenCreateDialog = useCallback(() => {
@@ -580,7 +586,7 @@ export default function Lists() {
       console.error(error);
       showMessage(
         error instanceof Error ? error.message : "Failed to create list",
-        "error"
+        "error",
       );
     } finally {
       setSaving(false);
@@ -658,7 +664,7 @@ export default function Lists() {
           {
             method: "DELETE",
             credentials: "include",
-          }
+          },
         );
         if (!removeResponse.ok) {
           console.error("Failed to remove picture");
@@ -675,7 +681,7 @@ export default function Lists() {
             method: "POST",
             credentials: "include",
             body: formData,
-          }
+          },
         );
         if (!uploadResponse.ok) {
           console.error("Failed to upload picture");
@@ -691,7 +697,7 @@ export default function Lists() {
       console.error(error);
       showMessage(
         error instanceof Error ? error.message : "Failed to update list",
-        "error"
+        "error",
       );
     } finally {
       setSaving(false);
@@ -737,7 +743,7 @@ export default function Lists() {
       console.error(error);
       showMessage(
         error instanceof Error ? error.message : "Failed to delete list",
-        "error"
+        "error",
       );
     } finally {
       setSaving(false);
@@ -748,7 +754,7 @@ export default function Lists() {
     (
       setter: React.Dispatch<React.SetStateAction<Set<number>>>,
       listId: number,
-      active: boolean
+      active: boolean,
     ) => {
       setter((prev) => {
         const next = new Set(prev);
@@ -760,7 +766,7 @@ export default function Lists() {
         return next;
       });
     },
-    []
+    [],
   );
 
   const handleToggleLike = useCallback(
@@ -783,8 +789,8 @@ export default function Lists() {
                   likedByCurrentUser: !currentlyLiked,
                   likes: Math.max(0, item.likes + (currentlyLiked ? -1 : 1)),
                 }
-              : item
-          )
+              : item,
+          ),
         );
         setMyLists((prev) =>
           prev.map((item) =>
@@ -793,20 +799,20 @@ export default function Lists() {
                   ...item,
                   likes: Math.max(0, item.likes + (currentlyLiked ? -1 : 1)),
                 }
-              : item
-          )
+              : item,
+          ),
         );
       } catch (error) {
         console.error(error);
         showMessage(
           error instanceof Error ? error.message : "Failed to update like",
-          "error"
+          "error",
         );
       } finally {
         withBusySet(setLikeBusyIds, listId, false);
       }
     },
-    [showMessage, withBusySet]
+    [showMessage, withBusySet],
   );
 
   const renderListPicture = useCallback(
@@ -825,7 +831,7 @@ export default function Lists() {
         />
       );
     },
-    []
+    [],
   );
 
   return (
@@ -942,7 +948,7 @@ export default function Lists() {
                                     <Stack direction="row" spacing={2}>
                                       {renderListPicture(
                                         list.pictureUrl,
-                                        list.name
+                                        list.name,
                                       )}
                                       <Box
                                         sx={{
@@ -976,7 +982,7 @@ export default function Lists() {
                                                     e.stopPropagation();
                                                     void handleToggleLike(
                                                       list.id,
-                                                      liked
+                                                      liked,
                                                     );
                                                   }}
                                                   disabled={likeBusy}
@@ -1118,7 +1124,7 @@ export default function Lists() {
                                     <Stack direction="row" spacing={2}>
                                       {renderListPicture(
                                         list.pictureUrl,
-                                        list.name
+                                        list.name,
                                       )}
                                       <Box flex={1} minWidth={0}>
                                         <Stack direction={"column"}>
@@ -1154,7 +1160,7 @@ export default function Lists() {
                                                   onClick={(e) => {
                                                     e.stopPropagation();
                                                     handleOpenDeleteConfirmation(
-                                                      list
+                                                      list,
                                                     );
                                                   }}
                                                   disabled={saving}

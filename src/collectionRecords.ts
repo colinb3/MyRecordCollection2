@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Collection records management and caching utility for handling user record collections
+ * @fileformat TypeScript
+ */
+
 import apiUrl from "./api";
 import type { Record as MrcRecord } from "./types";
 

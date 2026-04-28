@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Community member profile page component displaying user profiles and statistics
+ * @fileformat Page component
+ */
+
 import {
   useCallback,
   useEffect,
@@ -86,10 +92,10 @@ export default function CommunityProfile() {
   const cachedUser = getCachedUserInfo();
   const [username, setUsername] = useState<string>(cachedUser?.username ?? "");
   const [displayName, setDisplayName] = useState<string>(
-    cachedUser?.displayName ?? ""
+    cachedUser?.displayName ?? "",
   );
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
-    cachedUser?.profilePicUrl ?? null
+    cachedUser?.profilePicUrl ?? null,
   );
   const [userLoading, setUserLoading] = useState(!cachedUser);
 
@@ -281,10 +287,10 @@ export default function CommunityProfile() {
     (tab: "followers" | "following") => {
       if (!profileUsername) return;
       navigate(
-        `/community/${encodeURIComponent(profileUsername)}/follows?tab=${tab}`
+        `/community/${encodeURIComponent(profileUsername)}/follows?tab=${tab}`,
       );
     },
-    [navigate, profileUsername]
+    [navigate, profileUsername],
   );
 
   const handleToggleFollow = useCallback(async () => {
@@ -444,7 +450,7 @@ export default function CommunityProfile() {
                               aria-label="Compare collections"
                               onClick={() =>
                                 navigate(
-                                  `/community/${profileUsername}/compare`
+                                  `/community/${profileUsername}/compare`,
                                 )
                               }
                             >
@@ -503,7 +509,7 @@ export default function CommunityProfile() {
                                   .catch(() => {});
                               } else {
                                 navigator.clipboard.writeText(
-                                  window.location.href
+                                  window.location.href,
                                 );
                               }
                             }}
@@ -550,7 +556,7 @@ export default function CommunityProfile() {
                           <ButtonBase
                             onClick={() =>
                               navigate(
-                                `/master/${profile.listeningTo!.masterId}`
+                                `/master/${profile.listeningTo!.masterId}`,
                               )
                             }
                             sx={{
@@ -660,8 +666,8 @@ export default function CommunityProfile() {
                             {followPending
                               ? "Updating…"
                               : profile.isFollowing
-                              ? "Unfollow"
-                              : "Follow"}
+                                ? "Unfollow"
+                                : "Follow"}
                           </Button>
                         )}
                         <Button

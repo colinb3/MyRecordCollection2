@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Date parsing and normalization utilities for handling various date formats
+ * @fileformat TypeScript
+ */
+
 const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_PREFIX_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
 const SPACE_SEPARATED_PATTERN = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d+)?([zZ]|[+-]\d{2}:?\d{2})?$/;

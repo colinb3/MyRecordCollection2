@@ -1,3 +1,10 @@
+/**
+ * @author Colin Brown
+ * @description Main server application for My Record Collection - a music collection management platform
+ * Handles API routes for records, users, authentication, Discogs integration, and community features
+ * Built with Express.js and MySQL
+ */
+
 import express from "express";
 import cors from "cors";
 import mysql from "mysql2/promise";
@@ -37,6 +44,11 @@ app.use(cors({
 app.use(cookieParser());
 app.use("/uploads", express.static(uploadsRoot));
 
+/**
+ * GET /robots.txt
+ * Returns robots.txt file for search engine crawlers
+ * @returns {string} robots.txt content
+ */
 // Serve robots.txt for API subdomain
 app.get("/robots.txt", (_req, res) => {
   res.type("text/plain");
@@ -84,6 +96,12 @@ const profilePicStorage = multer.diskStorage({
   },
 });
 
+/**
+ * Validates that uploaded file is an allowed image format (JPG, PNG, WEBP, AVIF)
+ * @param {Object} _req - Express request object (unused)
+ * @param {Object} file - Multer file object
+ * @param {Function} cb - Callback function
+ */
 function profilePicFileFilter(_req, file, cb) {
   if (!ALLOWED_PROFILE_MIME_TYPES.has(file.mimetype)) {
     return cb(new Error("Only image files (JPG, PNG, WEBP, AVIF) are allowed."));
@@ -121,16 +139,31 @@ const listPicUpload = multer({
   limits: { fileSize: LIST_PIC_SIZE_LIMIT },
 });
 
+/**
+ * Builds relative path for profile picture storage
+ * @param {string} filename - The uploaded filename
+ * @returns {string} Relative path for storage
+ */
 function buildProfilePicRelativePath(filename) {
   return `profile/${filename}`;
 }
 
+/**
+ * Converts relative profile picture path to public URL
+ * @param {string} relativePath - Relative path in storage
+ * @returns {string|null} Public URL or null if no path
+ */
 function buildProfilePicPublicPath(relativePath) {
   if (!relativePath) return null;
   const normalized = relativePath.replace(/\\/g, "/");
   return `/uploads/${normalized}`;
 }
 
+/**
+ * Deletes a profile picture file from disk storage
+ * @param {string} relativePath - Relative path to the file
+ * @returns {Promise<void>}
+ */
 async function deleteProfilePicFile(relativePath) {
   if (!relativePath) return;
   const absolutePath = path.join(uploadsRoot, relativePath);
@@ -143,16 +176,31 @@ async function deleteProfilePicFile(relativePath) {
   }
 }
 
+/**
+ * Builds relative path for list picture storage
+ * @param {string} filename - The uploaded filename
+ * @returns {string} Relative path for storage
+ */
 function buildListPicRelativePath(filename) {
   return `list/${filename}`;
 }
 
+/**
+ * Converts relative list picture path to public URL
+ * @param {string} relativePath - Relative path in storage
+ * @returns {string|null} Public URL or null if no path
+ */
 function buildListPicPublicPath(relativePath) {
   if (!relativePath) return null;
   const normalized = relativePath.replace(/\\/g, "/");
   return `/uploads/${normalized}`;
 }
 
+/**
+ * Deletes a list picture file from disk storage
+ * @param {string} relativePath - Relative path to the file
+ * @returns {Promise<void>}
+ */
 async function deleteListPicFile(relativePath) {
   if (!relativePath) return;
   const absolutePath = path.join(uploadsRoot, relativePath);
@@ -165,12 +213,22 @@ async function deleteListPicFile(relativePath) {
   }
 }
 
+/**
+ * Utility function to delay execution for a specified time
+ * @param {number} ms - Milliseconds to sleep
+ * @returns {Promise<void>}
+ */
 function sleep(ms) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
 }
 
+/**
+ * Normalizes follow count to a non-negative integer
+ * @param {*} value - Raw follow count value
+ * @returns {number} Normalized count (0 if invalid)
+ */
 function normalizeFollowCount(value) {
   const num = Number(value);
   if (!Number.isFinite(num) || num < 0) {
@@ -179,6 +237,11 @@ function normalizeFollowCount(value) {
   return Math.trunc(num);
 }
 
+/**
+ * Normalizes any value to a non-negative integer
+ * @param {*} value - Raw value to normalize
+ * @returns {number} Normalized integer (0 if invalid)
+ */
 function normalizeNonNegativeInt(value) {
   const num = Number(value);
   if (!Number.isFinite(num) || num < 0) {
@@ -187,6 +250,11 @@ function normalizeNonNegativeInt(value) {
   return Math.trunc(num);
 }
 
+/**
+ * Converts date value to YYYY-MM-DD format string
+ * @param {*} value - Date value (string, Date object, or other)
+ * @returns {string|null} Formatted date string or null if invalid
+ */
 function normalizeDateOnly(value) {
   if (!value) return null;
 
@@ -209,6 +277,11 @@ function normalizeDateOnly(value) {
   return null;
 }
 
+/**
+ * Formats a date/time value as UTC string in format YYYY-MM-DD HH:MM:SS
+ * @param {*} value - Date value or timestamp
+ * @returns {string|null} Formatted datetime string or null if invalid
+ */
 function formatUtcDateTime(value) {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -360,6 +433,14 @@ async function getProfileHighlightIds(pool, userUuid) {
   return normalizeProfileHighlightIds(rows[0].profileHighlights);
 }
 
+/**
+ * Fetches record data with associated tags for given record IDs
+ * @async
+ * @param {Object} pool - MySQL connection pool
+ * @param {string} userUuid - User UUID
+ * @param {number[]} recordIds - Array of record IDs to fetch
+ * @returns {Promise<Array>} Array of record objects with tags
+ */
 async function fetchRecordsWithTagsByIds(pool, userUuid, recordIds) {
   if (!Array.isArray(recordIds) || recordIds.length === 0) {
      return [];
@@ -404,6 +485,13 @@ async function fetchRecordsWithTagsByIds(pool, userUuid, recordIds) {
     .filter((value) => value !== undefined);
 }
 
+/**
+ * Retrieves a public user's profile data by username
+ * @async
+ * @param {Object} pool - MySQL connection pool
+ * @param {string} username - The username to look up
+ * @returns {Promise<Object|null>} User profile object or null if not found
+ */
 async function getUserByUsername(pool, username) {
   const [rows] = await pool.execute(
     `SELECT u.uuid, u.username, u.displayName, u.bio, u.profilePic, u.created,
@@ -416,6 +504,15 @@ async function getUserByUsername(pool, username) {
   return rows[0];
 }
 
+/**
+ * Gets list of users following a given user
+ * @async
+ * @param {Object} pool - MySQL connection pool
+ * @param {string} userUuid - The user UUID to get followers for
+ * @param {number|null} limit - Optional limit for pagination
+ * @param {number} offset - Offset for pagination
+ * @returns {Promise<Array>} Array of follower user summaries
+ */
 async function getFollowersForUser(pool, userUuid, limit = null, offset = 0) {
   let query = `SELECT follower.username, follower.displayName, follower.profilePic,
             (SELECT COUNT(*) FROM Follows WHERE followsUuid = follower.uuid) AS followersCount,
@@ -435,6 +532,15 @@ async function getFollowersForUser(pool, userUuid, limit = null, offset = 0) {
   return rows.map(mapCommunityUserSummary);
 }
 
+/**
+ * Gets list of users that a given user is following
+ * @async
+ * @param {Object} pool - MySQL connection pool
+ * @param {string} userUuid - The user UUID to get following list for
+ * @param {number|null} limit - Optional limit for pagination
+ * @param {number} offset - Offset for pagination
+ * @returns {Promise<Array>} Array of following user summaries
+ */
 async function getFollowingForUser(pool, userUuid, limit = null, offset = 0) {
   let query = `SELECT following.username, following.displayName, following.profilePic,
             (SELECT COUNT(*) FROM Follows WHERE followsUuid = following.uuid) AS followersCount,
@@ -454,6 +560,11 @@ async function getFollowingForUser(pool, userUuid, limit = null, offset = 0) {
   return rows.map(mapCommunityUserSummary);
 }
 
+/**
+ * Normalizes raw database row into standardized public user object
+ * @param {Object} row - Database row with user data
+ * @returns {Object|null} Normalized public user object or null
+ */
 function normalizePublicUser(row) {
   if (!row) return null;
   const displayName =
@@ -478,6 +589,11 @@ function normalizePublicUser(row) {
   };
 }
 
+/**
+ * Maps database row to community user summary (for followers/following lists)
+ * @param {Object} row - Database row with user data
+ * @returns {Object} Community user summary object
+ */
 function mapCommunityUserSummary(row) {
   const displayName =
     typeof row.displayName === "string" && row.displayName.trim()
@@ -494,6 +610,11 @@ function mapCommunityUserSummary(row) {
   };
 }
 
+/**
+ * Maps database row to standardized list summary object
+ * @param {Object} row - Database row with list data
+ * @returns {Object} List summary object with normalized fields
+ */
 function mapListSummaryRow(row) {
   const id = Number(row?.id);
   return {
@@ -511,6 +632,11 @@ function mapListSummaryRow(row) {
   };
 }
 
+/**
+ * Maps database row to list summary including owner information
+ * @param {Object} row - Database row with list and user data
+ * @returns {Object} List summary with owner details
+ */
 function mapListSummaryWithOwner(row) {
   const base = mapListSummaryRow(row);
   const username = typeof row?.username === "string" ? row.username : null;
@@ -530,6 +656,11 @@ function mapListSummaryWithOwner(row) {
   };
 }
 
+/**
+ * Maps database row to list record (record within a list) object
+ * @param {Object} row - Database row with record data
+ * @returns {Object} List record object with normalized fields
+ */
 function mapListRecordRow(row) {
   const id = Number(row?.id);
   const ratingValue = Number(row?.rating);
@@ -558,10 +689,22 @@ function mapListRecordRow(row) {
   };
 }
 
+/**
+ * Escapes special characters in LIKE clause for safe SQL queries
+ * @param {string} term - The search term to escape
+ * @returns {string} Escaped term safe for SQL LIKE
+ */
 function escapeForLike(term) {
   return term.replace(/[\\%_]/g, (match) => `\\${match}`);
 }
 
+/**
+ * Retrieves admin permissions for a user
+ * @async
+ * @param {Object} pool - MySQL connection pool
+ * @param {string} userUuid - User UUID to check
+ * @returns {Promise<Object|null>} Admin permissions object or null if not admin
+ */
 async function getAdminPermissions(pool, userUuid) {
   if (!userUuid) {
     return null;
@@ -580,6 +723,13 @@ async function getAdminPermissions(pool, userUuid) {
   };
 }
 
+/**
+ * Counts total number of other admins (excluding specified user)
+ * @async
+ * @param {Object} pool - MySQL connection pool
+ * @param {string} excludedUuid - User UUID to exclude from count
+ * @returns {Promise<number>} Total count of other admins
+ */
 async function countOtherAdmins(pool, excludedUuid) {
   if (!excludedUuid) {
     const [rows] = await pool.query("SELECT COUNT(*) AS total FROM Admin");
@@ -592,6 +742,13 @@ async function countOtherAdmins(pool, excludedUuid) {
   return Number(rows?.[0]?.total) || 0;
 }
 
+/**
+ * Counts total number of admins with manage_admins permission (excluding specified user)
+ * @async
+ * @param {Object} pool - MySQL connection pool
+ * @param {string} excludedUuid - User UUID to exclude from count
+ * @returns {Promise<number>} Count of admins with manage permission
+ */
 async function countOtherManageAdmins(pool, excludedUuid) {
   if (!excludedUuid) {
     const [rows] = await pool.query(
@@ -606,6 +763,13 @@ async function countOtherManageAdmins(pool, excludedUuid) {
   return Number(rows?.[0]?.total) || 0;
 }
 
+/**
+ * Fetches all tags associated with given record IDs, organized by record
+ * @async
+ * @param {Object} pool - MySQL connection pool
+ * @param {number[]} recordIds - Array of record IDs
+ * @returns {Promise<Object>} Object mapping recordId to array of tag names
+ */
 async function fetchTagsByRecordIds(pool, recordIds) {
   const tagsByRecord = {};
   if (!Array.isArray(recordIds) || recordIds.length === 0) {
@@ -626,6 +790,12 @@ async function fetchTagsByRecordIds(pool, recordIds) {
   return tagsByRecord;
 }
 
+/**
+ * Builds Discogs API search URL for artist and record name
+ * @param {string} artist - Artist name
+ * @param {string} record - Record name
+ * @returns {string} Formatted Discogs API search URL
+ */
 function buildDiscogsSearchUrl(artist, record) {
   const url = new URL(DISCOGS_API_URL);
   url.searchParams.set("query", artist + " - " + record);
@@ -637,6 +807,11 @@ function buildDiscogsSearchUrl(artist, record) {
   return url.toString();
 }
 
+/**
+ * Normalizes release year from Discogs to valid integer or null
+ * @param {*} raw - Raw year value
+ * @returns {number|null} Year between 1901-2100 or null
+ */
 function normalizeDiscogsReleaseYear(raw) {
   const year = Number(raw);
   if (Number.isInteger(year) && year >= 1901 && year <= 2100) {
@@ -645,6 +820,11 @@ function normalizeDiscogsReleaseYear(raw) {
   return null;
 }
 
+/**
+ * Builds Discogs API search URL for barcode lookup
+ * @param {string} barcode - Product barcode to search
+ * @returns {string} Formatted Discogs API barcode search URL
+ */
 function buildDiscogsBarcodeSearchUrl(barcode) {
   const url = new URL(DISCOGS_API_URL);
   url.searchParams.set("type", "release");
@@ -657,6 +837,12 @@ function buildDiscogsBarcodeSearchUrl(barcode) {
   return url.toString();
 }
 
+/**
+ * Splits Discogs title into artist and record name
+ * Handles formats like "Artist - Record Name"
+ * @param {string} title - The Discogs title to split
+ * @returns {Object} Object with artist and record properties
+ */
 function splitDiscogsTitle(title) {
   const value = typeof title === "string" ? title.trim() : "";
   if (!value) {
@@ -852,6 +1038,12 @@ function doesDiscogsResultMatch(discogsResult, expectedArtist, expectedRecord) {
   return calculateMatchScore(discogsResult, expectedArtist, expectedRecord) >= 0.7;
 }
 
+/**
+ * Searches Discogs by barcode and returns master release information
+ * @async
+ * @param {string} barcode - The product barcode to search
+ * @returns {Promise<Object|null>} Master release info or null if not found
+ */
 async function lookupDiscogsByBarcode(barcode) {
   const trimmed = typeof barcode === "string" ? barcode.trim() : "";
   if (!trimmed) {
@@ -932,6 +1124,14 @@ async function lookupDiscogsByBarcode(barcode) {
   }
 }
 
+/**
+ * Searches Discogs for master release matching artist and record name
+ * Uses fuzzy matching to find best result
+ * @async
+ * @param {string} artist - Artist name to search for
+ * @param {string} record - Record name to search for
+ * @returns {Promise<Object|null>} Master release info or null if not found
+ */
 async function lookupDiscogsMaster(artist, record) {
   const trimmedArtist = typeof artist === "string" ? artist.trim() : "";
   const trimmedRecord = typeof record === "string" ? record.trim() : "";
@@ -1419,6 +1619,13 @@ async function getUserListsForRecord(pool, userUuid, info) {
   });
 }
 
+/**
+ * Retrieves list by ID with owner information
+ * @async
+ * @param {Object} pool - MySQL connection pool
+ * @param {number} listId - The list ID
+ * @returns {Promise<Object|null>} List object with owner data or null
+ */
 async function getListById(pool, listId) {
   if (!Number.isInteger(listId) || listId <= 0) {
     return null;
@@ -1438,6 +1645,14 @@ async function getListById(pool, listId) {
   return rows[0];
 }
 
+/**
+ * Retrieves list by ID, verifying ownership by user
+ * @async
+ * @param {Object} pool - MySQL connection pool
+ * @param {number} listId - The list ID
+ * @param {string} userUuid - User UUID to verify ownership
+ * @returns {Promise<Object|null>} List object if owned by user, null otherwise
+ */
 async function getOwnedListById(pool, listId, userUuid) {
   if (!Number.isInteger(listId) || listId <= 0 || !userUuid) {
     return null;
@@ -1455,6 +1670,12 @@ async function getOwnedListById(pool, listId, userUuid) {
   return rows[0];
 }
 
+/**
+ * Fetches detailed release information from Discogs API
+ * @async
+ * @param {number} releaseId - Discogs release ID
+ * @returns {Promise<Object|null>} Release details or null if not found
+ */
 async function fetchDiscogsRelease(releaseId) {
   if (!releaseId) return null;
   const userAgent = process.env.DISCOGS_USER_AGENT || 'MyRecordCollection/1.0';
@@ -1559,7 +1780,13 @@ async function shutdown() {
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
-// JWT auth middleware
+/**
+ * Middleware to verify JWT authentication token
+ * Sets req.userUuid if token is valid
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Next middleware function
+ */
 function requireAuth(req, res, next) {
   const token = req.cookies?.token;
   if (!token) {
@@ -1576,6 +1803,14 @@ function requireAuth(req, res, next) {
   }
 }
 
+/**
+ * Middleware to verify admin privileges
+ * Checks if user has admin permissions in the database
+ * @async
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Next middleware function
+ */
 async function requireAdmin(req, res, next) {
   if (req.isAdmin === true && req.adminPermissions) {
     return next();
@@ -1595,6 +1830,12 @@ async function requireAdmin(req, res, next) {
   }
 }
 
+/**
+ * GET /api/records
+ * Retrieves all records for the authenticated user from a specific collection
+ * Query params: table (collection name)
+ * @returns {Object} records array and collection privacy settings
+ */
 app.get("/api/records", requireAuth, async (req, res) => {
   const tableName = typeof req.query.table === "string" ? req.query.table : null;
   console.log("Fetching record table:", tableName);
@@ -1647,7 +1888,12 @@ app.get("/api/records", requireAuth, async (req, res) => {
   }
 });
 
-// Get all records for a user across all collections
+/**
+ * GET /api/users/:username/records
+ * Retrieves all records for a user's collection(s)
+ * Respects collection privacy settings based on authentication
+ * @returns {Object} records array with user information
+ */
 app.get("/api/users/:username/records", async (req, res) => {
   const targetUsername = req.params.username;
   console.log(`Fetching all records for user: ${targetUsername}`);
@@ -1748,6 +1994,12 @@ app.get("/api/users/:username/records", async (req, res) => {
   }
 });
 
+/**
+ * GET /api/compare/:username
+ * Compares authenticated user's record collection with another user's collection
+ * @param {string} username - Username to compare with
+ * @returns {Object} Comparison data (records in common, unique to each user)
+ */
 app.get("/api/compare/:username", async (req, res) => {
   const targetUsername = req.params.username;
   console.log(`Comparing collections with user: ${targetUsername}`);
@@ -1833,7 +2085,12 @@ app.get("/api/compare/:username", async (req, res) => {
   }
 });
 
-// Compare genre interests between authenticated user and target user
+/**
+ * GET /api/compare/:username/genres
+ * Compares genre interests between authenticated user and target user
+ * @param {string} username - Username of the user to compare with
+ * @returns {Object} Comparison data showing shared genres and differences
+ */
 app.get("/api/compare/:username/genres", async (req, res) => {
   const targetUsername = req.params.username;
   console.log(`Comparing genre interests with user: ${targetUsername}`);
@@ -1934,6 +2191,12 @@ app.get("/api/compare/:username/genres", async (req, res) => {
   }
 });
 
+/**
+ * GET /api/records/master-info
+ * Retrieves metadata for a Discogs master record including genres and styles
+ * Query params: masterId, artist, record (for lookup)
+ * @returns {Object} Master record info with genres and styles
+ */
 app.get("/api/records/master-info", async (req, res) => {
   console.log("Fetching master info...");
 
@@ -2167,6 +2430,11 @@ app.get("/api/records/master-info", async (req, res) => {
   }
 });
 
+/**
+ * POST /api/barcode_search
+ * Searches Discogs by barcode and returns record information
+ * @returns {Object} Record info (artist, title, cover, genres, masterId) or null
+ */
 app.post("/api/barcode_search", async (req, res) => {
   console.log("Performing barcode search...");
   const rawBarcode =
@@ -2247,6 +2515,12 @@ app.post("/api/barcode_search", async (req, res) => {
   }
 });
 
+/**
+ * GET /api/records/master-reviews
+ * Retrieves reviews for a Discogs master record from user collection
+ * Query params: masterId
+ * @returns {Array} Reviews and ratings from users who own this record
+ */
 app.get("/api/records/master-reviews", async (req, res) => {
   console.log("Fetching master reviews...");
 
@@ -2418,6 +2692,12 @@ app.get("/api/records/master-reviews", async (req, res) => {
   }
 });
 
+/**
+ * GET /api/community/search
+ * Searches for users by username or display name
+ * Query params: q (search query), limit, offset
+ * @returns {Array} Matching user profiles
+ */
 app.get("/api/community/search", async (req, res) => {
   console.log("Community user search...");
   const rawQuery = typeof req.query.q === "string" ? req.query.q.trim() : "";
@@ -2445,6 +2725,12 @@ app.get("/api/community/search", async (req, res) => {
   }
 });
 
+/**
+ * GET /api/community/users/:username
+ * Retrieves public profile for a community user
+ * @param {string} username - Target username
+ * @returns {Object} Public user profile with collection stats
+ */
 app.get("/api/community/users/:username", async (req, res) => {
   console.log("Fetching public profile...");
   const targetUsername = req.params.username;
@@ -2614,6 +2900,12 @@ app.get("/api/community/users/:username", async (req, res) => {
   }
 });
 
+/**
+ * GET /api/community/users/:username/collection
+ * Retrieves a user's public record collection if privacy settings allow
+ * @param {string} username - Username of the profile owner
+ * @returns {Array} Records in user's collection
+ */
 app.get(
   "/api/community/users/:username/collection",
   async (req, res) => {
@@ -2674,6 +2966,12 @@ app.get(
   }
 );
 
+/**
+ * GET /api/community/users/:username/wishlist
+ * Retrieves a user's public wishlist
+ * @param {string} username - Target username
+ * @returns {Array} Records in user's wishlist
+ */
 app.get(
   "/api/community/users/:username/wishlist",
   async (req, res) => {
@@ -2794,6 +3092,14 @@ app.get(
   }
 );
 
+/**
+ * GET /api/community/users/:username/genre/:genreName
+ * Retrieves records by a specific genre from a user's collection (if public)
+ * @param {string} username - Username of the profile owner
+ * @param {string} genreName - Name of the genre
+ * @query {string} [t] - Collection table name (My Collection, Wishlist, Listened, etc.)
+ * @returns {Array} Records in the genre
+ */
 app.get(
   "/api/community/users/:username/genre/:genreName",
   async (req, res) => {
@@ -2894,6 +3200,10 @@ app.get(
   }
 );
 
+/**
+ * GET /api/community/users/:username/follows
+ * Retrieves list of users that a community user is following
+ */
 app.get(
   "/api/community/users/:username/follows",
   async (req, res) => {
@@ -2944,6 +3254,12 @@ app.get(
   }
 );
 
+/**
+ * GET /api/community/users/:username/genre-interests
+ * Retrieves a user's genre interests/preferences from their collections
+ * @param {string} username - Username of the profile owner
+ * @returns {Object} Genre statistics and interests for all collections
+ */
 app.get(
   "/api/community/users/:username/genre-interests",
   async (req, res) => {
@@ -3002,6 +3318,12 @@ app.get(
   }
 );
 
+/**
+ * GET /api/activity
+ * Retrieves recent activity feed for authenticated user
+ * Shows record additions and other user activities
+ * @returns {Array} Activity entries with timestamps
+ */
 app.get("/api/activity", requireAuth, async (req, res) => {
   const scopeRaw =
     typeof req.query.scope === "string" ? req.query.scope.toLowerCase() : "friends";
@@ -3418,6 +3740,11 @@ app.get("/api/activity", requireAuth, async (req, res) => {
   }
 });
 
+/**
+ * GET /api/tags
+ * Retrieves all tags for the authenticated user
+ * @returns {Array} Tag objects with names and frequencies
+ */
 app.get("/api/tags", requireAuth, async (req, res) => {
   console.log("Fetching tags...");
   try {
@@ -3444,6 +3771,12 @@ app.get("/api/tags/full", requireAuth, async (req, res) => {
   }
 });
 
+/**
+ * POST /api/community/users/:username/follow
+ * Follows a user (authenticated user follows target username)
+ * @param {string} username - Username of the user to follow
+ * @returns {Object} {success: true} or error message
+ */
 app.post(
   "/api/community/users/:username/follow",
   requireAuth,
@@ -3493,6 +3826,12 @@ app.post(
   }
 );
 
+/**
+ * DELETE /api/community/users/:username/follow
+ * Unfollows a user (authenticated user unfollows target username)
+ * @param {string} username - Username of the user to unfollow
+ * @returns {Object} {success: true} or error message
+ */
 app.delete(
   "/api/community/users/:username/follow",
   requireAuth,
@@ -3536,6 +3875,12 @@ app.delete(
   }
 );
 
+/**
+ * POST /api/register
+ * Creates a new user account with validation
+ * Sets authentication cookie on success
+ * @returns {Object} {success: true} or error message
+ */
 // Register endpoint
 app.post('/api/register', async (req, res) => {
   console.log("Registering user...");
@@ -3617,6 +3962,12 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/login
+ * Authenticates user with username/email and password
+ * Sets secure HTTP-only authentication cookie on success
+ * @returns {Object} {success: true} or error message
+ */
 // Login endpoint
 app.post('/api/login', async (req, res) => {
   console.log("Logging in...");
@@ -3650,6 +4001,11 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/logout
+ * Clears authentication cookie
+ * @returns {Object} {success: true}
+ */
 // Logout endpoint
 app.post('/api/logout', (req, res) => {
   console.log("Logging out...");
@@ -3657,6 +4013,12 @@ app.post('/api/logout', (req, res) => {
   res.json({ success: true });
 });
 
+/**
+ * GET /api/me
+ * Retrieves current authenticated user's profile information
+ * Requires valid JWT authentication
+ * @returns {Object} User profile with permissions and follow counts
+ */
 app.get('/api/me', requireAuth, async (req, res) => {
   console.log("Fetching user info...");
   try {
@@ -3732,6 +4094,11 @@ app.get('/api/me', requireAuth, async (req, res) => {
   }
 });
 
+/**
+ * PATCH /api/profile
+ * Updates user profile information (username, display name, bio)
+ * @returns {Object} Updated user profile data
+ */
 app.patch('/api/profile', requireAuth, async (req, res) => {
   console.log("Updating profile...");
   const { username: newUsername, displayName: rawDisplayName, bio: rawBio } = req.body || {};
@@ -3826,6 +4193,12 @@ app.patch('/api/profile', requireAuth, async (req, res) => {
   }
 });
 
+/**
+ * POST /api/profile/avatar
+ * Uploads a new profile picture for the authenticated user
+ * Removes previous picture if exists
+ * @returns {Object} Success status and new profile picture URL
+ */
 app.post('/api/profile/avatar', requireAuth, (req, res) => {
   console.log("Uploading profile picture...");
   profilePicUpload.single('avatar')(req, res, async (err) => {
@@ -3904,6 +4277,11 @@ app.delete('/api/profile/avatar', requireAuth, async (req, res) => {
   }
 });
 
+/**
+ * POST /api/profile/password
+ * Changes the authenticated user's password
+ * @returns {Object} {success: true} or error
+ */
 app.post('/api/profile/password', requireAuth, async (req, res) => {
   console.log("Changing password...");
   const { currentPassword, newPassword, confirmPassword } = req.body || {};
@@ -3940,6 +4318,11 @@ app.post('/api/profile/password', requireAuth, async (req, res) => {
   }
 });
 
+/**
+ * POST /api/profile/email
+ * Changes the authenticated user's email address
+ * @returns {Object} {success: true} or error
+ */
 app.post('/api/profile/email', requireAuth, async (req, res) => {
   console.log("Changing email...");
   const { email, password } = req.body || {};
@@ -4011,6 +4394,14 @@ if (process.env.NODE_ENV === 'production') {
 
 // Get a single record by ID
 // Supports both authenticated user's own records and public records when username query param is provided
+/**
+ * GET /api/records/:id
+ * Retrieves a single record by ID
+ * Supports both authenticated user's own records and public records when username query param is provided
+ * @param {number} id - Record ID
+ * @query {string} [username] - Optional username to check public records
+ * @returns {Object} Record object with full details
+ */
 app.get('/api/records/:id', async (req, res) => {
   console.log('Fetching single record...');
   const recordId = Number.parseInt(req.params.id, 10);
@@ -4162,6 +4553,12 @@ app.get('/api/records/:id', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/records/:id/review/like
+ * Adds a like to a record's review
+ * @param {number} id - Record ID
+ * @returns {Object} Updated like count
+ */
 app.post('/api/records/:id/review/like', requireAuth, async (req, res) => {
   const recordId = Number.parseInt(req.params.id, 10);
   console.log('Liking review for record ID:', recordId);
@@ -4209,6 +4606,12 @@ app.post('/api/records/:id/review/like', requireAuth, async (req, res) => {
   }
 });
 
+/**
+ * DELETE /api/records/:id/review/like
+ * Removes a like from a record's review
+ * @param {number} id - Record ID
+ * @returns {Object} Updated like count
+ */
 app.delete('/api/records/:id/review/like', requireAuth, async (req, res) => {
   const recordId = Number.parseInt(req.params.id, 10);
   console.log('Removing review like from record ID:', recordId);
@@ -4238,7 +4641,11 @@ app.delete('/api/records/:id/review/like', requireAuth, async (req, res) => {
   }
 });
 
-// Create or update a record
+/**
+ * POST /api/records/update
+ * Updates an existing record with new information, tags, and rating
+ * @returns {Object} Updated record object
+ */
 app.post('/api/records/update', requireAuth, async (req, res) => {
   console.log("Updating record...");
   const { id, record, artist, cover, rating, tags, release } = req.body;
@@ -4338,6 +4745,12 @@ app.post('/api/records/update', requireAuth, async (req, res) => {
   }
 });
 
+/**
+ * POST /api/records/create
+ * Creates a new record in the specified collection
+ * Automatically links to Discogs master release if found
+ * @returns {Object} Created record object with ID
+ */
 app.post('/api/records/create', requireAuth, async (req, res) => {
   console.log("Creating record...");
   const { record, artist, cover, rating, tags, release, tableName } = req.body;
@@ -4503,7 +4916,11 @@ app.post('/api/records/create', requireAuth, async (req, res) => {
   }
 });
 
-// Tag management endpoints
+/**
+ * POST /api/tags/create
+ * Creates a new tag for the authenticated user
+ * @returns {Object} Created tag object with ID and name
+ */
 app.post('/api/tags/create', requireAuth, async (req, res) => {
   console.log('Creating tag...');
   const { name } = req.body;
@@ -4523,6 +4940,11 @@ app.post('/api/tags/create', requireAuth, async (req, res) => {
   }
 });
 
+/**
+ * POST /api/tags/rename
+ * Renames an existing tag for the authenticated user
+ * @returns {Object} Success status
+ */
 app.post('/api/tags/rename', requireAuth, async (req, res) => {
   console.log('Renaming tag...');
   const { oldName, newName, tagId } = req.body;
@@ -4565,6 +4987,11 @@ app.post('/api/tags/rename', requireAuth, async (req, res) => {
   }
 });
 
+/**
+ * POST /api/tags/delete
+ * Deletes a tag and removes it from all records
+ * @returns {Object} Success status
+ */
 app.post('/api/tags/delete', requireAuth, async (req, res) => {
   console.log('Deleting tag...');
   const { name } = req.body;
@@ -4583,7 +5010,11 @@ app.post('/api/tags/delete', requireAuth, async (req, res) => {
   }
 });
 
-// Delete a record
+/**
+ * POST /api/records/delete
+ * Deletes a record from the user's collection
+ * @returns {Object} Success status
+ */
 app.post('/api/records/delete', requireAuth, async (req, res) => {
   console.log('Deleting record...');
   const { id } = req.body;
@@ -4603,6 +5034,11 @@ app.post('/api/records/delete', requireAuth, async (req, res) => {
   }
 });
 
+/**
+ * POST /api/import/discogs
+ * Imports user's Discogs collection into app
+ * @returns {Object} Import results and statistics
+ */
 app.post('/api/import/discogs', requireAuth, async (req, res) => {
   const { records, tableName } = req.body || {};
   console.log('Importing Discogs collection of', Array.isArray(records) ? records.length : 0, 'records...');
@@ -4803,7 +5239,11 @@ app.post('/api/import/discogs', requireAuth, async (req, res) => {
   }
 });
 
-// Delete all records in a user's collection (table)
+/**
+ * POST /api/records/clear
+ * Deletes all records from a user's collection
+ * @returns {Object} Success status
+ */
 app.post('/api/records/clear', requireAuth, async (req, res) => {
   console.log('Clearing collection...');
   const { tableName } = req.body || {};
@@ -4853,7 +5293,20 @@ app.post('/api/tags/clear', requireAuth, async (req, res) => {
   }
 });
 
-// Proxy to Last.fm album.search (requires LASTFM_API_KEY in env)
+/**
+ * GET /api/lastfm/album.search
+ * Search Last.fm for album artwork and metadata
+ * @query {string} q - Search query (artist and/or album name)
+ * @query {string} [page] - Page number for pagination (default: 1)
+ * @returns {Object} Last.fm search results
+ */
+/**
+ * GET /api/lastfm/album.search
+ * Proxy to Last.fm album search (requires LASTFM_API_KEY in environment)
+ * @query {string} q - Search query
+ * @query {number} [page] - Page number for pagination
+ * @returns {Object} Last.fm album search results
+ */
 app.get('/api/lastfm/album.search', async (req, res) => {
   const { q, page } = req.query;
   console.log("Last.fm album.search for query:", q, "and page:", page);
@@ -4905,6 +5358,11 @@ app.get('/api/lastfm/album.search', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/preferences/record-table
+ * Retrieves record table view preferences (column visibility, default sort)
+ * @returns {Object} Record table preferences
+ */
 app.get('/api/preferences/record-table', requireAuth, async (req, res) => {
   console.log('Fetching record table preferences...');
   try {
@@ -4934,6 +5392,13 @@ app.get('/api/preferences/record-table', requireAuth, async (req, res) => {
   }
 });
 
+/**
+ * POST /api/preferences/record-table
+ * Updates record table view preferences
+ * @body {Object} columnVisibility - Visibility settings for each column
+ * @body {Object} defaultSort - Default sort field and order
+ * @returns {Object} Updated preferences
+ */
 app.post('/api/preferences/record-table', requireAuth, async (req, res) => {
   console.log('Saving record table preferences...');
   try {
@@ -4952,6 +5417,11 @@ app.post('/api/preferences/record-table', requireAuth, async (req, res) => {
   }
 });
 
+/**
+ * GET /api/profile/highlights
+ * Retrieves the authenticated user's profile highlight record IDs
+ * @returns {Array} Record IDs marked as highlights
+ */
 app.get('/api/profile/highlights', requireAuth, async (req, res) => {
   console.log('Fetching profile highlights...');
   try {
@@ -4984,6 +5454,12 @@ app.get('/api/profile/highlights', requireAuth, async (req, res) => {
   }
 });
 
+/**
+ * POST /api/profile/highlights
+ * Updates the authenticated user's profile highlights
+ * @body {Array} highlightIds - Array of record IDs to highlight (max 3)
+ * @returns {Object} Updated highlights
+ */
 app.post('/api/profile/highlights', requireAuth, async (req, res) => {
   console.log('Updating profile highlights...');
   try {
@@ -5036,6 +5512,11 @@ app.get('/api/collections', requireAuth, async (req, res) => {
   }
 });
 
+/**
+ * GET /api/collections/privacy
+ * Retrieves privacy settings for all user collections
+ * @returns {Array} Collection privacy information
+ */
 app.get('/api/collections/privacy', requireAuth, async (req, res) => {
   console.log('Fetching collection privacy state...');
   try {
@@ -5086,6 +5567,13 @@ app.get('/api/collections/privacy', requireAuth, async (req, res) => {
   }
 });
 
+/**
+ * POST /api/collections/privacy
+ * Updates privacy settings for a collection
+ * @body {string} tableName - Collection name to update
+ * @body {boolean} isPrivate - Privacy setting (true = private, false = public)
+ * @returns {Object} Updated collection privacy settings
+ */
 app.post('/api/collections/privacy', requireAuth, async (req, res) => {
   console.log('Updating collection privacy state...');
   const { tableName: rawTableName, isPrivate } = req.body || {};
@@ -5182,6 +5670,15 @@ app.get('/api/lists/mine', requireAuth, async (req, res) => {
   }
 });
 
+/**
+ * POST /api/lists
+ * Creates a new list for the authenticated user with optional cover picture
+ * @body {string} name - List name (required)
+ * @body {string} [description] - List description
+ * @body {boolean} [isPrivate] - Privacy setting (default: false)
+ * @body {File} [picture] - Optional cover image file
+ * @returns {Object} Created list object
+ */
 app.post('/api/lists', requireAuth, listPicUpload.single('picture'), async (req, res) => {
   console.log('Creating list...');
   const uploadedFilename = req.file?.filename ?? null;
@@ -5250,6 +5747,15 @@ app.post('/api/lists', requireAuth, listPicUpload.single('picture'), async (req,
   }
 });
 
+/**
+ * PATCH /api/lists/:listId
+ * Updates an existing list metadata
+ * @param {number} listId - List ID
+ * @body {string} [name] - Updated list name
+ * @body {string} [description] - Updated description
+ * @body {boolean} [isPrivate] - Updated privacy setting
+ * @returns {Object} Updated list object
+ */
 app.patch('/api/lists/:listId', requireAuth, async (req, res) => {
   console.log('Updating list...');
   const listId = Number(req.params.listId);
@@ -5321,6 +5827,12 @@ app.patch('/api/lists/:listId', requireAuth, async (req, res) => {
   }
 });
 
+/**
+ * DELETE /api/lists/:listId
+ * Deletes a list owned by the authenticated user
+ * @param {number} listId - List ID to delete
+ * @returns {Object} Success status
+ */
 app.delete('/api/lists/:listId', requireAuth, async (req, res) => {
   console.log('Deleting list...');
   const listId = Number(req.params.listId);
@@ -5349,6 +5861,13 @@ app.delete('/api/lists/:listId', requireAuth, async (req, res) => {
   }
 });
 
+/**
+ * POST /api/lists/:listId/picture
+ * Uploads or updates a list cover picture
+ * @param {number} listId - List ID
+ * @body {File} picture - Cover image file
+ * @returns {Object} Updated picture URL
+ */
 app.post('/api/lists/:listId/picture', requireAuth, listPicUpload.single('picture'), async (req, res) => {
   console.log('Updating list picture...');
   const listId = Number(req.params.listId);
@@ -5393,6 +5912,12 @@ app.post('/api/lists/:listId/picture', requireAuth, listPicUpload.single('pictur
   }
 });
 
+/**
+ * DELETE /api/lists/:listId/picture
+ * Removes the list cover picture
+ * @param {number} listId - List ID
+ * @returns {Object} Success status
+ */
 app.delete('/api/lists/:listId/picture', requireAuth, async (req, res) => {
   console.log('Removing list picture...');
   const listId = Number(req.params.listId);
@@ -5421,6 +5946,14 @@ app.delete('/api/lists/:listId/picture', requireAuth, async (req, res) => {
   }
 });
 
+/**
+ * GET /api/lists/search
+ * Searches public lists by name or description
+ * @query {string} q - Search query
+ * @query {number} [limit] - Results per page
+ * @query {number} [offset] - Pagination offset
+ * @returns {Array} Matching public lists
+ */
 app.get('/api/lists/search', async (req, res) => {
   console.log('Searching public lists...');
   const limitRaw = Number(req.query.limit);
@@ -5462,6 +5995,13 @@ app.get('/api/lists/search', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/lists/popular
+ * Retrieves most popular public lists by like count
+ * @query {number} [limit] - Number of lists to return
+ * @query {number} [offset] - Pagination offset
+ * @returns {Array} Popular lists
+ */
 app.get('/api/lists/popular', async (req, res) => {
   console.log('Fetching popular lists...');
   try {
@@ -5495,6 +6035,12 @@ app.get('/api/lists/popular', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/lists/:listId
+ * Retrieves a list with all its records (public or owned by authenticated user)
+ * @param {number} listId - List ID
+ * @returns {Object} List with records array
+ */
 app.get('/api/lists/:listId', async (req, res) => {
   const listId = Number(req.params.listId);
   console.log('Fetching list detail...', listId);
@@ -5550,6 +6096,14 @@ app.get('/api/lists/:listId', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/lists/:listId/records
+ * Adds a record to a list or reorders list records
+ * @param {number} listId - List ID
+ * @body {number|Object} recordId - Record ID or record data to add
+ * @body {Array} [sortOrder] - New sort order for all records
+ * @returns {Object} Updated record in list
+ */
 app.post('/api/lists/:listId/records', requireAuth, async (req, res) => {
   const listId = Number(req.params.listId);
   console.log('Adding record to list...', listId);
@@ -5755,6 +6309,13 @@ app.post('/api/lists/:listId/records', requireAuth, async (req, res) => {
   }
 });
 
+/**
+ * DELETE /api/lists/:listId/records/:recordId
+ * Removes a record from a list
+ * @param {number} listId - List ID
+ * @param {number} recordId - Record ID to remove
+ * @returns {Object} Success status
+ */
 app.delete('/api/lists/:listId/records/:recordId', requireAuth, async (req, res) => {
   const listId = Number(req.params.listId);
   const recordId = Number(req.params.recordId);
@@ -5782,8 +6343,14 @@ app.delete('/api/lists/:listId/records/:recordId', requireAuth, async (req, res)
   }
 });
 
-// IMPORTANT: This route must come BEFORE app.put('/api/lists/:listId/records/:recordId')
-// so that 'reorder' doesn't get matched as :recordId
+// This route must come BEFORE app.put('/api/lists/:listId/records/:recordId')
+/**
+ * PUT /api/lists/:listId/records/reorder
+ * Reorders records in a list (must be called before PUT /api/lists/:listId/records/:recordId)
+ * @param {number} listId - List ID
+ * @body {Array} Array of objects with id and sortOrder fields
+ * @returns {Object} {success: true} or error message
+ */
 app.put('/api/lists/:listId/records/reorder', requireAuth, async (req, res) => {
   console.log('Reordering list records...');
   const listId = Number(req.params.listId);
@@ -5845,6 +6412,14 @@ app.put('/api/lists/:listId/records/reorder', requireAuth, async (req, res) => {
   }
 });
 
+/**
+ * PUT /api/lists/:listId/records/:recordId
+ * Updates a record within a list (e.g., custom notes, rating)
+ * @param {number} listId - List ID
+ * @param {number} recordId - Record ID
+ * @body {Object} - Updated record fields
+ * @returns {Object} Updated record
+ */
 app.put('/api/lists/:listId/records/:recordId', requireAuth, async (req, res) => {
   console.log('Updating list record...');
   const listId = Number(req.params.listId);
@@ -5913,6 +6488,12 @@ app.put('/api/lists/:listId/records/:recordId', requireAuth, async (req, res) =>
   }
 });
 
+/**
+ * POST /api/lists/:listId/like
+ * Adds a like to a list from the authenticated user
+ * @param {number} listId - List ID to like
+ * @returns {Object} Updated like count
+ */
 app.post('/api/lists/:listId/like', requireAuth, async (req, res) => {
   console.log('Liking list...');
   const listId = Number(req.params.listId);
@@ -5980,6 +6561,12 @@ app.post('/api/lists/:listId/like', requireAuth, async (req, res) => {
   }
 });
 
+/**
+ * DELETE /api/lists/:listId/like
+ * Removes a like from a list by the authenticated user
+ * @param {number} listId - List ID to unlike
+ * @returns {Object} Updated like count
+ */
 app.delete('/api/lists/:listId/like', requireAuth, async (req, res) => {
   console.log('Unliking list...');
   const listId = Number(req.params.listId);
@@ -6040,6 +6627,15 @@ app.delete('/api/lists/:listId/like', requireAuth, async (req, res) => {
 });
 
 // Admin management endpoints
+
+/**
+ * GET /api/admin/users
+ * Retrieves paginated list of all users (admin only)
+ * @query {number} [limit] - Results per page
+ * @query {number} [offset] - Pagination offset
+ * @query {string} [q] - Search query for filtering users
+ * @returns {Array} User objects with statistics
+ */
 app.get('/api/admin/users', requireAuth, requireAdmin, async (req, res) => {
   const rawSearch = typeof req.query.q === 'string' ? req.query.q.trim() : '';
   const limitRaw = Number(req.query.limit);
@@ -6104,6 +6700,17 @@ app.get('/api/admin/users', requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
+/**
+ * PATCH /api/admin/users/:userUuid
+ * Updates user information or permissions (admin only)
+ * @param {string} userUuid - User UUID
+ * @body {string} [username] - Updated username
+ * @body {string} [displayName] - Updated display name
+ * @body {boolean} [isAdmin] - Admin status
+ * @body {boolean} [canManageAdmins] - Permission to manage other admins
+ * @body {boolean} [canDeleteUsers] - Permission to delete users
+ * @returns {Object} Updated user
+ */
 app.patch('/api/admin/users/:userUuid', requireAuth, requireAdmin, async (req, res) => {
   console.log('Admin updating user...');
   const targetUuid = typeof req.params.userUuid === 'string' ? req.params.userUuid.trim() : '';
@@ -6369,6 +6976,12 @@ app.patch('/api/admin/users/:userUuid', requireAuth, requireAdmin, async (req, r
   }
 });
 
+/**
+ * DELETE /api/admin/users/:userUuid
+ * Permanently deletes a user account and all associated data (admin only)
+ * @param {string} userUuid - User UUID to delete
+ * @returns {Object} Success status
+ */
 app.delete('/api/admin/users/:userUuid', requireAuth, requireAdmin, async (req, res) => {
   console.log('Admin deleting user...');
   const targetUuid = typeof req.params.userUuid === 'string' ? req.params.userUuid.trim() : '';
@@ -6409,6 +7022,13 @@ app.delete('/api/admin/users/:userUuid', requireAuth, requireAdmin, async (req, 
   }
 });
 
+/**
+ * GET /api/admin/records
+ * Retrieves paginated list of all records in system (admin only)
+ * @query {number} [limit] - Results per page
+ * @query {number} [offset] - Pagination offset
+ * @returns {Array} Record objects with user info
+ */
 app.get('/api/admin/records', requireAuth, requireAdmin, async (req, res) => {
   const rawSearch = typeof req.query.q === 'string' ? req.query.q.trim() : '';
   const rawOwner = typeof req.query.user === 'string' ? req.query.user.trim() : '';
@@ -6500,6 +7120,18 @@ app.get('/api/admin/records', requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
+/**
+ * PATCH /api/admin/records/:recordId
+ * Updates record metadata (admin only)
+ * @param {number} recordId - Record ID
+ * @body {string} [name] - Record name
+ * @body {string} [artist] - Artist name
+ * @body {string} [cover] - Cover image URL
+ * @body {number} [rating] - Rating (0-10)
+ * @body {number} [release_year] - Release year
+ * @body {string} [masterId] - Discogs master ID
+ * @returns {Object} Updated record
+ */
 app.patch('/api/admin/records/:recordId', requireAuth, requireAdmin, async (req, res) => {
   console.log('Admin updating record...');
   const recordId = Number(req.params.recordId);
@@ -6704,6 +7336,12 @@ app.patch('/api/admin/records/:recordId', requireAuth, requireAdmin, async (req,
   }
 });
 
+/**
+ * DELETE /api/admin/records/:recordId
+ * Deletes a record from the system (admin only)
+ * @param {number} recordId - Record ID to delete
+ * @returns {Object} Success status
+ */
 app.delete('/api/admin/records/:recordId', requireAuth, requireAdmin, async (req, res) => {
   console.log('Admin deleting record...');
   const recordId = Number(req.params.recordId);
@@ -6724,6 +7362,13 @@ app.delete('/api/admin/records/:recordId', requireAuth, requireAdmin, async (req
   }
 });
 
+/**
+ * GET /api/admin/masters
+ * Retrieves paginated list of all master records (admin only)
+ * @query {number} [limit] - Results per page
+ * @query {number} [offset] - Pagination offset
+ * @returns {Array} Master record objects
+ */
 app.get('/api/admin/masters', requireAuth, requireAdmin, async (req, res) => {
   const rawSearch = typeof req.query.q === 'string' ? req.query.q.trim() : '';
   const limitRaw = Number(req.query.limit);
@@ -6777,6 +7422,15 @@ app.get('/api/admin/masters', requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
+/**
+ * PATCH /api/admin/masters/:masterId
+ * Updates master record metadata (admin only)
+ * @param {string} masterId - Master ID
+ * @body {string} [artist] - Master artist name
+ * @body {string} [name] - Master record name
+ * @body {string} [cover] - Cover image URL
+ * @returns {Object} Updated master record
+ */
 app.patch('/api/admin/masters/:masterId', requireAuth, requireAdmin, async (req, res) => {
   console.log('Admin updating master...');
   const masterId = parseMasterId(req.params.masterId);
@@ -6926,7 +7580,12 @@ app.patch('/api/admin/masters/:masterId', requireAuth, requireAdmin, async (req,
   }
 });
 
-// Get genres for a specific master (admin only)
+/**
+ * GET /api/admin/masters/:masterId/genres
+ * Retrieves genres and styles associated with a master record (admin only)
+ * @param {string} masterId - Master ID
+ * @returns {Array} Array of genres and styles with isStyle flag
+ */
 app.get('/api/admin/masters/:masterId/genres', requireAuth, requireAdmin, async (req, res) => {
   const masterId = parseMasterId(req.params.masterId);
   if (!isValidMasterId(masterId)) {
@@ -6958,6 +7617,12 @@ app.get('/api/admin/masters/:masterId/genres', requireAuth, requireAdmin, async 
   }
 });
 
+/**
+ * DELETE /api/admin/masters/:masterId
+ * Deletes a master record from the system (admin only)
+ * @param {string} masterId - Master ID to delete
+ * @returns {Object} Success status
+ */
 app.delete('/api/admin/masters/:masterId', requireAuth, requireAdmin, async (req, res) => {
   console.log('Admin deleting master...');
   const masterId = parseMasterId(req.params.masterId);
@@ -6978,6 +7643,13 @@ app.delete('/api/admin/masters/:masterId', requireAuth, requireAdmin, async (req
   }
 });
 
+/**
+ * GET /api/admin/tags
+ * Retrieves paginated list of all tags in system (admin only)
+ * @query {number} [limit] - Results per page
+ * @query {number} [offset] - Pagination offset
+ * @returns {Array} Tag objects with usage counts
+ */
 app.get('/api/admin/tags', requireAuth, requireAdmin, async (req, res) => {
   const rawSearch = typeof req.query.q === 'string' ? req.query.q.trim() : '';
   const rawOwner = typeof req.query.user === 'string' ? req.query.user.trim() : '';
@@ -7044,6 +7716,13 @@ app.get('/api/admin/tags', requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
+/**
+ * PATCH /api/admin/tags/:tagId
+ * Updates a tag (admin only)
+ * @param {number} tagId - Tag ID
+ * @body {string} [name] - New tag name
+ * @returns {Object} Updated tag
+ */
 app.patch('/api/admin/tags/:tagId', requireAuth, requireAdmin, async (req, res) => {
   console.log('Admin updating tag...');
   const tagId = Number(req.params.tagId);
@@ -7110,6 +7789,12 @@ app.patch('/api/admin/tags/:tagId', requireAuth, requireAdmin, async (req, res) 
   }
 });
 
+/**
+ * DELETE /api/admin/tags/:tagId
+ * Deletes a tag from the system (admin only)
+ * @param {number} tagId - Tag ID to delete
+ * @returns {Object} Success status
+ */
 app.delete('/api/admin/tags/:tagId', requireAuth, requireAdmin, async (req, res) => {
   console.log('Admin deleting tag...');
   const tagId = Number(req.params.tagId);
@@ -7329,7 +8014,16 @@ app.delete('/api/admin/lists/:listId/records/:recordId', requireAuth, requireAdm
 
 // ===================== REPORTS =====================
 
-// Submit a report (any type)
+/**
+ * POST /api/reports
+ * Submits a report for content violations, user issues, or system problems
+ * @body {string} type - Report type: 'general', 'user', 'record', 'master', or 'list'
+ * @body {string} reason - Reason for the report
+ * @body {string} [notes] - Additional notes about the report
+ * @body {string|number} [targetId] - ID of the target record/master/list
+ * @body {string} [targetUsername] - Username of the target user
+ * @returns {Object} {success: true} or error message
+ */
 app.post('/api/reports', requireAuth, async (req, res) => {
   console.log('Submitting report...');
   const userUuid = req.userUuid;
@@ -7396,7 +8090,15 @@ app.post('/api/reports', requireAuth, async (req, res) => {
   }
 });
 
-// Get reports (admin only) - paginated with filters
+/**
+ * GET /api/admin/reports
+ * Retrieves paginated list of all reports with optional filters (admin only)
+ * @query {number} [page] - Page number for pagination (default: 1)
+ * @query {string} [type] - Filter by report type: 'general', 'user', 'record', 'master', 'list'
+ * @query {string} [status] - Filter by status: 'open', 'resolved', 'dismissed'
+ * @query {string} [reportedBy] - Filter by username of report submitter
+ * @returns {Object} Paginated reports with total count
+ */
 app.get('/api/admin/reports', requireAuth, requireAdmin, async (req, res) => {
   console.log('Admin fetching reports...');
   const page = Math.max(1, Number(req.query.page) || 1);
@@ -7631,6 +8333,15 @@ app.post('/api/admin/covers/replace', requireAuth, requireAdmin, async (req, res
 });
 
 // Admin endpoint to merge two masters
+
+/**
+ * POST /api/admin/masters/merge
+ * Merges two master records into one (admin only)
+ * Updates all records and list records associated with the old master to the new master
+ * @body {string} oldMasterId - Master ID to merge from
+ * @body {string} newMasterId - Master ID to merge into
+ * @returns {Object} Merge statistics (duplicatesMarked, recordsUpdated, listRecordsUpdated, userGenresUpdated)
+ */
 app.post('/api/admin/masters/merge', requireAuth, requireAdmin, async (req, res) => {
   console.log('Admin merging masters...');
   const { oldMasterId, newMasterId } = req.body;
@@ -7805,7 +8516,11 @@ app.get("/api/masters/search", requireAuth, async (req, res) => {
   }
 });
 
-// Get current listening to
+/**
+ * GET /api/user/listening-to
+ * Retrieves the current record the user is listening to (if any)
+ * @returns {Object} Current listening record details (artist, cover, name, masterId)
+ */
 app.get("/api/user/listening-to", requireAuth, async (req, res) => {
   console.log("Fetching listening to...");
   
@@ -7867,7 +8582,12 @@ app.get("/api/user/listening-to", requireAuth, async (req, res) => {
   }
 });
 
-// Update listening to
+/**
+ * PUT /api/user/listening-to
+ * Updates the current record the authenticated user is listening to
+ * @body {string} masterId - Master ID of the record to set as currently listening
+ * @returns {Object} Updated listening record (success, listeningTo)
+ */
 app.put("/api/user/listening-to", requireAuth, async (req, res) => {
   console.log("Updating listening to...");
   
@@ -7947,7 +8667,11 @@ app.put("/api/user/listening-to", requireAuth, async (req, res) => {
   }
 });
 
-// Clear listening to
+/**
+ * DELETE /api/user/listening-to
+ * Clears the user's current listening status (removes what they're currently listening to)
+ * @returns {Object} {success: true} or error message
+ */
 app.delete("/api/user/listening-to", requireAuth, async (req, res) => {
   console.log("Clearing listening to...");
   

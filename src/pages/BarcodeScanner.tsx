@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Barcode scanner page component for scanning and adding records via barcode
+ * @fileformat Page component
+ */
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ThemeProvider,
@@ -71,10 +77,10 @@ export default function BarcodeScanner() {
   const cachedUser = getCachedUserInfo();
   const [username, setUsername] = useState<string>(cachedUser?.username ?? "");
   const [displayName, setDisplayName] = useState<string>(
-    cachedUser?.displayName ?? ""
+    cachedUser?.displayName ?? "",
   );
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
-    cachedUser?.profilePicUrl ?? null
+    cachedUser?.profilePicUrl ?? null,
   );
   const [userLoading, setUserLoading] = useState(!cachedUser);
   const [status, setStatus] = useState<ScannerStatus>("initial");
@@ -148,7 +154,7 @@ export default function BarcodeScanner() {
             const next = encodeURIComponent(
               `${location.pathname}${location.search || ""}${
                 location.hash || ""
-              }`
+              }`,
             );
             navigate(`/login?next=${next}`, { replace: true });
           }
@@ -186,7 +192,7 @@ export default function BarcodeScanner() {
             },
             {
               state: { fromScanner: true },
-            }
+            },
           );
           return;
         }
@@ -199,8 +205,8 @@ export default function BarcodeScanner() {
           typeof data?.masterId === "string" && data.masterId.trim()
             ? data.masterId.trim()
             : typeof data?.masterId === "number" && data.masterId > 0
-            ? String(data.masterId)
-            : undefined;
+              ? String(data.masterId)
+              : undefined;
         const releaseYear =
           typeof data?.releaseYear === "number" &&
           Number.isInteger(data.releaseYear)
@@ -224,7 +230,7 @@ export default function BarcodeScanner() {
               suggestedReleaseYear: releaseYear,
               fromScanner: true,
             },
-          }
+          },
         );
         return;
       } catch (error) {
@@ -233,7 +239,7 @@ export default function BarcodeScanner() {
         setMessage("Failed to look up barcode. Please try again.");
       }
     },
-    [navigate]
+    [navigate],
   );
 
   const handleDetected = useCallback(
@@ -245,7 +251,7 @@ export default function BarcodeScanner() {
       stopScanner();
       void processBarcode(rawValue);
     },
-    [processBarcode, stopScanner]
+    [processBarcode, stopScanner],
   );
 
   const scheduleDetect = useCallback(() => {
@@ -334,7 +340,7 @@ export default function BarcodeScanner() {
             ) {
               console.warn("Fallback barcode detection error", error);
             }
-          }
+          },
         )
         .then((controls) => {
           if (controls) {
@@ -352,7 +358,7 @@ export default function BarcodeScanner() {
           setMessage(
             error instanceof DOMException && error.name === "NotAllowedError"
               ? "Camera permission was denied. Allow camera access to scan barcodes."
-              : "Unable to access the camera for scanning."
+              : "Unable to access the camera for scanning.",
           );
         });
 
@@ -387,7 +393,7 @@ export default function BarcodeScanner() {
         scanningActiveRef.current = false;
         setStatus("unsupported");
         setMessage(
-          "Barcode scanning is not supported on this device. Enter the barcode manually below."
+          "Barcode scanning is not supported on this device. Enter the barcode manually below.",
         );
       }
       return;
@@ -399,7 +405,7 @@ export default function BarcodeScanner() {
         try {
           const supported = await detectorCtor.getSupportedFormats();
           const usable = supported.filter((format: string) =>
-            SCAN_FORMATS.includes(format)
+            SCAN_FORMATS.includes(format),
           );
           if (usable.length > 0) {
             formats = usable;
@@ -417,7 +423,7 @@ export default function BarcodeScanner() {
         scanningActiveRef.current = false;
         setStatus("unsupported");
         setMessage(
-          "Unable to initialize barcode scanning. Enter the barcode manually below."
+          "Unable to initialize barcode scanning. Enter the barcode manually below.",
         );
       }
       return;
@@ -454,7 +460,7 @@ export default function BarcodeScanner() {
         setMessage(
           error instanceof DOMException && error.name === "NotAllowedError"
             ? "Camera permission was denied. Allow camera access to scan barcodes."
-            : "Unable to access the camera."
+            : "Unable to access the camera.",
         );
       }
     }
@@ -508,7 +514,7 @@ export default function BarcodeScanner() {
       scanningActiveRef.current = false;
       await processBarcode(trimmed, true);
     },
-    [manualBarcode, processBarcode, stopScanner]
+    [manualBarcode, processBarcode, stopScanner],
   );
 
   return (

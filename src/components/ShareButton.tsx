@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Social sharing button component that enables users to share content using native share APIs
+ * @fileformat React Component
+ */
+
 import { IconButton, Tooltip } from "@mui/material";
 import ShareIcon from "@mui/icons-material/Share";
 import { useState } from "react";

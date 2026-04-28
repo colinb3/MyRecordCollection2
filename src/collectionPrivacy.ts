@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Collection privacy state management utility for handling collection visibility settings
+ * @fileformat TypeScript
+ */
+
 import apiUrl from "./api";
 
 const DEFAULT_COLLECTION_NAME = "My Collection";

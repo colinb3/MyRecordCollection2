@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Settings menu navigation component for selecting between different settings sections
+ * @fileformat React Component
+ */
+
 import { List, ListItemButton, ListItemText } from "@mui/material";
 
 export interface SettingsMenuOption {

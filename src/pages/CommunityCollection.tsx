@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Community member collection view page component for viewing other users' collections
+ * @fileformat Page component
+ */
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ThemeProvider,
@@ -53,10 +59,10 @@ export default function CommunityCollection({
   const cachedUser = getCachedUserInfo();
   const [username, setUsername] = useState<string>(cachedUser?.username ?? "");
   const [displayName, setDisplayName] = useState<string>(
-    cachedUser?.displayName ?? ""
+    cachedUser?.displayName ?? "",
   );
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
-    cachedUser?.profilePicUrl ?? null
+    cachedUser?.profilePicUrl ?? null,
   );
   const [userLoading, setUserLoading] = useState(!cachedUser);
 
@@ -131,7 +137,7 @@ export default function CommunityCollection({
       ? loadPublicUserCollectionByGenre(
           targetUsername,
           genreFilter,
-          tableFilter || undefined
+          tableFilter || undefined,
         )
       : loadPublicUserCollection(targetUsername, activeTableName);
 
@@ -201,14 +207,14 @@ export default function CommunityCollection({
 
     if (filters.tags.length > 0) {
       next = next.filter((record) =>
-        filters.tags.every((tag) => record.tags.includes(tag))
+        filters.tags.every((tag) => record.tags.includes(tag)),
       );
     }
 
     next = next.filter(
       (record) =>
         record.rating >= filters.rating.min &&
-        record.rating <= filters.rating.max
+        record.rating <= filters.rating.max,
     );
 
     const releaseMin = filters.release.min ?? MIN_RELEASE_YEAR;
@@ -235,18 +241,18 @@ export default function CommunityCollection({
   const searchPlaceholder = isWishlistView
     ? "Search Wishlist"
     : isListenedView
-    ? "Search Listened"
-    : "Search Collection";
+      ? "Search Listened"
+      : "Search Collection";
   const noMatchMessage = isWishlistView
     ? "No wishlist records match these filters."
     : isListenedView
-    ? "No listened records match these filters."
-    : "No records match these filters.";
+      ? "No listened records match these filters."
+      : "No records match these filters.";
   const emptyCollectionMessage = isWishlistView
     ? "No wishlist records to display."
     : isListenedView
-    ? "No listened records to display."
-    : "No records to display.";
+      ? "No listened records to display."
+      : "No records to display.";
   const navigateToRecordDetails = useCallback(
     (record: MrcRecord) => {
       const targetPath = viewingOwnCollection
@@ -257,7 +263,7 @@ export default function CommunityCollection({
 
       navigate(targetPath);
     },
-    [navigate, targetUsername, viewingOwnCollection]
+    [navigate, targetUsername, viewingOwnCollection],
   );
 
   const handleSelectRecord = useCallback(
@@ -266,7 +272,7 @@ export default function CommunityCollection({
         navigateToRecordDetails(record);
       }
     },
-    [navigateToRecordDetails]
+    [navigateToRecordDetails],
   );
 
   return (
@@ -319,7 +325,7 @@ export default function CommunityCollection({
                 onClick={() => {
                   if (profile) {
                     navigate(
-                      `/community/${encodeURIComponent(profile.username)}`
+                      `/community/${encodeURIComponent(profile.username)}`,
                     );
                   }
                 }}
@@ -352,10 +358,10 @@ export default function CommunityCollection({
                           tableFilter ? ` (${tableFilter})` : ""
                         }`
                       : isWishlistView
-                      ? `${targetDisplayName}'s Wishlist`
-                      : isListenedView
-                      ? `${targetDisplayName}'s Listened`
-                      : `${targetDisplayName}'s Collection`}
+                        ? `${targetDisplayName}'s Wishlist`
+                        : isListenedView
+                          ? `${targetDisplayName}'s Listened`
+                          : `${targetDisplayName}'s Collection`}
                   </Typography>
                 </Box>
               </ButtonBase>

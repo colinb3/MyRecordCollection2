@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Grid display component for previewing records with cover art and metadata
+ * @fileformat React Component
+ */
+
 import { useMemo } from "react";
 import Box from "@mui/material/Box";
 import Grid from "@mui/material/Grid";
@@ -54,7 +60,7 @@ export default function RecordPreviewGrid({
         const key = keyPrefix ? `${keyPrefix}-${record.id}` : record.id;
         const addedDateText =
           showDateAdded && record.added
-            ? formatLocalDate(record.added, dateFormatter) ?? record.added
+            ? (formatLocalDate(record.added, dateFormatter) ?? record.added)
             : null;
         const hasReview =
           typeof record.review === "string" && record.review.trim();

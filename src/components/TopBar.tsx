@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Application top navigation bar component with user menu and branding
+ * @fileformat React Component
+ */
+
 import React, { useState } from "react";
 import {
   Avatar,
@@ -123,7 +129,7 @@ export default function TopBar({
   const cachedInfo = getCachedUserInfo();
   const canAdmin = Boolean(isAdmin ?? cachedInfo?.isAdmin);
   const showPendingBadge = Boolean(
-    hasPendingReports ?? cachedInfo?.hasPendingReports
+    hasPendingReports ?? cachedInfo?.hasPendingReports,
   );
 
   return (
@@ -253,7 +259,7 @@ export default function TopBar({
                       const trimmedUsername = (username || "").trim();
                       if (trimmedUsername) {
                         navigate(
-                          `/community/${encodeURIComponent(trimmedUsername)}`
+                          `/community/${encodeURIComponent(trimmedUsername)}`,
                         );
                       } else {
                         navigate("/community");
@@ -365,7 +371,7 @@ export default function TopBar({
                         const next = encodeURIComponent(
                           `${location.pathname}${location.search || ""}${
                             location.hash || ""
-                          }`
+                          }`,
                         );
                         navigate(`/login?next=${next}`);
                       }

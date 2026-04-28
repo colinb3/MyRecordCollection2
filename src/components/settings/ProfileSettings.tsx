@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Profile settings component for managing user profile information and avatar
+ * @fileformat React Component
+ */
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import apiUrl from "../../api";
 import {
@@ -73,7 +79,7 @@ export default function ProfileSettings({
   const [displayNameError, setDisplayNameError] = useState<string | null>(null);
   const [bioError, setBioError] = useState<string | null>(null);
   const [profilePicPreview, setProfilePicPreview] = useState<string | null>(
-    profilePicUrl
+    profilePicUrl,
   );
   const [profilePicError, setProfilePicError] = useState<string | null>(null);
   const [profilePicUploading, setProfilePicUploading] = useState(false);
@@ -95,7 +101,7 @@ export default function ProfileSettings({
   const [emailPassword, setEmailPassword] = useState("");
   const [emailError, setEmailError] = useState<string | null>(null);
   const [emailPasswordError, setEmailPasswordError] = useState<string | null>(
-    null
+    null,
   );
   const [emailAlert, setEmailAlert] = useState<string | null>(null);
   const [emailSuccess, setEmailSuccess] = useState<string | null>(null);
@@ -154,7 +160,7 @@ export default function ProfileSettings({
   const [listeningToSearching, setListeningToSearching] = useState(false);
   const [listeningToError, setListeningToError] = useState<string | null>(null);
   const [listeningToSuccess, setListeningToSuccess] = useState<string | null>(
-    null
+    null,
   );
   const [savingListeningTo, setSavingListeningTo] = useState(false);
 
@@ -256,7 +262,7 @@ export default function ProfileSettings({
 
   const highlightIds = useMemo(
     () => highlightRecords.map((record) => record.id),
-    [highlightRecords]
+    [highlightRecords],
   );
 
   const highlightsDirty = useMemo(() => {
@@ -298,7 +304,7 @@ export default function ProfileSettings({
       }
       if (highlightRecords.length >= MAX_PROFILE_HIGHLIGHTS) {
         setHighlightError(
-          `You can feature up to ${MAX_PROFILE_HIGHLIGHTS} records.`
+          `You can feature up to ${MAX_PROFILE_HIGHLIGHTS} records.`,
         );
         return;
       }
@@ -307,7 +313,7 @@ export default function ProfileSettings({
         { ...record, tags: [...record.tags] },
       ]);
     },
-    [highlightRecords]
+    [highlightRecords],
   );
 
   const handleRemoveHighlight = useCallback((id: number) => {
@@ -331,7 +337,7 @@ export default function ProfileSettings({
         return next;
       });
     },
-    []
+    [],
   );
 
   const handleClearHighlights = useCallback(() => {
@@ -417,7 +423,7 @@ export default function ProfileSettings({
         apiUrl(`/api/masters/search?q=${encodeURIComponent(query)}`),
         {
           credentials: "include",
-        }
+        },
       );
 
       if (!res.ok) {
@@ -444,7 +450,7 @@ export default function ProfileSettings({
         name: string;
         artist: string | null;
         cover: string | null;
-      } | null
+      } | null,
     ) => {
       if (!master) return;
 
@@ -480,7 +486,7 @@ export default function ProfileSettings({
         setSavingListeningTo(false);
       }
     },
-    []
+    [],
   );
 
   const handleClearListeningTo = useCallback(async () => {
@@ -533,7 +539,7 @@ export default function ProfileSettings({
       hasError = true;
     } else if (!usernameRegex.test(trimmedUsername)) {
       setUsernameError(
-        "Username may only contain letters, numbers, and underscores"
+        "Username may only contain letters, numbers, and underscores",
       );
       hasError = true;
     } else {
@@ -639,7 +645,7 @@ export default function ProfileSettings({
   }, [profilePicUploading]);
 
   const handleProfilePicInputChange = async (
-    event: React.ChangeEvent<HTMLInputElement>
+    event: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -659,14 +665,14 @@ export default function ProfileSettings({
         (error) => {
           console.warn("Client-side image optimization failed", error);
           throw new Error(
-            "Could not process that image. Please choose a different file."
+            "Could not process that image. Please choose a different file.",
           );
-        }
+        },
       );
 
       if (optimizedFile.size > PROFILE_PIC_MAX_SIZE) {
         setProfilePicError(
-          "Optimized image is still larger than 3 MB. Please choose a smaller image."
+          "Optimized image is still larger than 3 MB. Please choose a smaller image.",
         );
         return;
       }
@@ -750,7 +756,7 @@ export default function ProfileSettings({
       hasError = true;
     } else if (!passwordRegex.test(newPassword)) {
       setNewPasswordError(
-        "Password must include a letter, a number, and a special character"
+        "Password must include a letter, a number, and a special character",
       );
       hasError = true;
     } else {
@@ -794,7 +800,7 @@ export default function ProfileSettings({
       if (!res.ok) {
         if (res.status === 401) {
           setCurrentPasswordError(
-            data.error || "Current password is incorrect."
+            data.error || "Current password is incorrect.",
           );
         } else {
           setPasswordAlert(data.error || "Failed to change password");
@@ -1215,14 +1221,14 @@ export default function ProfileSettings({
               highlightLimitReached
                 ? "Remove a highlight to add another."
                 : candidateError
-                ? candidateError
-                : searchInput.trim()
-                ? "No matching records."
-                : candidatesLoading
-                ? "Loading records..."
-                : filteredCandidates.length > 0
-                ? "Start typing to search your records."
-                : "No records available."
+                  ? candidateError
+                  : searchInput.trim()
+                    ? "No matching records."
+                    : candidatesLoading
+                      ? "Loading records..."
+                      : filteredCandidates.length > 0
+                        ? "Start typing to search your records."
+                        : "No records available."
             }
           />
         </Box>
@@ -1486,7 +1492,7 @@ export default function ProfileSettings({
                 setNewPasswordError("Password must be at least 8 characters");
               } else if (!passwordRegex.test(value)) {
                 setNewPasswordError(
-                  "Password must include a letter, a number, and a special character"
+                  "Password must include a letter, a number, and a special character",
                 );
               } else {
                 setNewPasswordError(null);

@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Collection settings component for managing collection privacy and configuration
+ * @fileformat React Component
+ */
+
 import {
   type ChangeEvent,
   useCallback,
@@ -149,7 +155,7 @@ function parseDiscogsRows(rows: DiscogsCsvRow[]): ParsedDiscogsRecord[] {
     ) {
       release = Math.min(
         Math.max(new Date().getFullYear(), MIN_RELEASE_YEAR),
-        MAX_RELEASE_YEAR
+        MAX_RELEASE_YEAR,
       );
     }
 
@@ -223,20 +229,20 @@ export default function CollectionSettings() {
     () =>
       cachedRecordTablePreferences
         ? { ...cachedRecordTablePreferences.columnVisibility }
-        : createDefaultColumnVisibility()
+        : createDefaultColumnVisibility(),
   );
   const [defaultSortPref, setDefaultSortPref] =
     useState<RecordTableSortPreference>(() =>
       cachedRecordTablePreferences
         ? { ...cachedRecordTablePreferences.defaultSort }
-        : createDefaultRecordTablePreferences().defaultSort
+        : createDefaultRecordTablePreferences().defaultSort,
     );
   const [prefsLoading, setPrefsLoading] = useState(!hadCachedPreferences);
   const [savingPrefs, setSavingPrefs] = useState(false);
 
   const sampleRecords = useMemo(
     () => parsedRecords.slice(0, 5),
-    [parsedRecords]
+    [parsedRecords],
   );
 
   const applyDefaultPreferences = useCallback(() => {
@@ -320,7 +326,7 @@ export default function CollectionSettings() {
       setValue: (next: boolean) => void,
       setSaving: (next: boolean) => void,
       saving: boolean,
-      successMessage: { private: string; public: string }
+      successMessage: { private: string; public: string },
     ) => {
       if (saving) return;
       setValue(checked);
@@ -370,7 +376,7 @@ export default function CollectionSettings() {
         setSaving(false);
       }
     },
-    [setSnackbar]
+    [setSnackbar],
   );
 
   const handleToggleCollectionPrivacy = useCallback(
@@ -386,10 +392,10 @@ export default function CollectionSettings() {
         {
           private: "Your collection is now private.",
           public: "Your collection is now public.",
-        }
+        },
       );
     },
-    [collectionPrivacySaving, isCollectionPrivate, updatePrivacy]
+    [collectionPrivacySaving, isCollectionPrivate, updatePrivacy],
   );
 
   const handleToggleWishlistPrivacy = useCallback(
@@ -405,10 +411,10 @@ export default function CollectionSettings() {
         {
           private: "Your wishlist is now private.",
           public: "Your wishlist is now public.",
-        }
+        },
       );
     },
-    [isWishlistPrivate, updatePrivacy, wishlistPrivacySaving]
+    [isWishlistPrivate, updatePrivacy, wishlistPrivacySaving],
   );
 
   const handleToggleListenedPrivacy = useCallback(
@@ -424,10 +430,10 @@ export default function CollectionSettings() {
         {
           private: "Your listened collection is now private.",
           public: "Your listened collection is now public.",
-        }
+        },
       );
     },
-    [isListenedPrivate, listenedPrivacySaving, updatePrivacy]
+    [isListenedPrivate, listenedPrivacySaving, updatePrivacy],
   );
 
   const handleToggleColumn =
@@ -600,7 +606,7 @@ export default function CollectionSettings() {
         },
       });
     },
-    [handleFileParsed]
+    [handleFileParsed],
   );
 
   const resetSelection = () => {
@@ -628,7 +634,7 @@ export default function CollectionSettings() {
           const fetched = await wikiGenres(record.record, record.artist, false);
           if (Array.isArray(fetched) && fetched.length > 0) {
             const unique = Array.from(
-              new Set(fetched.map((tag) => tag.trim()).filter(Boolean))
+              new Set(fetched.map((tag) => tag.trim()).filter(Boolean)),
             );
             tags = unique.slice(0, 12);
           }
@@ -832,7 +838,7 @@ export default function CollectionSettings() {
                   mb: 1,
                 }}
               />
-            )
+            ),
           )}
         </FormGroup>
         <Stack

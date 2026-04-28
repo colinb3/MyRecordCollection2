@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Application landing page component displayed to unauthenticated users
+ * @fileformat Page component
+ */
+
 import { useEffect, useMemo, useState } from "react";
 import {
   Box,
@@ -37,13 +43,13 @@ export default function LandingPage() {
   const cachedUserInfo = getCachedUserInfo();
   const [userLoading, setUserLoading] = useState(!cachedUserInfo);
   const [username, setUsername] = useState<string>(
-    cachedUserInfo?.username ?? ""
+    cachedUserInfo?.username ?? "",
   );
   const [displayName, setDisplayName] = useState<string>(
-    cachedUserInfo?.displayName ?? ""
+    cachedUserInfo?.displayName ?? "",
   );
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
-    cachedUserInfo?.profilePicUrl ?? null
+    cachedUserInfo?.profilePicUrl ?? null,
   );
 
   const carouselSlides = useMemo(
@@ -123,7 +129,7 @@ export default function LandingPage() {
         imageAlt: "Preview of the stats view showing user stats",
       },
     ],
-    []
+    [],
   );
 
   const [activeSlide, setActiveSlide] = useState(0);
@@ -156,7 +162,7 @@ export default function LandingPage() {
 
     let timer = window.setInterval(() => {
       setActiveSlide((prev) =>
-        prev + 1 === carouselSlides.length ? 0 : prev + 1
+        prev + 1 === carouselSlides.length ? 0 : prev + 1,
       );
     }, 8000);
 
@@ -164,7 +170,7 @@ export default function LandingPage() {
       window.clearInterval(timer);
       timer = window.setInterval(() => {
         setActiveSlide((prev) =>
-          prev + 1 === carouselSlides.length ? 0 : prev + 1
+          prev + 1 === carouselSlides.length ? 0 : prev + 1,
         );
       }, 8000);
     };
@@ -189,13 +195,13 @@ export default function LandingPage() {
 
   const handlePrevSlide = () => {
     setActiveSlide((prev) =>
-      prev === 0 ? carouselSlides.length - 1 : prev - 1
+      prev === 0 ? carouselSlides.length - 1 : prev - 1,
     );
   };
 
   const handleNextSlide = () => {
     setActiveSlide((prev) =>
-      prev + 1 === carouselSlides.length ? 0 : prev + 1
+      prev + 1 === carouselSlides.length ? 0 : prev + 1,
     );
   };
 

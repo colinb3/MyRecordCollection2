@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Dialog component for editing record information including title, artist, rating, and tags
+ * @fileformat React Component
+ */
+
 import React, { useEffect, useRef, useState } from "react";
 import {
   Dialog,
@@ -58,7 +64,7 @@ export default function EditRecordDialog({
           try {
             const response = await fetch(
               apiUrl(`/api/records/master-info?masterId=${record.masterId}`),
-              { credentials: "include" }
+              { credentials: "include" },
             );
             if (response.ok) {
               const data = await response.json();
@@ -92,7 +98,7 @@ export default function EditRecordDialog({
 
   // Generic handler for simple text field changes
   const handleChange = (
-    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     const { name, value } = event.target;
     if (editedRecord) {
@@ -143,7 +149,7 @@ export default function EditRecordDialog({
     setEditedRecord((prev) => {
       if (!prev) return prev;
       const exists = prev.tags.some(
-        (t) => t.toLowerCase() === normalized.toLowerCase()
+        (t) => t.toLowerCase() === normalized.toLowerCase(),
       );
       if (exists) return prev;
       return { ...prev, tags: [...prev.tags, normalized] };
@@ -191,8 +197,8 @@ export default function EditRecordDialog({
               tags
                 .map((tag) => tag.trim())
                 .filter(Boolean)
-                .map((tag) => tag.replace(/\s+/g, " "))
-            )
+                .map((tag) => tag.replace(/\s+/g, " ")),
+            ),
           ).slice(0, 12);
           lastFetchKeyRef.current = fetchKey;
           setRecommendedTags(normalized);
@@ -244,7 +250,7 @@ export default function EditRecordDialog({
   }
 
   const existingTagsLower = new Set(
-    editedRecord.tags.map((tag) => tag.toLowerCase())
+    editedRecord.tags.map((tag) => tag.toLowerCase()),
   );
 
   const titleArtistLocked = !editedRecord.isCustom && editedRecord.id !== -1;

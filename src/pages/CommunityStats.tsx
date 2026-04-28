@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Community statistics page component for viewing aggregate community data and trends
+ * @fileformat Page component
+ */
+
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   ThemeProvider,
@@ -67,10 +73,10 @@ export default function CommunityStats() {
   const cachedUser = getCachedUserInfo();
   const [username, setUsername] = useState<string>(cachedUser?.username ?? "");
   const [displayName, setDisplayName] = useState<string>(
-    cachedUser?.displayName ?? ""
+    cachedUser?.displayName ?? "",
   );
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
-    cachedUser?.profilePicUrl ?? null
+    cachedUser?.profilePicUrl ?? null,
   );
   const [userLoading, setUserLoading] = useState(!cachedUser);
 
@@ -92,7 +98,7 @@ export default function CommunityStats() {
   });
   const [targetDisplayName, setTargetDisplayName] = useState<string>("");
   const [targetProfilePicUrl, setTargetProfilePicUrl] = useState<string | null>(
-    null
+    null,
   );
 
   // Get the genre data for the current table filter
@@ -149,10 +155,10 @@ export default function CommunityStats() {
         const res = await fetch(
           apiUrl(
             `/api/community/users/${encodeURIComponent(
-              targetUsername
-            )}/genre-interests`
+              targetUsername,
+            )}/genre-interests`,
           ),
-          { credentials: "include" }
+          { credentials: "include" },
         );
 
         if (!res.ok) {
@@ -169,7 +175,7 @@ export default function CommunityStats() {
             "My Collection": [],
             Wishlist: [],
             Listened: [],
-          }
+          },
         );
         setTargetDisplayName(data.displayName || targetUsername);
         setTargetProfilePicUrl(data.profilePicUrl || null);
@@ -205,11 +211,11 @@ export default function CommunityStats() {
       }
       navigate(
         `/community/${encodeURIComponent(
-          targetUsername
-        )}/genre?${params.toString()}`
+          targetUsername,
+        )}/genre?${params.toString()}`,
       );
     },
-    [navigate, targetUsername, tableFilter]
+    [navigate, targetUsername, tableFilter],
   );
 
   const handleTableFilterChange = useCallback(
@@ -218,7 +224,7 @@ export default function CommunityStats() {
         setTableFilter(newFilter);
       }
     },
-    []
+    [],
   );
 
   const pieChartData = genreData

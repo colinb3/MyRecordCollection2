@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description User information caching and management utility for storing logged-in user data
+ * @fileformat TypeScript
+ */
+
 import apiUrl from "./api";
 import type { UserInfo } from "./types";
 

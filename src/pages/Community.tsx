@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Community page component displaying community users, feeds, and social features
+ * @fileformat Page component
+ */
+
 import {
   useCallback,
   useEffect,
@@ -58,10 +64,10 @@ export default function Community() {
   const cachedUser = getCachedUserInfo();
   const [username, setUsername] = useState<string>(cachedUser?.username ?? "");
   const [displayName, setDisplayName] = useState<string>(
-    cachedUser?.displayName ?? ""
+    cachedUser?.displayName ?? "",
   );
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
-    cachedUser?.profilePicUrl ?? null
+    cachedUser?.profilePicUrl ?? null,
   );
   const [userLoading, setUserLoading] = useState(!cachedUser);
 
@@ -81,7 +87,7 @@ export default function Community() {
       });
       setSearchParams(next, { replace: true });
     },
-    [searchParams, setSearchParams]
+    [searchParams, setSearchParams],
   );
 
   const [friendsFeed, setFriendsFeed] = useState<ActivityFeedState>({
@@ -111,7 +117,7 @@ export default function Community() {
       if (!info) {
         if (location.pathname !== "/login") {
           const next = encodeURIComponent(
-            `${location.pathname}${location.search || ""}${location.hash || ""}`
+            `${location.pathname}${location.search || ""}${location.hash || ""}`,
           );
           navigate(`/login?next=${next}`);
         }
@@ -195,7 +201,7 @@ export default function Community() {
         setYouFeed((prev) =>
           prev.status === "idle"
             ? { ...prev, status: "loading", error: null }
-            : prev
+            : prev,
         );
       }
       try {
@@ -218,7 +224,7 @@ export default function Community() {
         /* ignore if requestAnimationFrame not available */
       }
     },
-    [updateSearchParams, setYouFeed]
+    [updateSearchParams, setYouFeed],
   );
 
   const handleLogout = useCallback(async () => {
@@ -231,7 +237,7 @@ export default function Community() {
       event.stopPropagation();
       navigate(`/community/${encodeURIComponent(ownerUsername)}`);
     },
-    [navigate]
+    [navigate],
   );
 
   const loadMoreFriends = useCallback(() => {
@@ -312,7 +318,7 @@ export default function Community() {
 
       navigate(targetPath);
     },
-    [navigate, username, location]
+    [navigate, username, location],
   );
 
   const handleListNavigate = useCallback(
@@ -325,7 +331,7 @@ export default function Community() {
 
       navigate(targetPath);
     },
-    [navigate, username, location]
+    [navigate, username, location],
   );
 
   const isFriendsView = activeView === "friends";
@@ -342,7 +348,7 @@ export default function Community() {
           {
             method,
             credentials: "include",
-          }
+          },
         );
 
         if (!res.ok) {
@@ -382,7 +388,7 @@ export default function Community() {
         console.error("Error toggling record like", error);
       }
     },
-    [isFriendsView]
+    [isFriendsView],
   );
 
   const handleToggleListLike = useCallback(
@@ -434,7 +440,7 @@ export default function Community() {
         console.error("Error toggling list like", error);
       }
     },
-    [isFriendsView]
+    [isFriendsView],
   );
   const currentFeed = isFriendsView ? friendsFeed : youFeed;
   const currentStatus = currentFeed.status;
@@ -601,7 +607,7 @@ export default function Community() {
                           ownerDisplayName || entry.reviewOwner.username;
 
                         const likedDate = entry.likedAt
-                          ? formatRelativeTime(entry.likedAt) ?? entry.likedAt
+                          ? (formatRelativeTime(entry.likedAt) ?? entry.likedAt)
                           : null;
 
                         return (
@@ -610,8 +616,8 @@ export default function Community() {
                             onClick={() =>
                               navigate(
                                 `/community/${encodeURIComponent(
-                                  entry.reviewOwner.username
-                                )}/record/${entry.record.id}`
+                                  entry.reviewOwner.username,
+                                )}/record/${entry.record.id}`,
                               )
                             }
                             sx={{
@@ -670,7 +676,7 @@ export default function Community() {
                                       event.stopPropagation();
                                       handleOwnerClick(
                                         event,
-                                        entry.liker.username
+                                        entry.liker.username,
                                       );
                                     }}
                                     sx={{
@@ -696,7 +702,7 @@ export default function Community() {
                                       event.stopPropagation();
                                       handleOwnerClick(
                                         event,
-                                        entry.reviewOwner.username
+                                        entry.reviewOwner.username,
                                       );
                                     }}
                                     sx={{
@@ -758,7 +764,7 @@ export default function Community() {
                           ownerDisplayName || entry.listOwner.username;
 
                         const likedDate = entry.likedAt
-                          ? formatRelativeTime(entry.likedAt) ?? entry.likedAt
+                          ? (formatRelativeTime(entry.likedAt) ?? entry.likedAt)
                           : null;
 
                         return (
@@ -821,7 +827,7 @@ export default function Community() {
                                       event.stopPropagation();
                                       handleOwnerClick(
                                         event,
-                                        entry.liker.username
+                                        entry.liker.username,
                                       );
                                     }}
                                     sx={{
@@ -847,7 +853,7 @@ export default function Community() {
                                       event.stopPropagation();
                                       handleOwnerClick(
                                         event,
-                                        entry.listOwner.username
+                                        entry.listOwner.username,
                                       );
                                     }}
                                     sx={{
@@ -904,8 +910,8 @@ export default function Community() {
                           .toUpperCase();
 
                         const listeningDate = entry.listeningAt
-                          ? formatRelativeTime(entry.listeningAt) ??
-                            entry.listeningAt
+                          ? (formatRelativeTime(entry.listeningAt) ??
+                            entry.listeningAt)
                           : null;
 
                         return (
@@ -936,7 +942,7 @@ export default function Community() {
                                   event.stopPropagation();
                                   handleOwnerClick(
                                     event,
-                                    entry.listener.username
+                                    entry.listener.username,
                                   );
                                 }}
                                 sx={{
@@ -974,7 +980,7 @@ export default function Community() {
                                       event.stopPropagation();
                                       handleOwnerClick(
                                         event,
-                                        entry.listener.username
+                                        entry.listener.username,
                                       );
                                     }}
                                     sx={{
@@ -1041,15 +1047,15 @@ export default function Community() {
                       // Type-specific rendering
                       if (entry.type === "record") {
                         const addedDate = entry.record.added
-                          ? formatRelativeTime(entry.record.added) ??
-                            entry.record.added
+                          ? (formatRelativeTime(entry.record.added) ??
+                            entry.record.added)
                           : null;
                         const tagsLabel =
                           entry.record.tags && entry.record.tags.length > 0
                             ? entry.record.tags.join(", ")
                             : "";
                         const recordCoverSrc = resolveImageUrl(
-                          entry.record.cover
+                          entry.record.cover,
                         );
                         const tableName = (() => {
                           const raw =
@@ -1113,7 +1119,7 @@ export default function Community() {
                                   onClick={(event) =>
                                     handleOwnerClick(
                                       event,
-                                      entry.owner.username
+                                      entry.owner.username,
                                     )
                                   }
                                   sx={{
@@ -1279,7 +1285,7 @@ export default function Community() {
                                               e,
                                               entry.record.id,
                                               entry.record
-                                                .viewerHasLikedReview ?? false
+                                                .viewerHasLikedReview ?? false,
                                             )
                                           }
                                           sx={{
@@ -1315,11 +1321,11 @@ export default function Community() {
                       // List entry rendering
                       if (entry.type === "list") {
                         const createdDate = entry.list.created
-                          ? formatRelativeTime(entry.list.created) ??
-                            entry.list.created
+                          ? (formatRelativeTime(entry.list.created) ??
+                            entry.list.created)
                           : null;
                         const listPictureSrc = resolveImageUrl(
-                          entry.list.picture
+                          entry.list.picture,
                         );
                         const canNavigateToList =
                           Number.isInteger(entry.list.id) &&
@@ -1363,7 +1369,7 @@ export default function Community() {
                                   onClick={(event) =>
                                     handleOwnerClick(
                                       event,
-                                      entry.owner.username
+                                      entry.owner.username,
                                     )
                                   }
                                   sx={{
@@ -1493,7 +1499,8 @@ export default function Community() {
                                         handleToggleListLike(
                                           e,
                                           entry.list.id,
-                                          entry.list.likedByCurrentUser ?? false
+                                          entry.list.likedByCurrentUser ??
+                                            false,
                                         )
                                       }
                                       sx={{
@@ -1549,7 +1556,7 @@ export default function Community() {
                                   >
                                     {previewRecords.map((preview, index) => {
                                       const previewSrc = resolveImageUrl(
-                                        preview.cover
+                                        preview.cover,
                                       );
                                       const previewKey =
                                         preview.id > 0
@@ -1657,13 +1664,13 @@ export default function Community() {
                             ? loadingMoreFriends
                               ? "Loading..."
                               : hasMoreFriends
-                              ? "Load More"
-                              : "No More Activity"
+                                ? "Load More"
+                                : "No More Activity"
                             : loadingMoreYou
-                            ? "Loading..."
-                            : hasMoreYou
-                            ? "Load More"
-                            : "No More Activity"}
+                              ? "Loading..."
+                              : hasMoreYou
+                                ? "Load More"
+                                : "No More Activity"}
                         </Button>
                       </ListItem>
                     )}

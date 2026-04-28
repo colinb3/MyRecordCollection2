@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Global search page component for searching across records and users
+ * @fileformat Page component
+ */
+
 import {
   useState,
   useEffect,
@@ -76,7 +82,7 @@ export default function Search() {
   const paramTab = searchParams.get("tab");
   const paramQuery = searchParams.get("q") ?? "";
   const initialTab: SearchTab = SEARCH_TAB_VALUES.includes(
-    paramTab as SearchTab
+    paramTab as SearchTab,
   )
     ? (paramTab as SearchTab) || "records"
     : "records";
@@ -85,10 +91,10 @@ export default function Search() {
   const cachedUser = getCachedUserInfo();
   const [username, setUsername] = useState<string>(cachedUser?.username ?? "");
   const [displayName, setDisplayName] = useState<string>(
-    cachedUser?.displayName ?? ""
+    cachedUser?.displayName ?? "",
   );
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
-    cachedUser?.profilePicUrl ?? null
+    cachedUser?.profilePicUrl ?? null,
   );
   const [userLoading, setUserLoading] = useState(!cachedUser);
 
@@ -136,7 +142,7 @@ export default function Search() {
       }
       setSearchParams(next, { replace: true });
     },
-    [setSearchParams]
+    [setSearchParams],
   );
 
   const handleLogout = useCallback(async () => {
@@ -166,9 +172,9 @@ export default function Search() {
     try {
       const res = await fetch(
         apiUrl(
-          `/api/lastfm/album.search?q=${encodeURIComponent(trimmed)}&page=1`
+          `/api/lastfm/album.search?q=${encodeURIComponent(trimmed)}&page=1`,
         ),
-        { credentials: "include" }
+        { credentials: "include" },
       );
       if (res.ok) {
         const data = await res.json();
@@ -201,10 +207,10 @@ export default function Search() {
       const res = await fetch(
         apiUrl(
           `/api/lastfm/album.search?q=${encodeURIComponent(
-            trimmed
-          )}&page=${nextPage}`
+            trimmed,
+          )}&page=${nextPage}`,
         ),
-        { credentials: "include" }
+        { credentials: "include" },
       );
       if (res.ok) {
         const data = await res.json();
@@ -237,7 +243,7 @@ export default function Search() {
         updateSearchParams("records", "");
       }
     },
-    [updateSearchParams]
+    [updateSearchParams],
   );
 
   const recordItems = useMemo<RecordListItem[]>(() => {
@@ -258,7 +264,7 @@ export default function Search() {
       const submitted = (searchParams.get("q") ?? "").trim();
       navigate("/master", { state: { album: item, query: submitted } });
     },
-    [navigate, searchParams]
+    [navigate, searchParams],
   );
 
   const [listResults, setListResults] = useState<ListSearchResult[]>([]);
@@ -282,7 +288,7 @@ export default function Search() {
       setListResults([]);
       setListStatus("error");
       setListError(
-        `Enter at least ${MIN_LIST_QUERY_LENGTH} characters to search.`
+        `Enter at least ${MIN_LIST_QUERY_LENGTH} characters to search.`,
       );
       return;
     }
@@ -292,9 +298,9 @@ export default function Search() {
     try {
       const response = await fetch(
         apiUrl(
-          `/api/lists/search?q=${encodeURIComponent(trimmed)}&limit=20&offset=0`
+          `/api/lists/search?q=${encodeURIComponent(trimmed)}&limit=20&offset=0`,
         ),
-        { credentials: "include" }
+        { credentials: "include" },
       );
       if (!response.ok) {
         const problem = await response.json().catch(() => ({}));
@@ -362,7 +368,7 @@ export default function Search() {
     (listId: number) => {
       navigate(`/lists/${listId}`);
     },
-    [navigate]
+    [navigate],
   );
 
   const handleListsClear = useCallback(
@@ -376,7 +382,7 @@ export default function Search() {
         updateSearchParams("lists", "");
       }
     },
-    [updateSearchParams]
+    [updateSearchParams],
   );
 
   const [userResults, setUserResults] = useState<CommunityUserSummary[]>([]);
@@ -400,7 +406,7 @@ export default function Search() {
       setUserResults([]);
       setUserStatus("error");
       setUserError(
-        `Enter at least ${MIN_USER_QUERY_LENGTH} characters to search.`
+        `Enter at least ${MIN_USER_QUERY_LENGTH} characters to search.`,
       );
       return;
     }
@@ -423,7 +429,7 @@ export default function Search() {
     (targetUsername: string) => {
       navigate(`/community/${encodeURIComponent(targetUsername)}`);
     },
-    [navigate]
+    [navigate],
   );
 
   const handleUsersClear = useCallback(
@@ -437,7 +443,7 @@ export default function Search() {
         updateSearchParams("users", "");
       }
     },
-    [updateSearchParams]
+    [updateSearchParams],
   );
 
   const handleTabChange = useCallback(
@@ -446,8 +452,8 @@ export default function Search() {
         activeTab === "records"
           ? recordSearchInput
           : activeTab === "lists"
-          ? listSearchInput
-          : userSearchInput;
+            ? listSearchInput
+            : userSearchInput;
       if (value === "records") {
         setRecordSearchInput(currentInput);
       } else if (value === "lists") {
@@ -464,7 +470,7 @@ export default function Search() {
       recordSearchInput,
       updateSearchParams,
       userSearchInput,
-    ]
+    ],
   );
 
   const handleTopBarSearchChange = useCallback(
@@ -477,7 +483,7 @@ export default function Search() {
         setUserSearchInput(value);
       }
     },
-    [activeTab]
+    [activeTab],
   );
 
   const handleTopBarSearchSubmit = useCallback(
@@ -514,7 +520,7 @@ export default function Search() {
       handleRecordsClear,
       handleUsersClear,
       updateSearchParams,
-    ]
+    ],
   );
 
   useEffect(() => {
@@ -572,15 +578,15 @@ export default function Search() {
             activeTab === "records"
               ? "Search albums by title"
               : activeTab === "lists"
-              ? "Search public lists"
-              : "Search for users"
+                ? "Search public lists"
+                : "Search for users"
           }
           searchValue={
             activeTab === "records"
               ? recordSearchInput
               : activeTab === "lists"
-              ? listSearchInput
-              : userSearchInput
+                ? listSearchInput
+                : userSearchInput
           }
           onSearchChange={handleTopBarSearchChange}
           onSearchSubmit={handleTopBarSearchSubmit}
@@ -831,7 +837,7 @@ export default function Search() {
                               ? list.pictureUrl.trim()
                               : "";
                           const createdText = list.created
-                            ? formatLocalDate(list.created) ?? list.created
+                            ? (formatLocalDate(list.created) ?? list.created)
                             : null;
                           const recordCountText = `${list.recordCount} ${
                             list.recordCount === 1 ? "record" : "records"
@@ -841,7 +847,7 @@ export default function Search() {
                             metaSegments.push(
                               `${list.likes} ${
                                 list.likes === 1 ? "like" : "likes"
-                              }`
+                              }`,
                             );
                           }
                           if (createdText) {
@@ -856,8 +862,8 @@ export default function Search() {
                           const primaryOwnerLabel = ownerDisplayName
                             ? ownerDisplayName
                             : ownerUsername
-                            ? `@${ownerUsername}`
-                            : null;
+                              ? `@${ownerUsername}`
+                              : null;
 
                           return (
                             <ListItemButton

@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description User settings page component for managing user preferences and configuration
+ * @fileformat Page component
+ */
+
 import { useEffect, useMemo, useState } from "react";
 import {
   ThemeProvider,
@@ -44,15 +50,15 @@ export default function Settings() {
   const [username, setUsername] = useState<string>(cachedUser?.username ?? "");
   const [email, setEmail] = useState<string | null>(cachedUser?.email ?? null);
   const [displayName, setDisplayName] = useState<string>(
-    cachedUser?.displayName ?? ""
+    cachedUser?.displayName ?? "",
   );
   const [userUuid, setUserUuid] = useState<string>(cachedUser?.userUuid ?? "");
   const [bio, setBio] = useState<string>(cachedUser?.bio ?? "");
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
-    cachedUser?.profilePicUrl ?? null
+    cachedUser?.profilePicUrl ?? null,
   );
   const [selectedSection, setSelectedSection] = useState<string>(
-    MENU_OPTIONS[0].id
+    MENU_OPTIONS[0].id,
   );
   const [drawerOpen, setDrawerOpen] = useState(false);
   const isLargeScreen = useMediaQuery("(min-width:900px)");
@@ -66,7 +72,7 @@ export default function Settings() {
       if (!info) {
         if (location.pathname !== "/login") {
           const next = encodeURIComponent(
-            `${location.pathname}${location.search || ""}${location.hash || ""}`
+            `${location.pathname}${location.search || ""}${location.hash || ""}`,
           );
           navigate(`/login?next=${next}`);
         }

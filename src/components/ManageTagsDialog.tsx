@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Dialog component for managing and organizing user-defined tags
+ * @fileformat React Component
+ */
+
 import { useState, useEffect } from "react";
 import apiUrl from "../api";
 import { updateTagsCache } from "../userTags";
@@ -54,7 +60,7 @@ export default function ManageTagsDialog({
 
   const openSnack = (
     message: string,
-    severity: "success" | "error" = "success"
+    severity: "success" | "error" = "success",
   ) => {
     setSnackbar({ open: true, message, severity });
   };

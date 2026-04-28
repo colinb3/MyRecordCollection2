@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Feedback settings component for users to submit feedback and bug reports
+ * @fileformat React Component
+ */
+
 import { useState } from "react";
 import {
   Box,
@@ -52,7 +58,7 @@ export default function FeedbackSettings() {
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
         throw new Error(
-          data.error || `Failed to submit feedback (${response.status})`
+          data.error || `Failed to submit feedback (${response.status})`,
         );
       }
 
@@ -61,7 +67,7 @@ export default function FeedbackSettings() {
       setNotes("");
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to submit feedback"
+        err instanceof Error ? err.message : "Failed to submit feedback",
       );
     } finally {
       setSubmitting(false);

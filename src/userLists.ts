@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description User lists caching utility that maintains a cache of user list names for the MasterRecord page
+ * @fileformat TypeScript
+ */
+
 // User lists caching utility
 // Manages a minimal cache of user list names for the MasterRecord page
 

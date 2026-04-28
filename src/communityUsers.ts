@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Community users data fetching utility for retrieving community member information and feeds
+ * @fileformat TypeScript
+ */
+
 import apiUrl from "./api";
 import { normalizeApiRecord } from "./collectionRecords";
 import type {

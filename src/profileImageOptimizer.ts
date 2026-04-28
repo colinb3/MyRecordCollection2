@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Profile image optimization utility for compressing and optimizing image uploads
+ * @fileformat TypeScript
+ */
+
 const DEFAULT_MAX_DIMENSION = 512;
 const MIME_EXTENSION_MAP = new Map<string, string>([
   ["image/jpeg", ".jpg"],

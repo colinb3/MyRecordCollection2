@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Main collection view page component displaying user's record collection
+ * @fileformat Page component
+ */
+
 import { useState, useEffect, useCallback } from "react";
 import apiUrl from "../api";
 import {
@@ -89,13 +95,13 @@ export default function Collection({ tableName, title }: CollectionProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const [username, setUsername] = useState<string>(
-    cachedUserInfo?.username ?? ""
+    cachedUserInfo?.username ?? "",
   );
   const [displayName, setDisplayName] = useState<string>(
-    cachedUserInfo?.displayName ?? ""
+    cachedUserInfo?.displayName ?? "",
   );
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
-    cachedUserInfo?.profilePicUrl ?? null
+    cachedUserInfo?.profilePicUrl ?? null,
   );
   const [userLoading, setUserLoading] = useState(!cachedUserInfo);
 
@@ -136,13 +142,13 @@ export default function Collection({ tableName, title }: CollectionProps) {
     () =>
       cachedRecordTablePreferences
         ? { ...cachedRecordTablePreferences.columnVisibility }
-        : createDefaultColumnVisibility()
+        : createDefaultColumnVisibility(),
   );
   const [defaultSortPref, setDefaultSortPref] =
     useState<RecordTableSortPreference>(() =>
       cachedRecordTablePreferences
         ? { ...cachedRecordTablePreferences.defaultSort }
-        : createDefaultRecordTablePreferences().defaultSort
+        : createDefaultRecordTablePreferences().defaultSort,
     );
 
   const handleFilterChange = (newFilters: Partial<Filters>) => {
@@ -153,7 +159,7 @@ export default function Collection({ tableName, title }: CollectionProps) {
     (record: Record) => {
       navigate(`/record/${record.id}`);
     },
-    [navigate]
+    [navigate],
   );
 
   const resetFilters = () => {
@@ -169,14 +175,14 @@ export default function Collection({ tableName, title }: CollectionProps) {
       processedRecords = processedRecords.filter(
         (r) =>
           r.record.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          r.artist.toLowerCase().includes(searchTerm.toLowerCase())
+          r.artist.toLowerCase().includes(searchTerm.toLowerCase()),
       );
     }
 
     // 2. Filter by tags
     if (filters.tags.length > 0) {
       processedRecords = processedRecords.filter((r) =>
-        filters.tags.every((tag) => r.tags.includes(tag))
+        filters.tags.every((tag) => r.tags.includes(tag)),
       );
     }
 
@@ -184,7 +190,7 @@ export default function Collection({ tableName, title }: CollectionProps) {
     processedRecords = processedRecords.filter(
       (r) =>
         r.rating >= (filters.rating?.min ?? 0) &&
-        r.rating <= (filters.rating?.max ?? 10)
+        r.rating <= (filters.rating?.max ?? 10),
     );
 
     // 4. Filter by release
@@ -214,7 +220,7 @@ export default function Collection({ tableName, title }: CollectionProps) {
           (async () => {
             const res = await fetch(
               apiUrl(`/api/records?table=${encodeURIComponent(tableName)}`),
-              { credentials: "include" }
+              { credentials: "include" },
             );
             if (!res.ok) {
               console.error("Failed to fetch records", res.status);
@@ -289,7 +295,7 @@ export default function Collection({ tableName, title }: CollectionProps) {
       if (!info) {
         if (location.pathname !== "/login") {
           const next = encodeURIComponent(
-            `${location.pathname}${location.search || ""}${location.hash || ""}`
+            `${location.pathname}${location.search || ""}${location.hash || ""}`,
           );
           navigate(`/login?next=${next}`);
         }
@@ -427,7 +433,7 @@ export default function Collection({ tableName, title }: CollectionProps) {
                   const next = encodeURIComponent(
                     `${location.pathname}${location.search || ""}${
                       location.hash || ""
-                    }`
+                    }`,
                   );
                   navigate(`/login?next=${next}`);
                   return;
@@ -605,8 +611,8 @@ export default function Collection({ tableName, title }: CollectionProps) {
                       ...r,
                       tags: r.tags.map((t) => (t === oldName ? newName : t)),
                     }
-                  : r
-              )
+                  : r,
+              ),
             );
             // Also update filteredRecords immediately for UX consistency
             setFilteredRecords((prev) =>
@@ -616,8 +622,8 @@ export default function Collection({ tableName, title }: CollectionProps) {
                       ...r,
                       tags: r.tags.map((t) => (t === oldName ? newName : t)),
                     }
-                  : r
-              )
+                  : r,
+              ),
             );
             // Update filters selection if the renamed tag was selected
             setFilters((prev) => ({
@@ -631,7 +637,7 @@ export default function Collection({ tableName, title }: CollectionProps) {
                     ...prev,
                     tags: prev.tags.map((t) => (t === oldName ? newName : t)),
                   }
-                : prev
+                : prev,
             );
           }}
           onTagDeleted={(deleted) => {
@@ -640,20 +646,20 @@ export default function Collection({ tableName, title }: CollectionProps) {
               prev.map((r) =>
                 r.tags.includes(deleted)
                   ? { ...r, tags: r.tags.filter((t) => t !== deleted) }
-                  : r
-              )
+                  : r,
+              ),
             );
             setFilteredRecords((prev) =>
               prev.map((r) =>
                 r.tags.includes(deleted)
                   ? { ...r, tags: r.tags.filter((t) => t !== deleted) }
-                  : r
-              )
+                  : r,
+              ),
             );
             setSelectedRecord((prev) =>
               prev && prev.tags.includes(deleted)
                 ? { ...prev, tags: prev.tags.filter((t) => t !== deleted) }
-                : prev
+                : prev,
             );
             // Also remove from currently applied filters
             setFilters((prev) => ({

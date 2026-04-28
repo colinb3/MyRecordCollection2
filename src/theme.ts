@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Material-UI theme configuration for application dark mode styling
+ * @fileformat TypeScript
+ */
+
 import { createTheme } from '@mui/material/styles';
 
 export const darkTheme = createTheme({

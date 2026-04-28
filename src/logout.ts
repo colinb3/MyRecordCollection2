@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Logout operation handler that clears user session and caches on logout
+ * @fileformat TypeScript
+ */
+
 import apiUrl from "./api";
 import { clearRecordTablePreferencesCache } from "./preferences";
 import { clearCollectionRecordsCache } from "./collectionRecords";

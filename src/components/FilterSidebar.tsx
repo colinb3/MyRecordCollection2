@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Filter sidebar component for filtering collection records by various criteria
+ * @fileformat React Component
+ */
+
 import {
   Paper,
   Typography,

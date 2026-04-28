@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Dialog component for moving records between different collections
+ * @fileformat React Component
+ */
+
 import { useEffect, useState } from "react";
 import apiUrl from "../api";
 import {
@@ -79,7 +85,7 @@ export default function MoveRecordDialog({
   };
 
   const availableTargets = collections.filter(
-    (c) => !currentCollection || c !== currentCollection
+    (c) => !currentCollection || c !== currentCollection,
   );
 
   return (

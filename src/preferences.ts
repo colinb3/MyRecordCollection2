@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Record table preferences management and caching utility for storing user column visibility and sorting preferences
+ * @fileformat TypeScript
+ */
+
 import apiUrl from "./api";
 import {
   createDefaultColumnVisibility,

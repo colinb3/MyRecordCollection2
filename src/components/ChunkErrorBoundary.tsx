@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Error boundary component for handling code splitting chunk loading failures gracefully
+ * @fileformat React Component
+ */
+
 import React, { Component, type ReactNode } from "react";
 import {
   Box,
@@ -53,7 +59,7 @@ export default class ChunkErrorBoundary extends Component<Props, State> {
     if (this.state.isChunkError) {
       const reloadCount = parseInt(
         sessionStorage.getItem(RELOAD_KEY) || "0",
-        10
+        10,
       );
       if (reloadCount < MAX_AUTO_RELOADS) {
         sessionStorage.setItem(RELOAD_KEY, String(reloadCount + 1));

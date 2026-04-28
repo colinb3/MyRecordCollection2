@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Tutorial dialog component that displays interactive guided tours of application features
+ * @fileformat React Component
+ */
+
 import { useState } from "react";
 import {
   Dialog,

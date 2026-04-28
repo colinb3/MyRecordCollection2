@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Wikipedia album genre lookup utility that queries Wikipedia API to extract album metadata
+ * @fileformat TypeScript
+ */
+
 // wiki.ts
 // Client-side helper to query Wikipedia and extract album genres (converted from original C++ logic).
 // Usage:

@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Album cover image display component with loading state and error handling
+ * @fileformat React Component
+ */
+
 import { useState } from "react";
 import { Avatar, Skeleton, Box, type SxProps, type Theme } from "@mui/material";
 import ImageNotSupportedIcon from "@mui/icons-material/ImageNotSupported";

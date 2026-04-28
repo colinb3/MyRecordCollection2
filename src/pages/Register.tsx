@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description User registration page component for creating new user accounts
+ * @fileformat Page component
+ */
+
 import React, { useState } from "react";
 import apiUrl from "../api";
 import {
@@ -46,7 +52,7 @@ export default function Register() {
       hasError = true;
     } else if (!usernameRegex.test(username)) {
       setUsernameError(
-        "Username may only contain letters, numbers, and underscores"
+        "Username may only contain letters, numbers, and underscores",
       );
       hasError = true;
     } else {
@@ -70,7 +76,7 @@ export default function Register() {
       hasError = true;
     } else if (!passwordRegex.test(password)) {
       setPasswordError(
-        "Password must include a letter, a number, and a special character"
+        "Password must include a letter, a number, and a special character",
       );
       hasError = true;
     } else {
@@ -182,7 +188,7 @@ export default function Register() {
                   setUsernameError("Username must be at least 3 characters");
                 } else if (!usernameRegex.test(e.target.value)) {
                   setUsernameError(
-                    "Username may only contain letters, numbers, and underscores"
+                    "Username may only contain letters, numbers, and underscores",
                   );
                 } else {
                   setUsernameError("");
@@ -227,7 +233,7 @@ export default function Register() {
                   setPasswordError("Password must be at least 8 characters");
                 } else if (!passwordRegex.test(e.target.value)) {
                   setPasswordError(
-                    "Password must include a letter, a number, and a special character"
+                    "Password must include a letter, a number, and a special character",
                   );
                 } else {
                   setPasswordError("");

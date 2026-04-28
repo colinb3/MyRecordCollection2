@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Record detail page component displaying detailed information about a specific record
+ * @fileformat Page component
+ */
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ThemeProvider,
@@ -64,10 +70,10 @@ export default function RecordDetails() {
   const cachedUser = getCachedUserInfo();
   const [username, setUsername] = useState<string>(cachedUser?.username ?? "");
   const [displayName, setDisplayName] = useState<string>(
-    cachedUser?.displayName ?? ""
+    cachedUser?.displayName ?? "",
   );
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
-    cachedUser?.profilePicUrl ?? null
+    cachedUser?.profilePicUrl ?? null,
   );
   const [userLoading, setUserLoading] = useState(!cachedUser);
 
@@ -115,7 +121,7 @@ export default function RecordDetails() {
         // Only require login if viewing own records, not community records
         if (location.pathname !== "/login") {
           const next = encodeURIComponent(
-            `${location.pathname}${location.search || ""}${location.hash || ""}`
+            `${location.pathname}${location.search || ""}${location.hash || ""}`,
           );
           navigate(`/login?next=${next}`);
         }
@@ -142,8 +148,8 @@ export default function RecordDetails() {
         }
         setAvailableTags(
           Array.from(seen.values()).sort((a, b) =>
-            a.localeCompare(b, undefined, { sensitivity: "base" })
-          )
+            a.localeCompare(b, undefined, { sensitivity: "base" }),
+          ),
         );
       }
     })();
@@ -169,8 +175,8 @@ export default function RecordDetails() {
         const url = ownerUsername
           ? apiUrl(
               `/api/records/${recordIdNumber}?username=${encodeURIComponent(
-                ownerUsername
-              )}`
+                ownerUsername,
+              )}`,
             )
           : apiUrl(`/api/records/${recordIdNumber}`);
 
@@ -283,7 +289,7 @@ export default function RecordDetails() {
     addTags(availableTags);
     addTags(record?.tags ?? null);
     return Array.from(seen.values()).sort((a, b) =>
-      a.localeCompare(b, undefined, { sensitivity: "base" })
+      a.localeCompare(b, undefined, { sensitivity: "base" }),
     );
   }, [availableTags, record?.tags]);
 
@@ -319,7 +325,7 @@ export default function RecordDetails() {
               ...prev,
               ...saved,
             }
-          : saved
+          : saved,
       );
       const savedLikesValue = Number(saved.reviewLikes ?? 0);
       setReviewLikes(Number.isFinite(savedLikesValue) ? savedLikesValue : 0);
@@ -341,7 +347,7 @@ export default function RecordDetails() {
         addTags(prev);
         addTags(saved.tags);
         const merged = Array.from(seen.values()).sort((a, b) =>
-          a.localeCompare(b, undefined, { sensitivity: "base" })
+          a.localeCompare(b, undefined, { sensitivity: "base" }),
         );
         try {
           // update the shared cache so other components (e.g. FilterSidebar)
@@ -376,12 +382,12 @@ export default function RecordDetails() {
       currentCollectionName === "N/A"
       ? `/community/${encodeURIComponent(ownerUsername)}/collection`
       : `/community/${encodeURIComponent(ownerUsername)}/${encodeURIComponent(
-          currentCollectionName.toLowerCase()
+          currentCollectionName.toLowerCase(),
         )}`
     : currentCollectionName === "My Collection" ||
-      currentCollectionName === "N/A"
-    ? "/mycollection"
-    : `/${encodeURIComponent(currentCollectionName.toLowerCase())}`;
+        currentCollectionName === "N/A"
+      ? "/mycollection"
+      : `/${encodeURIComponent(currentCollectionName.toLowerCase())}`;
 
   const handleRequestDelete = () => {
     if (!record) return;
@@ -438,7 +444,7 @@ export default function RecordDetails() {
 
   const handleRecordMoved = (
     targetCollection: string,
-    serverMessage?: string
+    serverMessage?: string,
   ) => {
     // Update the record with new collection and current date
     setRecord((prev) =>
@@ -449,7 +455,7 @@ export default function RecordDetails() {
             tableName: targetCollection,
             added: new Date().toISOString(),
           }
-        : prev
+        : prev,
     );
 
     setMoveDialogOpen(false);
@@ -492,7 +498,7 @@ export default function RecordDetails() {
   const releaseText =
     record && record.release > 0 ? `${record.release}` : "Unknown";
   const addedText = record
-    ? formatLocalDate(record.added, dateFormatter) ?? "Unknown"
+    ? (formatLocalDate(record.added, dateFormatter) ?? "Unknown")
     : "Unknown";
   const masterRecordButtonTooltip = record?.masterId;
   const showMasterButton = Boolean(record?.masterId);
@@ -515,7 +521,7 @@ export default function RecordDetails() {
         {
           method,
           credentials: "include",
-        }
+        },
       );
 
       if (response.status === 401) {
@@ -526,7 +532,7 @@ export default function RecordDetails() {
         });
         if (location.pathname !== "/login") {
           const next = encodeURIComponent(
-            `${location.pathname}${location.search || ""}${location.hash || ""}`
+            `${location.pathname}${location.search || ""}${location.hash || ""}`,
           );
           navigate(`/login?next=${next}`);
         }
@@ -557,7 +563,7 @@ export default function RecordDetails() {
               reviewLikes: normalizedLikes,
               viewerHasLikedReview: nextLiked,
             }
-          : prev
+          : prev,
       );
     } catch (error) {
       const message =

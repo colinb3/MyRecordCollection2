@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Sidebar component for navigating master database records with search and filtering
+ * @fileformat React Component
+ */
+
 import type { ReactNode } from "react";
 import { useState } from "react";
 import {
@@ -99,10 +105,10 @@ export default function MasterSidebar({
   // Combine wikiTags and availableTags into grouped options for Autocomplete
   const getGroupedOptions = () => {
     const suggestedTags = (wikiTags ?? []).filter(
-      (tag) => !selectedTags.includes(tag)
+      (tag) => !selectedTags.includes(tag),
     );
     const existingTags = availableTags.filter(
-      (tag) => !selectedTags.includes(tag) && !(wikiTags ?? []).includes(tag)
+      (tag) => !selectedTags.includes(tag) && !(wikiTags ?? []).includes(tag),
     );
     return [
       ...suggestedTags.map((tag) => ({ tag, group: "Suggested" })),
@@ -117,13 +123,13 @@ export default function MasterSidebar({
 
     // Case-insensitive check if already selected
     const alreadySelected = selectedTags.some(
-      (t) => t.toLowerCase() === truncated.toLowerCase()
+      (t) => t.toLowerCase() === truncated.toLowerCase(),
     );
     if (alreadySelected) return;
 
     // Case-insensitive check if it exists in availableTags
     const existingTag = availableTags.find(
-      (t) => t.toLowerCase() === truncated.toLowerCase()
+      (t) => t.toLowerCase() === truncated.toLowerCase(),
     );
     if (existingTag) {
       // Use the existing tag's casing
@@ -136,7 +142,7 @@ export default function MasterSidebar({
 
   const handleTagSelect = (
     _: unknown,
-    value: { tag: string; group: string } | string | null
+    value: { tag: string; group: string } | string | null,
   ) => {
     if (!value) return;
     const tagToAdd =

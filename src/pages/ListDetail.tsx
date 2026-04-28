@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description List detail view page component for displaying individual list contents
+ * @fileformat Page component
+ */
+
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   ThemeProvider,
@@ -260,10 +266,10 @@ export default function ListDetail() {
   const cachedUser = getCachedUserInfo();
   const [username, setUsername] = useState<string>(cachedUser?.username ?? "");
   const [displayName, setDisplayName] = useState<string>(
-    cachedUser?.displayName ?? ""
+    cachedUser?.displayName ?? "",
   );
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
-    cachedUser?.profilePicUrl ?? null
+    cachedUser?.profilePicUrl ?? null,
   );
   const [userLoading, setUserLoading] = useState(!cachedUser);
 
@@ -301,7 +307,7 @@ export default function ListDetail() {
   });
   const [editPictureFile, setEditPictureFile] = useState<File | null>(null);
   const [editPicturePreview, setEditPicturePreview] = useState<string | null>(
-    null
+    null,
   );
   const [removePictureFlag, setRemovePictureFlag] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState<{
@@ -337,11 +343,11 @@ export default function ListDetail() {
     (
       message: string,
       severity: SnackbarState["severity"] = "success",
-      action?: React.ReactNode
+      action?: React.ReactNode,
     ) => {
       setSnackbar({ open: true, message, severity, action });
     },
-    []
+    [],
   );
 
   const closeSnackbar = useCallback(() => {
@@ -398,7 +404,7 @@ export default function ListDetail() {
         isOwner: input.isOwner === true,
       };
     },
-    [listId]
+    [listId],
   );
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -477,7 +483,7 @@ export default function ListDetail() {
       console.error(error);
       showMessage(
         error instanceof Error ? error.message : "Failed to load list",
-        "error"
+        "error",
       );
       setList(null);
       setRecords([]);
@@ -511,16 +517,16 @@ export default function ListDetail() {
               likedByCurrentUser: !prev.likedByCurrentUser,
               likes: Math.max(
                 0,
-                prev.likes + (prev.likedByCurrentUser ? -1 : 1)
+                prev.likes + (prev.likedByCurrentUser ? -1 : 1),
               ),
             }
-          : prev
+          : prev,
       );
     } catch (error) {
       console.error(error);
       showMessage(
         error instanceof Error ? error.message : "Failed to update like",
-        "error"
+        "error",
       );
     } finally {
       setLikeBusy(false);
@@ -557,11 +563,11 @@ export default function ListDetail() {
         console.error(error);
         showMessage(
           error instanceof Error ? error.message : "Failed to restore record",
-          "error"
+          "error",
         );
       }
     },
-    [list, loadList, showMessage]
+    [list, loadList, showMessage],
   );
 
   const handleRemoveRecord = useCallback(
@@ -574,7 +580,7 @@ export default function ListDetail() {
           {
             method: "DELETE",
             credentials: "include",
-          }
+          },
         );
         if (!response.ok) {
           const problem = await response.json().catch(() => ({}));
@@ -587,7 +593,7 @@ export default function ListDetail() {
                 ...prev,
                 recordCount: Math.max(0, prev.recordCount - 1),
               }
-            : prev
+            : prev,
         );
 
         // Show message with undo action
@@ -603,13 +609,13 @@ export default function ListDetail() {
             }}
           >
             UNDO
-          </Button>
+          </Button>,
         );
       } catch (error) {
         console.error(error);
         showMessage(
           error instanceof Error ? error.message : "Failed to remove record",
-          "error"
+          "error",
         );
       } finally {
         setRemovingIds((prev) => {
@@ -619,7 +625,7 @@ export default function ListDetail() {
         });
       }
     },
-    [list, showMessage, handleUndoRemove, closeSnackbar]
+    [list, showMessage, handleUndoRemove, closeSnackbar],
   );
 
   const handleEditRecord = useCallback((record: ListRecordEntry) => {
@@ -657,7 +663,7 @@ export default function ListDetail() {
           credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ rating, releaseYear, cover }),
-        }
+        },
       );
 
       if (!response.ok) {
@@ -678,8 +684,8 @@ export default function ListDetail() {
                   releaseYear: updatedRecord.releaseYear ?? null,
                   cover: updatedRecord.cover ?? null,
                 }
-              : r
-          )
+              : r,
+          ),
         );
       }
 
@@ -689,7 +695,7 @@ export default function ListDetail() {
       console.error(error);
       showMessage(
         error instanceof Error ? error.message : "Failed to update record",
-        "error"
+        "error",
       );
     }
   }, [list, editRecordState, showMessage, handleCloseEditRecord]);
@@ -723,7 +729,7 @@ export default function ListDetail() {
             credentials: "include",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ updates }),
-          }
+          },
         );
 
         if (!response.ok) {
@@ -738,11 +744,11 @@ export default function ListDetail() {
         setRecords(records);
         showMessage(
           error instanceof Error ? error.message : "Failed to reorder records",
-          "error"
+          "error",
         );
       }
     },
-    [records, list, showMessage]
+    [records, list, showMessage],
   );
 
   const handleOpenEdit = useCallback(() => {
@@ -848,7 +854,7 @@ export default function ListDetail() {
           {
             method: "DELETE",
             credentials: "include",
-          }
+          },
         );
         if (!removeResponse.ok) {
           console.error("Failed to remove picture");
@@ -865,7 +871,7 @@ export default function ListDetail() {
             method: "POST",
             credentials: "include",
             body: formData,
-          }
+          },
         );
         if (!uploadResponse.ok) {
           console.error("Failed to upload new picture");
@@ -879,7 +885,7 @@ export default function ListDetail() {
       console.error(error);
       showMessage(
         error instanceof Error ? error.message : "Failed to update list",
-        "error"
+        "error",
       );
     } finally {
       setSaving(false);
@@ -921,7 +927,7 @@ export default function ListDetail() {
       console.error(error);
       showMessage(
         error instanceof Error ? error.message : "Failed to delete list",
-        "error"
+        "error",
       );
     } finally {
       setSaving(false);
@@ -932,7 +938,7 @@ export default function ListDetail() {
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
-    })
+    }),
   );
 
   const renderCover = useCallback((cover: string | null, name: string) => {
@@ -957,7 +963,7 @@ export default function ListDetail() {
       // Just navigate - browser history will handle the back button
       navigate(`/master/${masterId}`);
     },
-    [navigate]
+    [navigate],
   );
 
   if (!Number.isInteger(listId) || listId <= 0) {
@@ -1161,8 +1167,8 @@ export default function ListDetail() {
                                 onClick={() =>
                                   navigate(
                                     `/community/${encodeURIComponent(
-                                      list.owner!.username
-                                    )}`
+                                      list.owner!.username,
+                                    )}`,
                                   )
                                 }
                                 sx={{

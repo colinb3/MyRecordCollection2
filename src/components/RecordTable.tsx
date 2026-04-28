@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Data table component for displaying records with sorting and column customization
+ * @fileformat React Component
+ */
+
 import { useMemo } from "react";
 import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 import { Box, useMediaQuery } from "@mui/material";
@@ -121,9 +127,9 @@ const columns: GridColDef[] = [
       }
       const hasReview = Boolean(
         params.row &&
-          params.row.review !== undefined &&
-          params.row.review !== null &&
-          params.row.review !== ""
+        params.row.review !== undefined &&
+        params.row.review !== null &&
+        params.row.review !== "",
       );
 
       return (
@@ -219,7 +225,7 @@ export default function RecordTable({
   const isXSScreen = useMediaQuery("(min-width:600px)");
   const columnsWithResponsive = useMemo(() => {
     return columns.map((col) =>
-      col.field === "cover" ? { ...col, width: isXSScreen ? 112 : 96 } : col
+      col.field === "cover" ? { ...col, width: isXSScreen ? 112 : 96 } : col,
     );
   }, [isXSScreen]);
   const handleRowClick = (params: { row: Record }) => {

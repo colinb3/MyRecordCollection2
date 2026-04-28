@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Admin panel page component for administrative operations and system management
+ * @fileformat Page component
+ */
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { KeyboardEvent } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -552,7 +558,7 @@ function UsersTab({ permissions, currentUserUuid }: UsersTabProps) {
   const [error, setError] = useState<string | null>(null);
   const [mutatingUserId, setMutatingUserId] = useState<string | null>(null);
   const [accessDialogUser, setAccessDialogUser] = useState<AdminUser | null>(
-    null
+    null,
   );
   const [editUserDialog, setEditUserDialog] = useState<AdminUser | null>(null);
   const [displayNameInput, setDisplayNameInput] = useState<string | null>(null);
@@ -588,7 +594,7 @@ function UsersTab({ permissions, currentUserUuid }: UsersTabProps) {
           apiUrl(`/api/admin/users?${params.toString()}`),
           {
             credentials: "include",
-          }
+          },
         );
 
         let payload: unknown = null;
@@ -601,7 +607,7 @@ function UsersTab({ permissions, currentUserUuid }: UsersTabProps) {
         if (!response.ok) {
           const message = getErrorMessage(
             payload,
-            `Failed to load users (${response.status})`
+            `Failed to load users (${response.status})`,
           );
           throw new Error(message);
         }
@@ -627,7 +633,7 @@ function UsersTab({ permissions, currentUserUuid }: UsersTabProps) {
         setLoadingMore(false);
       }
     },
-    [filters]
+    [filters],
   );
 
   useEffect(() => {
@@ -684,14 +690,14 @@ function UsersTab({ permissions, currentUserUuid }: UsersTabProps) {
 
       const response = await fetch(
         apiUrl(
-          `/api/admin/users/${encodeURIComponent(accessDialogUser.userUuid)}`
+          `/api/admin/users/${encodeURIComponent(accessDialogUser.userUuid)}`,
         ),
         {
           method: "PATCH",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
-        }
+        },
       );
 
       let data: unknown = null;
@@ -704,7 +710,7 @@ function UsersTab({ permissions, currentUserUuid }: UsersTabProps) {
       if (!response.ok) {
         const message = getErrorMessage(
           data,
-          `Failed to update user (${response.status})`
+          `Failed to update user (${response.status})`,
         );
         throw new Error(message);
       }
@@ -717,8 +723,8 @@ function UsersTab({ permissions, currentUserUuid }: UsersTabProps) {
       if (updatedUser) {
         setUsers((prev) =>
           prev.map((entry) =>
-            entry.userUuid === updatedUser.userUuid ? updatedUser : entry
-          )
+            entry.userUuid === updatedUser.userUuid ? updatedUser : entry,
+          ),
         );
       } else {
         await fetchUsers(0, false);
@@ -726,7 +732,7 @@ function UsersTab({ permissions, currentUserUuid }: UsersTabProps) {
       setAccessDialogUser(null);
     } catch (err) {
       setDialogError(
-        err instanceof Error ? err.message : "Failed to update user"
+        err instanceof Error ? err.message : "Failed to update user",
       );
     } finally {
       setSavingAccess(false);
@@ -743,7 +749,7 @@ function UsersTab({ permissions, currentUserUuid }: UsersTabProps) {
       return;
     }
     const confirmed = window.confirm(
-      `Delete user "${user.username}"? This cannot be undone.`
+      `Delete user "${user.username}"? This cannot be undone.`,
     );
     if (!confirmed) {
       return;
@@ -756,7 +762,7 @@ function UsersTab({ permissions, currentUserUuid }: UsersTabProps) {
         {
           method: "DELETE",
           credentials: "include",
-        }
+        },
       );
 
       let payload: unknown = null;
@@ -769,7 +775,7 @@ function UsersTab({ permissions, currentUserUuid }: UsersTabProps) {
       if (!response.ok) {
         const message = getErrorMessage(
           payload,
-          `Failed to delete user (${response.status})`
+          `Failed to delete user (${response.status})`,
         );
         throw new Error(message);
       }
@@ -881,7 +887,7 @@ function UsersTab({ permissions, currentUserUuid }: UsersTabProps) {
                           variant="outlined"
                           onClick={() =>
                             navigate(
-                              `/community/${encodeURIComponent(user.username)}`
+                              `/community/${encodeURIComponent(user.username)}`,
                             )
                           }
                         >
@@ -1094,28 +1100,28 @@ function UsersTab({ permissions, currentUserUuid }: UsersTabProps) {
                 const res = await fetch(
                   apiUrl(
                     `/api/admin/users/${encodeURIComponent(
-                      editUserDialog.userUuid
-                    )}`
+                      editUserDialog.userUuid,
+                    )}`,
                   ),
                   {
                     method: "PATCH",
                     credentials: "include",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(payload),
-                  }
+                  },
                 );
                 const data = await res.json().catch(() => ({}));
                 if (!res.ok) {
                   throw new Error(
-                    data?.error || `Failed to save user (${res.status})`
+                    data?.error || `Failed to save user (${res.status})`,
                   );
                 }
                 const updated = data && data.user ? data.user : null;
                 if (updated) {
                   setUsers((prev) =>
                     prev.map((u) =>
-                      u.userUuid === updated.userUuid ? updated : u
-                    )
+                      u.userUuid === updated.userUuid ? updated : u,
+                    ),
                   );
                 } else {
                   await fetchUsers(0, false);
@@ -1123,7 +1129,7 @@ function UsersTab({ permissions, currentUserUuid }: UsersTabProps) {
                 setEditUserDialog(null);
               } catch (err) {
                 setUserEditError(
-                  err instanceof Error ? err.message : "Failed to save user"
+                  err instanceof Error ? err.message : "Failed to save user",
                 );
               } finally {
                 setSavingUserEdit(false);
@@ -1193,7 +1199,7 @@ function RecordsTab() {
 
         const response = await fetch(
           apiUrl(`/api/admin/records?${params.toString()}`),
-          { credentials: "include" }
+          { credentials: "include" },
         );
 
         let payload: unknown = null;
@@ -1233,7 +1239,7 @@ function RecordsTab() {
         setLoadingMore(false);
       }
     },
-    [filters]
+    [filters],
   );
 
   useEffect(() => {
@@ -1276,18 +1282,18 @@ function RecordsTab() {
     setRatingEditInput(
       editing.rating !== null && editing.rating !== undefined
         ? String(editing.rating)
-        : ""
+        : "",
     );
     setReviewInput(editing.review ?? "");
     setMasterIdEditInput(
       editing.masterId !== null && editing.masterId !== undefined
         ? String(editing.masterId)
-        : ""
+        : "",
     );
     setReleaseYearInput(
       editing.releaseYear !== null && editing.releaseYear !== undefined
         ? String(editing.releaseYear)
-        : ""
+        : "",
     );
     setAddedInput(toDateTimeLocal(editing.added));
     setIsCustomInput(Boolean(editing.isCustom));
@@ -1335,7 +1341,7 @@ function RecordsTab() {
         /^r\d+$/i.test(masterValue) && Number(masterValue.slice(1)) > 0;
       if (!isValidNumeric && !isValidRelease) {
         setError(
-          "Master ID must be a positive integer or 'r' followed by a positive integer."
+          "Master ID must be a positive integer or 'r' followed by a positive integer.",
         );
         setSaving(false);
         return;
@@ -1363,7 +1369,7 @@ function RecordsTab() {
       const formatted = fromDateTimeLocal(addedInput);
       if (!formatted) {
         setError(
-          "Added timestamp must be valid and formatted as YYYY-MM-DDTHH:MM or YYYY-MM-DDTHH:MM:SS."
+          "Added timestamp must be valid and formatted as YYYY-MM-DDTHH:MM or YYYY-MM-DDTHH:MM:SS.",
         );
         setSaving(false);
         return;
@@ -1389,7 +1395,7 @@ function RecordsTab() {
       if (!response.ok) {
         const message = getErrorMessage(
           payload,
-          `Failed to update record (${response.status})`
+          `Failed to update record (${response.status})`,
         );
         throw new Error(message);
       }
@@ -1402,8 +1408,8 @@ function RecordsTab() {
       if (updatedRecord) {
         setRecords((prev) =>
           prev.map((entry) =>
-            entry.id === updatedRecord.id ? updatedRecord : entry
-          )
+            entry.id === updatedRecord.id ? updatedRecord : entry,
+          ),
         );
       } else {
         await fetchRecords(0, false);
@@ -1418,7 +1424,7 @@ function RecordsTab() {
 
   const handleDelete = async (record: AdminRecord) => {
     const confirmed = window.confirm(
-      `Delete record "${record.record}" from ${record.owner.username}?`
+      `Delete record "${record.record}" from ${record.owner.username}?`,
     );
     if (!confirmed) return;
     setError(null);
@@ -1438,7 +1444,7 @@ function RecordsTab() {
       if (!response.ok) {
         const message = getErrorMessage(
           payload,
-          `Failed to delete record (${response.status})`
+          `Failed to delete record (${response.status})`,
         );
         throw new Error(message);
       }
@@ -1541,7 +1547,7 @@ function RecordsTab() {
                           variant="outlined"
                           onClick={() =>
                             navigate(
-                              `/community/${record.owner.username}/record/${record.id}`
+                              `/community/${record.owner.username}/record/${record.id}`,
                             )
                           }
                         >
@@ -1737,7 +1743,7 @@ function MastersTab() {
 
         const response = await fetch(
           apiUrl(`/api/admin/masters?${params.toString()}`),
-          { credentials: "include" }
+          { credentials: "include" },
         );
 
         let payload: unknown = null;
@@ -1777,7 +1783,7 @@ function MastersTab() {
         setLoadingMore(false);
       }
     },
-    [filters]
+    [filters],
   );
 
   useEffect(() => {
@@ -1815,7 +1821,7 @@ function MastersTab() {
     setReleaseYearInput(
       editing.releaseYear !== null && editing.releaseYear !== undefined
         ? String(editing.releaseYear)
-        : ""
+        : "",
     );
 
     // Load genres and styles
@@ -1824,7 +1830,7 @@ function MastersTab() {
       try {
         const response = await fetch(
           apiUrl(`/api/admin/masters/${editing.id}/genres`),
-          { credentials: "include" }
+          { credentials: "include" },
         );
         if (response.ok) {
           const data = await response.json();
@@ -1895,7 +1901,7 @@ function MastersTab() {
       if (!response.ok) {
         const message = getErrorMessage(
           payload,
-          `Failed to update master (${response.status})`
+          `Failed to update master (${response.status})`,
         );
         throw new Error(message);
       }
@@ -1908,8 +1914,8 @@ function MastersTab() {
       if (updatedMaster) {
         setMasters((prev) =>
           prev.map((entry) =>
-            entry.id === updatedMaster.id ? updatedMaster : entry
-          )
+            entry.id === updatedMaster.id ? updatedMaster : entry,
+          ),
         );
       } else {
         await fetchMasters(0, false);
@@ -1924,7 +1930,7 @@ function MastersTab() {
 
   const handleDelete = async (master: AdminMaster) => {
     const confirmed = window.confirm(
-      `Delete master "${master.name}" (ID ${master.id})?`
+      `Delete master "${master.name}" (ID ${master.id})?`,
     );
     if (!confirmed) return;
     setError(null);
@@ -1944,7 +1950,7 @@ function MastersTab() {
       if (!response.ok) {
         const message = getErrorMessage(
           payload,
-          `Failed to delete master (${response.status})`
+          `Failed to delete master (${response.status})`,
         );
         throw new Error(message);
       }
@@ -2242,7 +2248,7 @@ function ListsTab() {
 
         const response = await fetch(
           apiUrl(`/api/admin/lists?${params.toString()}`),
-          { credentials: "include" }
+          { credentials: "include" },
         );
 
         let payload: unknown = null;
@@ -2255,7 +2261,7 @@ function ListsTab() {
         if (!response.ok) {
           const message = getErrorMessage(
             payload,
-            `Failed to load lists (${response.status})`
+            `Failed to load lists (${response.status})`,
           );
           throw new Error(message);
         }
@@ -2280,7 +2286,7 @@ function ListsTab() {
         setLoadingMore(false);
       }
     },
-    [filters]
+    [filters],
   );
 
   useEffect(() => {
@@ -2342,7 +2348,7 @@ function ListsTab() {
       if (!response.ok) {
         const message = getErrorMessage(
           payload,
-          `Failed to update list (${response.status})`
+          `Failed to update list (${response.status})`,
         );
         throw new Error(message);
       }
@@ -2355,8 +2361,8 @@ function ListsTab() {
       if (updatedList) {
         setLists((prev) =>
           prev.map((entry) =>
-            entry.id === updatedList.id ? updatedList : entry
-          )
+            entry.id === updatedList.id ? updatedList : entry,
+          ),
         );
       } else {
         await fetchLists(0, false);
@@ -2379,7 +2385,7 @@ function ListsTab() {
         {
           method: "DELETE",
           credentials: "include",
-        }
+        },
       );
 
       let payload: unknown = null;
@@ -2392,7 +2398,7 @@ function ListsTab() {
       if (!response.ok) {
         const message = getErrorMessage(
           payload,
-          `Failed to delete picture (${response.status})`
+          `Failed to delete picture (${response.status})`,
         );
         throw new Error(message);
       }
@@ -2412,7 +2418,7 @@ function ListsTab() {
     try {
       const response = await fetch(
         apiUrl(`/api/admin/lists/${list.id}/records`),
-        { credentials: "include" }
+        { credentials: "include" },
       );
 
       let payload: unknown = null;
@@ -2425,7 +2431,7 @@ function ListsTab() {
       if (!response.ok) {
         const message = getErrorMessage(
           payload,
-          `Failed to load records (${response.status})`
+          `Failed to load records (${response.status})`,
         );
         throw new Error(message);
       }
@@ -2444,7 +2450,7 @@ function ListsTab() {
   const handleDeleteRecord = async (record: AdminListRecord) => {
     if (!viewingRecords) return;
     const confirmed = window.confirm(
-      `Remove "${record.name}" from list "${viewingRecords.name}"?`
+      `Remove "${record.name}" from list "${viewingRecords.name}"?`,
     );
     if (!confirmed) return;
     setError(null);
@@ -2455,7 +2461,7 @@ function ListsTab() {
         {
           method: "DELETE",
           credentials: "include",
-        }
+        },
       );
 
       let payload: unknown = null;
@@ -2468,7 +2474,7 @@ function ListsTab() {
       if (!response.ok) {
         const message = getErrorMessage(
           payload,
-          `Failed to delete record (${response.status})`
+          `Failed to delete record (${response.status})`,
         );
         throw new Error(message);
       }
@@ -2768,7 +2774,7 @@ function ReportsTab() {
 
         const response = await fetch(
           apiUrl(`/api/admin/reports?${params.toString()}`),
-          { credentials: "include" }
+          { credentials: "include" },
         );
 
         let payload: unknown = null;
@@ -2781,7 +2787,7 @@ function ReportsTab() {
         if (!response.ok) {
           const message = getErrorMessage(
             payload,
-            `Failed to load reports (${response.status})`
+            `Failed to load reports (${response.status})`,
           );
           throw new Error(message);
         }
@@ -2796,7 +2802,7 @@ function ReportsTab() {
         setTotal(typeof body.total === "number" ? body.total : 0);
         setPage(typeof body.page === "number" ? body.page : 1);
         setTotalPages(
-          typeof body.totalPages === "number" ? body.totalPages : 1
+          typeof body.totalPages === "number" ? body.totalPages : 1,
         );
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load reports");
@@ -2805,7 +2811,7 @@ function ReportsTab() {
         setLoading(false);
       }
     },
-    [typeFilter, statusFilter, reportedByFilter]
+    [typeFilter, statusFilter, reportedByFilter],
   );
 
   useEffect(() => {
@@ -2818,7 +2824,7 @@ function ReportsTab() {
 
   const handlePageChange = (
     _event: React.ChangeEvent<unknown>,
-    value: number
+    value: number,
   ) => {
     fetchReports(value);
   };
@@ -2849,7 +2855,7 @@ function ReportsTab() {
             status: editStatus,
             adminNotes: editAdminNotes.trim() || null,
           }),
-        }
+        },
       );
 
       let payload: unknown = null;
@@ -2862,7 +2868,7 @@ function ReportsTab() {
       if (!response.ok) {
         const message = getErrorMessage(
           payload,
-          `Failed to update report (${response.status})`
+          `Failed to update report (${response.status})`,
         );
         throw new Error(message);
       }
@@ -2888,8 +2894,8 @@ function ReportsTab() {
                 status: editStatus,
                 adminNotes: editAdminNotes.trim() || null,
               }
-            : r
-        )
+            : r,
+        ),
       );
       setEditing(null);
     } catch (err) {
@@ -2918,7 +2924,7 @@ function ReportsTab() {
   };
 
   const getStatusColor = (
-    status: string
+    status: string,
   ): "default" | "warning" | "success" | "error" => {
     switch (status) {
       case "Pending":
@@ -3041,8 +3047,8 @@ function ReportsTab() {
                         onClick={() =>
                           navigate(
                             `/community/${encodeURIComponent(
-                              report.reportedByUsername!
-                            )}`
+                              report.reportedByUsername!,
+                            )}`,
                           )
                         }
                         sx={{ textTransform: "none", p: 0, minWidth: 0 }}
@@ -3256,7 +3262,7 @@ function TagsTab() {
 
         const response = await fetch(
           apiUrl(`/api/admin/tags?${params.toString()}`),
-          { credentials: "include" }
+          { credentials: "include" },
         );
 
         let payload: unknown = null;
@@ -3269,7 +3275,7 @@ function TagsTab() {
         if (!response.ok) {
           const message = getErrorMessage(
             payload,
-            `Failed to load tags (${response.status})`
+            `Failed to load tags (${response.status})`,
           );
           throw new Error(message);
         }
@@ -3295,7 +3301,7 @@ function TagsTab() {
         setLoadingMore(false);
       }
     },
-    [filters]
+    [filters],
   );
 
   useEffect(() => {
@@ -3349,7 +3355,7 @@ function TagsTab() {
       if (!response.ok) {
         const message = getErrorMessage(
           payload,
-          `Failed to update tag (${response.status})`
+          `Failed to update tag (${response.status})`,
         );
         throw new Error(message);
       }
@@ -3361,7 +3367,9 @@ function TagsTab() {
 
       if (updatedTag) {
         setTags((prev) =>
-          prev.map((entry) => (entry.id === updatedTag.id ? updatedTag : entry))
+          prev.map((entry) =>
+            entry.id === updatedTag.id ? updatedTag : entry,
+          ),
         );
       } else {
         await fetchTags(0, false);
@@ -3394,7 +3402,7 @@ function TagsTab() {
       if (!response.ok) {
         const message = getErrorMessage(
           payload,
-          `Failed to delete tag (${response.status})`
+          `Failed to delete tag (${response.status})`,
         );
         throw new Error(message);
       }
@@ -3548,7 +3556,7 @@ export default function Admin() {
   const [username, setUsername] = useState(cached?.username ?? "");
   const [displayName, setDisplayName] = useState(cached?.displayName ?? "");
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
-    cached?.profilePicUrl ?? null
+    cached?.profilePicUrl ?? null,
   );
   const [userLoading, setUserLoading] = useState(!cached);
   const [userUuid, setUserUuid] = useState<string>(cached?.userUuid ?? "");
@@ -3556,7 +3564,7 @@ export default function Admin() {
     cached?.adminPermissions ?? {
       canManageAdmins: false,
       canDeleteUsers: false,
-    }
+    },
   );
   const [tab, setTab] = useState<AdminTabKey>("users");
 
@@ -3569,7 +3577,7 @@ export default function Admin() {
       if (!info) {
         if (location.pathname !== "/login") {
           const next = encodeURIComponent(
-            `${location.pathname}${location.search || ""}${location.hash || ""}`
+            `${location.pathname}${location.search || ""}${location.hash || ""}`,
           );
           navigate(`/login?next=${next}`, { replace: true });
         }

@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description User tags caching and management utility for storing user-defined tags
+ * @fileformat TypeScript
+ */
+
 import apiUrl from "./api";
 
 let cachedTags: string[] | null = null;

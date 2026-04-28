@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description 404 not found error page component for handling invalid routes
+ * @fileformat Page component
+ */
+
 import { useState, useEffect } from "react";
 import {
   Box,
@@ -19,13 +25,13 @@ export default function NotFound() {
   const cachedUserInfo = getCachedUserInfo();
 
   const [username, setUsername] = useState<string>(
-    cachedUserInfo?.username ?? ""
+    cachedUserInfo?.username ?? "",
   );
   const [displayName, setDisplayName] = useState<string>(
-    cachedUserInfo?.displayName ?? ""
+    cachedUserInfo?.displayName ?? "",
   );
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
-    cachedUserInfo?.profilePicUrl ?? null
+    cachedUserInfo?.profilePicUrl ?? null,
   );
   const [userLoading, setUserLoading] = useState(!cachedUserInfo);
 

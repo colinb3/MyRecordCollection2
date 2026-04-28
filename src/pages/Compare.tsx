@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Record comparison page component for comparing records across users
+ * @fileformat Page component
+ */
+
 import { useState, useEffect, useCallback } from "react";
 import {
   ThemeProvider,
@@ -59,10 +65,10 @@ export default function Compare() {
   const cachedUser = getCachedUserInfo();
   const [username, setUsername] = useState<string>(cachedUser?.username ?? "");
   const [displayName, setDisplayName] = useState<string>(
-    cachedUser?.displayName ?? ""
+    cachedUser?.displayName ?? "",
   );
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
-    cachedUser?.profilePicUrl ?? null
+    cachedUser?.profilePicUrl ?? null,
   );
   const [userLoading, setUserLoading] = useState(!cachedUser);
   const profileInitial = (displayName || username || "?")
@@ -168,7 +174,7 @@ export default function Compare() {
         apiUrl(`/api/compare/${encodeURIComponent(targetUsername)}`),
         {
           credentials: "include",
-        }
+        },
       );
 
       if (!res.ok) {
@@ -181,7 +187,7 @@ export default function Compare() {
     } catch (err) {
       console.error("Failed to load comparison", err);
       setError(
-        err instanceof Error ? err.message : "Failed to load comparison"
+        err instanceof Error ? err.message : "Failed to load comparison",
       );
       setAllRecords([]);
     } finally {
@@ -220,7 +226,7 @@ export default function Compare() {
 
   const handleFilterChange = (
     _event: React.MouseEvent<HTMLElement>,
-    newFilter: CollectionFilter | null
+    newFilter: CollectionFilter | null,
   ) => {
     if (newFilter !== null) {
       setFilter(newFilter);
@@ -236,7 +242,7 @@ export default function Compare() {
     try {
       const res = await fetch(
         apiUrl(`/api/compare/${encodeURIComponent(targetUsername)}/genres`),
-        { credentials: "include" }
+        { credentials: "include" },
       );
 
       if (!res.ok) {
@@ -308,7 +314,7 @@ export default function Compare() {
             theirRating: theirGenres[genre]?.rating ?? null,
             myPercent: myGenres[genre]?.collectionPercent ?? 0,
             theirPercent: theirGenres[genre]?.collectionPercent ?? 0,
-          })
+          }),
         );
 
         // Sort by combined presence (sum of both percentages)
@@ -324,7 +330,7 @@ export default function Compare() {
       setAllGenreComparisons(newAllGenreComparisons);
     } catch (err) {
       setGenreError(
-        err instanceof Error ? err.message : "Failed to load genre comparison"
+        err instanceof Error ? err.message : "Failed to load genre comparison",
       );
       setAllGenreComparisons({
         all: [],
@@ -437,7 +443,7 @@ export default function Compare() {
                       alt={targetProfileAlt}
                       onClick={() =>
                         navigate(
-                          `/community/${encodeURIComponent(targetUsername)}`
+                          `/community/${encodeURIComponent(targetUsername)}`,
                         )
                       }
                       sx={{
@@ -889,8 +895,8 @@ export default function Compare() {
                                     }
                                     navigate(
                                       `/community/${encodeURIComponent(
-                                        username
-                                      )}/genre?${params.toString()}`
+                                        username,
+                                      )}/genre?${params.toString()}`,
                                     );
                                   }}
                                   sx={{
@@ -943,8 +949,8 @@ export default function Compare() {
                                     }
                                     navigate(
                                       `/community/${encodeURIComponent(
-                                        targetUsername
-                                      )}/genre?${params.toString()}`
+                                        targetUsername,
+                                      )}/genre?${params.toString()}`,
                                     );
                                   }}
                                   sx={{

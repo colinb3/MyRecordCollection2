@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description User login page component for authenticating existing users
+ * @fileformat Page component
+ */
+
 import React, { useState } from "react";
 import apiUrl from "../api";
 import {

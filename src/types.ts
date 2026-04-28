@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Central TypeScript type definitions and interfaces for the application
+ * @fileformat TypeScript
+ */
+
 export interface Record {
   id: number;
   cover?: string; // Optional cover art path

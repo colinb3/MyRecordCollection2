@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Animated spinning record vinyl component that displays album cover art
+ * @fileformat React Component
+ */
+
 import { Box } from "@mui/material";
 import customVinyl from "../assets/customVinyl.png";
 

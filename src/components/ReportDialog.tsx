@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Dialog component for submitting user reports about content, bugs, or inappropriate behavior
+ * @fileformat React Component
+ */
+
 import { useState } from "react";
 import {
   Dialog,
@@ -113,7 +119,7 @@ export default function ReportDialog({
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
         throw new Error(
-          data.error || `Failed to submit report (${response.status})`
+          data.error || `Failed to submit report (${response.status})`,
         );
       }
 
@@ -172,12 +178,12 @@ export default function ReportDialog({
             {type === "user"
               ? "User: "
               : type === "record"
-              ? "Record: "
-              : type === "master"
-              ? "Master: "
-              : type === "list"
-              ? "List: "
-              : ""}
+                ? "Record: "
+                : type === "master"
+                  ? "Master: "
+                  : type === "list"
+                    ? "List: "
+                    : ""}
             <strong>{targetName}</strong>
           </Typography>
         )}

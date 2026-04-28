@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Main router component that sets up application routes with lazy-loaded pages and error boundaries
+ * @fileformat React Component
+ */
+
 import {
   BrowserRouter,
   Routes,
@@ -34,7 +40,7 @@ const Compare = lazy(() => import("./pages/Compare"));
 // Component that prevents authenticated users from seeing auth pages
 function RedirectIfAuthed({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<"loading" | "authed" | "anon">(
-    "loading"
+    "loading",
   );
   useEffect(() => {
     let cancelled = false;
@@ -343,7 +349,7 @@ function RouteTracker() {
 
       // Community routes
       m = pathname.match(
-        /^\/community(?:\/([^\/]+))(?:\/(collection|wishlist|listened|genre|follows|stats|compare))?$/
+        /^\/community(?:\/([^\/]+))(?:\/(collection|wishlist|listened|genre|follows|stats|compare))?$/,
       );
       if (m) {
         const username = m[1] ? decodeURIComponent(m[1]) : null;

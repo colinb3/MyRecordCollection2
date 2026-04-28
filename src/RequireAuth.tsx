@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Authentication route protection component that redirects unauthenticated users to login
+ * @fileformat React Component
+ */
+
 import React, { useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { loadUserInfo } from "./userInfo";
@@ -18,7 +24,7 @@ export default function RequireAuth({
         // avoid redirect loops when already on /login
         if (location.pathname !== "/login") {
           const next = encodeURIComponent(
-            `${location.pathname}${location.search || ""}${location.hash || ""}`
+            `${location.pathname}${location.search || ""}${location.hash || ""}`,
           );
           navigate(`/login?next=${next}`);
         }

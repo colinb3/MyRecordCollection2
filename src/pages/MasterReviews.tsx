@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Master record reviews page component for viewing and managing community reviews
+ * @fileformat Page component
+ */
+
 import {
   useCallback,
   useEffect,
@@ -62,7 +68,7 @@ type SortOption = "likes" | "date" | "friends";
 
 function sortMasterReviews(
   entries: MasterReviewEntry[],
-  sortOption: SortOption
+  sortOption: SortOption,
 ): MasterReviewEntry[] {
   const list = [...entries];
   const parseDate = (value: string) => {
@@ -120,17 +126,17 @@ export default function MasterReviews() {
   }, [masterIdParam]);
 
   const [album, setAlbum] = useState<RecordListItem | null>(
-    locationState.album ?? null
+    locationState.album ?? null,
   );
   const [masterRatingAverage, setMasterRatingAverage] = useState<number | null>(
-    null
+    null,
   );
   const [username, setUsername] = useState<string>(cachedUser?.username ?? "");
   const [displayName, setDisplayName] = useState<string>(
-    cachedUser?.displayName ?? ""
+    cachedUser?.displayName ?? "",
   );
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
-    cachedUser?.profilePicUrl ?? null
+    cachedUser?.profilePicUrl ?? null,
   );
   const [userLoading, setUserLoading] = useState(!cachedUser);
   const [reviews, setReviews] = useState<MasterReviewEntry[]>([]);
@@ -189,7 +195,7 @@ export default function MasterReviews() {
       event.stopPropagation();
       navigate(`/community/${encodeURIComponent(ownerUsername)}`);
     },
-    [navigate]
+    [navigate],
   );
 
   const handleSortChange = useCallback(
@@ -209,7 +215,7 @@ export default function MasterReviews() {
       setFetchError(null);
       setSortOption(next);
     },
-    [sortOption, username, setSnackbar, setFetchStatus, setFetchError]
+    [sortOption, username, setSnackbar, setFetchStatus, setFetchError],
   );
 
   const handleToggleReviewLike = useCallback(
@@ -241,7 +247,7 @@ export default function MasterReviews() {
           {
             method,
             credentials: "include",
-          }
+          },
         );
 
         if (response.status === 401) {
@@ -254,7 +260,7 @@ export default function MasterReviews() {
             const next = encodeURIComponent(
               `${location.pathname}${location.search || ""}${
                 location.hash || ""
-              }`
+              }`,
             );
             navigate(`/login?next=${next}`);
           }
@@ -284,7 +290,7 @@ export default function MasterReviews() {
                   reviewLikes: normalizedLikes,
                   likedByViewer: nextLiked,
                 }
-              : entry
+              : entry,
           );
           return sortMasterReviews(updated, sortOption);
         });
@@ -303,7 +309,7 @@ export default function MasterReviews() {
         });
       }
     },
-    [likeBusy, reviews, username, navigate, location, setSnackbar, sortOption]
+    [likeBusy, reviews, username, navigate, location, setSnackbar, sortOption],
   );
 
   const handleSnackbarClose = useCallback(
@@ -313,7 +319,7 @@ export default function MasterReviews() {
       }
       setSnackbar((prev) => ({ ...prev, open: false }));
     },
-    [setSnackbar]
+    [setSnackbar],
   );
 
   useEffect(() => {
@@ -333,10 +339,10 @@ export default function MasterReviews() {
         const res = await fetch(
           apiUrl(
             `/api/records/master-reviews?masterId=${safeMasterId}&sort=${encodeURIComponent(
-              sortOption
-            )}`
+              sortOption,
+            )}`,
           ),
-          { credentials: "include" }
+          { credentials: "include" },
         );
         if (!res.ok) {
           let message = "Failed to load reviews";
@@ -380,7 +386,7 @@ export default function MasterReviews() {
           Number.isFinite(ratingAverageFromResponse)
         ) {
           setMasterRatingAverage(
-            Math.round(ratingAverageFromResponse * 10) / 10
+            Math.round(ratingAverageFromResponse * 10) / 10,
           );
         }
 
@@ -439,7 +445,7 @@ export default function MasterReviews() {
                         ? ownerValue.displayName
                         : null,
                     profilePicUrl: normalizeProfilePicUrl(
-                      ownerValue.profilePicUrl
+                      ownerValue.profilePicUrl,
                     ),
                   },
                 };
@@ -447,7 +453,7 @@ export default function MasterReviews() {
               })
               .filter(
                 (entry: MasterReviewEntry | null): entry is MasterReviewEntry =>
-                  entry !== null
+                  entry !== null,
               )
           : [];
         setReviews(sortMasterReviews(normalized, sortOption));

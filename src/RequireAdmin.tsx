@@ -1,3 +1,9 @@
+/**
+ * @author Colin Brown
+ * @description Admin route protection component that restricts access to admin-only pages
+ * @fileformat React Component
+ */
+
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { loadUserInfo } from "./userInfo";
