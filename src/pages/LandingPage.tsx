@@ -583,10 +583,6 @@ export default function LandingPage() {
               <Typography variant="h4" fontWeight={700} gutterBottom>
                 Everything you need to stay on top of your collection
               </Typography>
-              <Typography variant="body1" color="text.secondary">
-                From showing off to your friends to checking the reviews of an
-                new record, every feature is built with collectors in mind.
-              </Typography>
             </Box>
 
             <Box
@@ -698,15 +694,6 @@ export default function LandingPage() {
             >
               <Typography variant="h4" fontWeight={700} gutterBottom>
                 Ready to give your records the archive they deserve?
-              </Typography>
-              <Typography
-                variant="body1"
-                color="text.secondary"
-                maxWidth={680}
-                mx="auto"
-                paragraph
-              >
-                Join a growing community of collectors and never miss a beat.
               </Typography>
               <Stack
                 direction={{ xs: "column", sm: "row" }}

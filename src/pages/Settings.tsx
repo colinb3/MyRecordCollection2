@@ -31,7 +31,7 @@ import { performLogout } from "../logout.ts";
 import TopBar from "../components/TopBar.tsx";
 import SettingsMenu, {
   type SettingsMenuOption,
-} from "../components/SettingsMenu.tsx";
+} from "../components/settings/SettingsMenu.tsx";
 import CollectionSettings from "../components/settings/CollectionSettings.tsx";
 import ProfileSettings from "../components/settings/ProfileSettings.tsx";
 import FeedbackSettings from "../components/settings/FeedbackSettings.tsx";

@@ -884,9 +884,6 @@ export default function ProfileSettings({
         <Typography variant="h4" gutterBottom>
           Profile Settings
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Update everything about your profile.
-        </Typography>
         <Stack
           direction={{ xs: "row", sm: "row" }}
           spacing={3}
@@ -1370,11 +1367,10 @@ export default function ProfileSettings({
 
       <Box>
         <Typography variant="h6" sx={{ mb: 1 }}>
-          Email
+          Change Email
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
-          Update the email address associated with your account. You will need
-          to confirm this change with your current password.
+          You will need to confirm this change with your current password.
         </Typography>
         <Stack spacing={2}>
           <TextField

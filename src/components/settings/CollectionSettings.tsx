@@ -713,9 +713,6 @@ export default function CollectionSettings() {
           <Typography variant="h4" gutterBottom>
             Collection Settings
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Make your collection your own.
-          </Typography>
         </Box>
 
         <Stack spacing={1.5}>
