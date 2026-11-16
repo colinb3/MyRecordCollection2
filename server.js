@@ -55,7 +55,7 @@ app.get("/robots.txt", (_req, res) => {
   res.send("User-agent: *\nDisallow: /\n");
 });
 
-const PORT = Number(process.env.PORT || 4000);
+const PORT = Number(process.env.PORT || 4001);
 // bind to 0.0.0.0 so the server is reachable from other machines (GCE VM)
 const HOST = process.env.HOST || '0.0.0.0';
 const JWT_SECRET = process.env.JWT_SECRET;
