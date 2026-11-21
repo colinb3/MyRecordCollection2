@@ -55,7 +55,7 @@ app.get("/robots.txt", (_req, res) => {
   res.send("User-agent: *\nDisallow: /\n");
 });
 
-const PORT = Number(process.env.PORT || 4001);
+const PORT = Number(process.env.PORT || 4000);
 // bind to 0.0.0.0 so the server is reachable from other machines (GCE VM)
 const HOST = process.env.HOST || '0.0.0.0';
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -2266,6 +2266,8 @@ app.get("/api/records/master-info", async (req, res) => {
                 : null;
             const artist = typeof discogsData?.artists?.[0]?.name === "string" ? cleanDiscogsArtist(discogsData.artists[0].name) : null;
             const name = typeof discogsData?.title === "string" ? discogsData.title : null;
+            const genres = Array.isArray(discogsData?.genres) ? discogsData.genres : [];
+            const styles = Array.isArray(discogsData?.styles) ? discogsData.styles : [];
             
             return res.json({
               masterId: masterIdParam,
@@ -2278,6 +2280,8 @@ app.get("/api/records/master-info", async (req, res) => {
               userCollections,
               userLists,
               inDb: false,
+              genres,
+              styles,
             });
           }
         } catch (discogsError) {
@@ -2295,6 +2299,8 @@ app.get("/api/records/master-info", async (req, res) => {
           userCollections,
           userLists,
           inDb: false,
+          genres: [],
+          styles: [],
         });
       }
 
@@ -2309,6 +2315,33 @@ app.get("/api/records/master-info", async (req, res) => {
         return Number.isFinite(num) && num >= 0 ? num : 0;
       });
 
+      const [genreRows] = await pool.query(
+        `SELECT genre, isStyle FROM MasterGenre WHERE masterId = ? ORDER BY isStyle, genre`,
+        [masterIdParam]
+      );
+      let genres = [];
+      let styles = [];
+      if (Array.isArray(genreRows)) {
+        for (const genreRow of genreRows) {
+          if (typeof genreRow.genre === "string" && genreRow.genre.trim()) {
+            if (Boolean(genreRow.isStyle)) {
+              styles.push(genreRow.genre.trim());
+            } else {
+              genres.push(genreRow.genre.trim());
+            }
+          }
+        }
+      }
+
+      if (genres.length === 0 && styles.length === 0) {
+        const discogsDetails = await fetchDiscogsMasterDetails(masterIdParam);
+        if (discogsDetails) {
+          genres = discogsDetails.genres;
+          styles = discogsDetails.styles;
+          await insertMasterGenres(pool, masterIdParam, genres, styles);
+        }
+      }
+
       return res.json({
         masterId: row.id,
         releaseYear: Number.isInteger(releaseYearValue) ? releaseYearValue : null,
@@ -2320,6 +2353,8 @@ app.get("/api/records/master-info", async (req, res) => {
         userCollections,
         userLists,
         inDb: true,
+        genres,
+        styles,
       });
     } catch (error) {
       console.error("Failed to load master info", error);
@@ -2399,6 +2434,41 @@ app.get("/api/records/master-info", async (req, res) => {
         })
       : null;
 
+    const [genreRows] = await pool.query(
+      `SELECT genre, isStyle FROM MasterGenre WHERE masterId = ? ORDER BY isStyle, genre`,
+      [result.masterId]
+    );
+    let genres = [];
+    let styles = [];
+    if (Array.isArray(genreRows)) {
+      for (const genreRow of genreRows) {
+        if (typeof genreRow.genre === "string" && genreRow.genre.trim()) {
+          if (Boolean(genreRow.isStyle)) {
+            styles.push(genreRow.genre.trim());
+          } else {
+            genres.push(genreRow.genre.trim());
+          }
+        }
+      }
+    }
+
+    if (genres.length === 0 && styles.length === 0) {
+      const searchGenres = Array.isArray(result.genres) ? result.genres : [];
+      const searchStyles = Array.isArray(result.styles) ? result.styles : [];
+      if (searchGenres.length > 0 || searchStyles.length > 0) {
+        genres = searchGenres;
+        styles = searchStyles;
+        await insertMasterGenres(pool, result.masterId, genres, styles);
+      } else {
+        const discogsDetails = await fetchDiscogsMasterDetails(result.masterId);
+        if (discogsDetails) {
+          genres = discogsDetails.genres;
+          styles = discogsDetails.styles;
+          await insertMasterGenres(pool, result.masterId, genres, styles);
+        }
+      }
+    }
+
     const userCollections = await getUserCollectionsForRecord(pool, authenticatedUserUuid, {
       masterId: result.masterId,
       artist,
@@ -2421,8 +2491,8 @@ app.get("/api/records/master-info", async (req, res) => {
       userCollections,
       userLists,
       inDb: !!ratingAveRow,
-      genres: result.genres || [],
-      styles: result.styles || [],
+      genres,
+      styles,
     });
   } catch (error) {
     console.error("Failed to load master info", error);
@@ -4862,6 +4932,24 @@ app.post('/api/records/create', requireAuth, async (req, res) => {
       
       // Sync genres and styles (add new ones and remove ones not in the list)
       await syncMasterGenres(pool, masterId, genres, styles);
+
+      if (genres.length === 0 && styles.length === 0) {
+        const [genreRows] = await pool.execute(
+          `SELECT 1 FROM MasterGenre WHERE masterId = ? LIMIT 1`,
+          [masterId]
+        );
+        if (!Array.isArray(genreRows) || genreRows.length === 0) {
+          const discogsDetails = await fetchDiscogsMasterDetails(masterId);
+          if (discogsDetails) {
+            await insertMasterGenres(
+              pool,
+              masterId,
+              discogsDetails.genres,
+              discogsDetails.styles
+            );
+          }
+        }
+      }
     }
 
   const nameToInsert = recordName || DEFAULT_NEW_RECORD_NAME;
@@ -6258,6 +6346,22 @@ app.post('/api/lists/:listId/records', requireAuth, async (req, res) => {
         // Insert genres/styles if provided and master exists
         if ((genres.length > 0 || styles.length > 0)) {
           await insertMasterGenres(pool, masterId, genres, styles);
+        } else {
+          const [genreRows] = await pool.execute(
+            `SELECT 1 FROM MasterGenre WHERE masterId = ? LIMIT 1`,
+            [masterId]
+          );
+          if (!Array.isArray(genreRows) || genreRows.length === 0) {
+            const discogsDetails = await fetchDiscogsMasterDetails(masterId);
+            if (discogsDetails) {
+              await insertMasterGenres(
+                pool,
+                masterId,
+                discogsDetails.genres,
+                discogsDetails.styles
+              );
+            }
+          }
         }
       }
     }
